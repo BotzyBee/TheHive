@@ -1,4 +1,3 @@
-
 /*
 This file provides a single place to call functions which will be run in their own thread.
 Functions in this file should be prefixed 'pool' and simply call their normal counterparts in other files.
@@ -6,7 +5,7 @@ Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
 
-import { Piscina } from "piscina";
+import { Piscina } from 'piscina';
 // import { indexKnowledgebase } from './cron_jobs/fileIndexing.js';
 // import { writeLogsToFile } from './utils.js';
 // import { getDbAgent } from './DB/CRUD.js';
@@ -18,11 +17,11 @@ export let indexTimerActive = false;
 export let pool; // Piscina worker pool (multi-thread)
 
 export function setupPool() {
-    pool = new Piscina({
-        filename: new URL("./worker.js", import.meta.url).href,
-        minThreads: 2, // Minimum number of worker threads to keep alive
-        maxThreads: 4  // Maximum number of worker threads
-    });
+  pool = new Piscina({
+    filename: new URL('./worker.js', import.meta.url).href,
+    minThreads: 2, // Minimum number of worker threads to keep alive
+    maxThreads: 4, // Maximum number of worker threads
+  });
 }
 
 // export async function poolIndexKnowledgebase(){
@@ -30,7 +29,7 @@ export function setupPool() {
 //     let dbAgent = await getDbAgent();
 //     if(dbAgent.isOk()){
 //         let call = await indexKnowledgebase(dbAgent.value);
-//         await writeLogsToFile(); // write app logs to AppfileDir 
+//         await writeLogsToFile(); // write app logs to AppfileDir
 //         indexTimerActive = false;
 //         return call;
 //     } else {
@@ -40,9 +39,9 @@ export function setupPool() {
 //     }
 // }
 
-// // Process AI JOB 
+// // Process AI JOB
 // export async function poolAiJobEngine({jobClassObject}){
-//     // Create new AI Agent in thread 
+//     // Create new AI Agent in thread
 //     let params = {};
 //     params.userPlanReview = jobClassObject.userPlanReview;
 //     params.conversationHistory = jobClassObject.conversationHistory;
@@ -59,15 +58,13 @@ export function setupPool() {
 //                 errorText: `Error (poolAiJobEngine -> AiJobEngine) : ${call.value.errorText}`
 //             })
 //     }
-//     return Ok(call.value); // Note non-standard Err() format! 
+//     return Ok(call.value); // Note non-standard Err() format!
 // }
-
 
 // [][] -------------------------------------------------------------------------- [][]
 // Example functions in worker.js
 // export function poolAdd ({ a, b }) { return add({a, b})}  // 'add' could be any regular JS function.
-// export function poolMultiply ({ a, b }) { return Multiply ({ a, b }) }; // 
-
+// export function poolMultiply ({ a, b }) { return Multiply ({ a, b }) }; //
 
 // USE THIS CODE TO CALL POOL WORKER FUNCTION FROM OTHER JS FILES
 // import { Piscina } from "piscina";

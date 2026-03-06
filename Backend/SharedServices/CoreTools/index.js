@@ -1,4 +1,4 @@
-import { TimerManager } from "./timers.js";
+import { TimerManager } from './timers.js';
 
 export class CoreTools {
   constructor() {}

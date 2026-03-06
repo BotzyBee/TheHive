@@ -1,4 +1,4 @@
-import { Agents} from './Agents/index.js';
+import { Agents } from './Agents/index.js';
 import { AiCall } from './CallAI/index.js';
 import { CoreTools } from './CoreTools/index.js';
 import { Database } from './Database/index.js';
@@ -17,7 +17,7 @@ class SharedServices {
   /** @type {SharedUtils} */
   utils;
 
-  constructor( agents, callAI, coreTools, database, utils ) {
+  constructor(agents, callAI, coreTools, database, utils) {
     this.agents = agents;
     this.callAI = callAI;
     this.coreTools = coreTools;
@@ -26,7 +26,7 @@ class SharedServices {
   }
 }
 
-export let Services = new SharedServices( 
+export let Services = new SharedServices(
   new Agents(),
   new AiCall(),
   new CoreTools(),

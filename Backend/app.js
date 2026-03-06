@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
-import { initDatabaseConnection, closeDatabaseConnection } from './SharedServices/Database/index.js';
+import {
+  initDatabaseConnection,
+  closeDatabaseConnection,
+} from './SharedServices/Database/index.js';
 import { SharedUtils } from './SharedServices/Utils/index.js';
-import { setupPool, pool} from './Engine/worker.js';
+import { setupPool, pool } from './Engine/worker.js';
 import { Services } from './SharedServices/index.js';
 import { indexTimerActive } from './Engine/worker.js';
 
@@ -14,31 +17,36 @@ let su = new SharedUtils();
 // init function - setup db connections/ timers etc
 // [][] -------------------------------------- [][]
 const initServices = async () => {
-    // only call once
-    if (!servicesStarted) {
-        // init Surreal DB agent
-        let dbTools = await initDatabaseConnection();
-        if (dbTools.isErr()) {
-                su.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`)
-                process.exit(1);
-        }
-        // Setup Piscina Pool
-        setupPool(); su.shortID
-        //Knowledgebase re-indexing timer (every 60 seconds)
-        Services.coreTools.timers.addNewTimer("KB_Indexing_Timer", async () => {
-            if (!indexTimerActive) {
-                await pool.run({}, { name: 'poolIndexKnowledgebase' });
-            }
-        }, 60000);
-        // //New Job Scheduler (every 5 seconds)
-        // Services.coreTools.timers.addNewTimer("New_Job_Scheduler", async () => {
-        //     // Only call if not already busy
-        //     if (!nonAllocTimerActive) {
-        //         await checkNonAllocated();
-        //     }
-        // }, 5000);
-        servicesStarted = true;
+  // only call once
+  if (!servicesStarted) {
+    // init Surreal DB agent
+    let dbTools = await initDatabaseConnection();
+    if (dbTools.isErr()) {
+      su.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`);
+      process.exit(1);
     }
+    // Setup Piscina Pool
+    setupPool();
+    su.shortID;
+    //Knowledgebase re-indexing timer (every 60 seconds)
+    Services.coreTools.timers.addNewTimer(
+      'KB_Indexing_Timer',
+      async () => {
+        if (!indexTimerActive) {
+          await pool.run({}, { name: 'poolIndexKnowledgebase' });
+        }
+      },
+      60000
+    );
+    // //New Job Scheduler (every 5 seconds)
+    // Services.coreTools.timers.addNewTimer("New_Job_Scheduler", async () => {
+    //     // Only call if not already busy
+    //     if (!nonAllocTimerActive) {
+    //         await checkNonAllocated();
+    //     }
+    // }, 5000);
+    servicesStarted = true;
+  }
 };
 // Express init
 const app = express();
@@ -47,8 +55,8 @@ app.use(cors()); // Enable CORS for all origins <=== should be reviewed for prod
 app.use(express.json()); // Enable JSON body parsing
 
 // Root endpoint: check if API is online
-app.get("/", (req, res) => {
-    res.status(200).send("The Hive is online 🐝");
+app.get('/', (req, res) => {
+  res.status(200).send('The Hive is online 🐝');
 });
 
 // // AI Job endpoint: create a new AI job
@@ -145,33 +153,33 @@ app.get("/", (req, res) => {
 // [][] --- Server Start/ Graceful shutdown --- [][]
 let server;
 const startServer = () => {
-    server = app.listen(port, () => {
-        su.log(`Server running on port ${port}`);
-    });
+  server = app.listen(port, () => {
+    su.log(`Server running on port ${port}`);
+  });
 };
 const gracefulShutdown = async (signal) => {
-    su.log("Graceful Shutdown Started");
+  su.log('Graceful Shutdown Started');
 
-    // Stop the Express server from accepting new connections
-    if (server) {
-        server.close(() => {
-            su.log("Server closed")
-        });
-    }
+  // Stop the Express server from accepting new connections
+  if (server) {
+    server.close(() => {
+      su.log('Server closed');
+    });
+  }
 
-    // Clear all active timers
-    Services.coreTools.timers.stopAndClearAllTimers();
+  // Clear all active timers
+  Services.coreTools.timers.stopAndClearAllTimers();
 
-    // Terminate the Piscina worker pool gracefully
-    if (pool) {
-        await pool.destroy();
-    }
+  // Terminate the Piscina worker pool gracefully
+  if (pool) {
+    await pool.destroy();
+  }
 
-    // Close database connection
-    await closeDatabaseConnection();
-    
-    su.log("Graceful shutdown complete. Exiting process.");
-    process.exit(0); // Exit the process once all cleanup is done
+  // Close database connection
+  await closeDatabaseConnection();
+
+  su.log('Graceful shutdown complete. Exiting process.');
+  process.exit(0); // Exit the process once all cleanup is done
 };
 
 // Listen for termination signals from Docker (SIGTERM) and Ctrl+C (SIGINT)
@@ -179,12 +187,14 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // init services and start the server
-initServices().then(() => {
+initServices()
+  .then(() => {
     startServer();
-}).catch(err => {
+  })
+  .catch((err) => {
     su.log(`Failed to start application: ${err.message}`);
     process.exit(1); // Exit if init
-});
+  });
 
 // //    switch (aiResult.outcome) {
 // //         case Outcome.SUCCESS:

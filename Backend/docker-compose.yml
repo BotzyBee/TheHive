@@ -1,10 +1,9 @@
-
 services:
   indexdb:
     container_name: botzybee_database
     image: surrealdb/surrealdb:latest
     ports:
-      - "8000:8000"
+      - '8000:8000'
     volumes:
       - shared-data:/data # don't change this!
     command: start --bind 0.0.0.0:8000 --user ${dbRootUser} --pass ${dbRootPass} surrealkv:///data/AppFiles/surreal.db
@@ -20,7 +19,7 @@ services:
       dockerfile: Dockerfile
       target: base
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
       - indexdb
     volumes:

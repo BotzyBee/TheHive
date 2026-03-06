@@ -1,4 +1,3 @@
 export class Agents {
-  constructor() {
-  }
+  constructor() {}
 }
