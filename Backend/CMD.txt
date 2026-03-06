@@ -1,0 +1,36 @@
+## Prettier
+npx prettier --write .
+
+## DOCKER
+
+# start
+sudo service docker start
+
+# restart
+sudo service docker restart
+
+# check running services (add -a to include not running services)
+sudo docker ps
+
+# PORT FIXES
+sudo lsof -i :11434 (list processes on this port)
+sudo kill -9 <PID> (kill the process)
+
+# Docker Networking Queries
+- ip address show (overview of PC ip stuff)
+- sudo docker network ls (list all docker networks.. driver = network type)
+- bridge link (like ip address show)
+- sudo docker inspect <network>
+- sudo docker exec -it <cont> sh (shell access to container)
+- ping xxx.xx.x.x 
+- ip route 
+
+// Build (if new or update)
+sudo docker-compose up --build
+
+// Just run
+sudo docker-compose up
+
+// Prune 
+docker builder prune -a
+docker volume prune -a

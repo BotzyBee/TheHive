@@ -1,0 +1,39 @@
+node_modules
+**/node-modules/
+Backend/node_modules/
+Backend/test_outputs/
+Backend/archive/
+Frontend/node_modules/
+
+*.env
+*.env.local
+!.env.example
+!.env.test
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+.vscode
+
+#Frontend
+/Frontend/.svelte-kit
+/Frontend/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Other
+Notes.txt
+test.js
+
+
+
+
+

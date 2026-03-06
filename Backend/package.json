@@ -1,0 +1,34 @@
+{
+    "name": "botzybee_backend",
+    "version": "0.1.0",
+    "description": "Backend for Botzy Bee AI Assistant",
+    "type": "module",
+    "main": "app.js",
+    "scripts": {
+        "test": "vitest"
+    },
+    "author": "BotzyBee",
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.78.0",
+        "@azure/identity": "^4.10.1",
+        "@google/genai": "^1.4.0",
+        "@langchain/anthropic": "^0.3.24",
+        "@langchain/core": "^0.3.57",
+        "@langchain/openai": "^0.5.12",
+        "@langchain/textsplitters": "^0.1.0",
+        "axios": "^1.11.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.5.0",
+        "express": "^5.1.0",
+        "mathjs": "^14.5.2",
+        "nunjucks": "^3.2.4",
+        "officeparser": "^5.1.1",
+        "piscina": "^5.0.0",
+        "puppeteer-core": "^24.12.1",
+        "surrealdb": "^1.3.2"
+    },
+    "devDependencies": {
+        "prettier": "3.8.1",
+        "vitest": "^4.0.18"
+    }
+}

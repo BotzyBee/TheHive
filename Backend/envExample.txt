@@ -1,0 +1,42 @@
+# This is the docker mapped url
+# In this example /data/UserFiles points to C:/path/to/Knowledgebase/UserFiles 
+# ie data/ == knowledgebase/
+# this mapping is set in docker-compose.yml
+
+knowledgebaseURL=/data/UserFiles
+
+# this is the URL to where you want the knowledgebase on the HOST filesystem.
+# URLs MUST use forward slashes (no backslashes!)
+
+knowledgebaseHostURL=C:/path/to/Knowledgebase 
+
+dbRootUser=YourUsername
+dbRootPass=YourPassword
+
+# OPEN AI API KEY
+OAI_KEY=YourKeyHere
+# GEMINI API KEY
+GEM_KEY=YourKeyHere
+# ANTHROPIC
+ANT_KEY=YourKeyHere
+
+# Register new application @ https://portal.azure.com/#home to get the following:
+# Application (client) ID
+AZURE_CLIENT_ID=YourKeyHere
+# Object ID
+AZURE_OBJECT_ID=YourKeyHere
+# Directory (tenant) ID
+AZURE_TENANT_ID=YourKeyHere
+# APP SECRET
+AZURE_APP_SECRET=YourKeyHere
+# Email Account
+defaultEmail=me@me.com
+# Browser Cloud Key
+browserCloudKey=....
+# N8N API Cred (Custom set)
+n8nApiKey=
+# Perplexity
+PXY_KEY=
+
+# User Timezone
+TIMEZONE='Europe/London'
