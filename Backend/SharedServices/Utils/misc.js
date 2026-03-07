@@ -1,6 +1,9 @@
+import { saveFile } from "../FileSystem/CRUD.js";
+import { appFilesDir } from "../../constants.js";
+
 // [][] -- Log Helper Fn -- [][]
 let allLogs = []; // Holds all logs until written to file.
-const MAX_LOGS = 200;
+const MAX_LOGS = 500;
 export function log(...input) {
   console.log(...input);
   allLogs.push({
@@ -10,6 +13,12 @@ export function log(...input) {
   if (allLogs.length > MAX_LOGS) {
     allLogs.shift();
   }
+}
+
+export async function writeLogsToFile(filename = 'logs.txt') {
+    // Convert logs to a single string (separated by newlines)
+    const logsString = allLogs.join('\n \n [][] -------- Log Entry ---------- [][] \n'); 
+    await saveFile(`/data/${appFilesDir}/Logging`, logsString, filename); // using docker mapping.
 }
 
 /**

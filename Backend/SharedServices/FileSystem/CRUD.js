@@ -1,14 +1,18 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
-import { SharedUtils } from '../Utils/index.js';
+import * as su from '../Utils/index.js';
 import { containerVolumeRoot } from '../../constants.js';
 
-let su = new SharedUtils();
-
 // [][] ---- CREATE ---- [][]
+/**
+ * Save Content to a file on the host system
+ * @param {string} folderPath - The full filepath on the host machine (not docker/ container path)
+ * @param {string | buffer | object} fileContent 
+ * @param {string} fileNameIncExt 
+ * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
+ */
 export async function saveFile(folderPath, fileContent, fileNameIncExt) {
-  // note folderPath should be the filePath on the host machine eg C:/folder/here not the container path.
   let savePath = path.join(folderPath, fileNameIncExt);
   let dataToWrite;
   let encoding = 'utf8';
@@ -30,63 +34,62 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt) {
   try {
     await fsp.mkdir(folderPath, { recursive: true });
     await fsp.writeFile(savePath, dataToWrite, encoding);
-    return su.result_ok('File created');
+    return su.Ok('File created');
   } catch (error) {
     return su.logAndErr(`Error - (saveFile) : ${error}`);
   }
 }
 
 // [][] ---- READ ---- [][]
+/**
+ * Read file content from file on host machine.
+ * @param {string} filePath - full filepath of file location on host machine (not docker/ container url) 
+ * @param {boolean} asBuffer - true = file will be read as buffer.
+ * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
+ */
 export async function readFileContent(filePath, asBuffer = false) {
   try {
     if (asBuffer) {
       // Read as a binary Buffer
       const bufferContent = await fsp.readFile(filePath);
-      return su.result_ok(bufferContent);
+      return su.Ok(bufferContent);
     } else {
       // Read as UTF-8 text by default
       const textContent = await fsp.readFile(filePath, 'utf8');
-      return su.result_ok(textContent);
+      return su.Ok(textContent);
     }
   } catch (error) {
     return su.logAndErr(`Error (readFileContent) : ${error}`);
   }
 }
 
-// NOTE - url must be a directory and be correctly escaped
+// NOTE - 
+/**
+ * Fetches the update, created, accessed times for a directory
+ * @param {string} url - url must be a directory and be correctly escaped. 
+ * @returns {Result} {outcome: 'Ok' | 'Error', value: any }
+ *   Example Return Data
+ */
 export async function getUpdateStatsFromUrl(url) {
   url = decodeURIComponent(url); // handle encoded URLS
-  // GetUpdateStats() Example Return.value :
-  // {
-  //     dev: 0,
-  //     mode: 16822,
-  //     nlink: 1,
-  //     uid: 0,
-  //     gid: 0,
-  //     rdev: 0,
-  //     blksize: 4096,
-  //     ino: 41376821576640376,
-  //     size: 0,
-  //     blocks: 8,
-  //     atimeMs: 1748623136768.1797,
-  //     mtimeMs: 1748465156062.4373, // Modified/ Updated Millis
-  //     ctimeMs: 1748465156062.4373,
-  //     birthtimeMs: 1748206665599.7468
-  //   }
   try {
-    let data = await fs.statSync(url);
+    let data = fs.statSync(url);
     // round Millis -
     data.atimeMs = Math.round(data.atimeMs);
     data.mtimeMs = Math.round(data.mtimeMs);
     data.ctimeMs = Math.round(data.ctimeMs);
     data.birthtimeMs = Math.round(data.birthtimeMs);
-    return su.result_ok(data);
+    return su.Ok(data);
   } catch (error) {
     return su.logAndErr(error);
   }
 }
 
-// NOTE - url must be a directory
+/**
+ * Returns a list of files and sub-directories
+ * @param {string} url - must be a directory! 
+ * @returns {Result} {outcome: 'Ok' | 'Error', value: any }
+ */
 export async function getFilesAndDirectoriesFromDir(url) {
   url = decodeURIComponent(url); // handle encoded URLS
   let fileList = [];
@@ -131,10 +134,14 @@ export async function getFilesAndDirectoriesFromDir(url) {
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
-  return su.result_ok({ directoryList, fileList });
+  return su.Ok({ directoryList, fileList });
 }
 
-// THIS ONLY extracts the file extension from the name
+/**
+ * Extracts the file extension by looking for the last full stop.
+ * @param {string} filename - Name of the file including extension. 
+ * @returns {string | null } - null if failed. 
+ */
 export function getFileExtension(filename) {
   // Find the last occurrence of the dot character in the filename.
   if (!filename) return null;
@@ -153,6 +160,11 @@ export function getFileExtension(filename) {
   return filename.substring(lastDotIndex + 1);
 }
 
+/**
+ * Gets the extension, size in bytes (raw and formatted)
+ * @param {string} filePath - full filepath on the host system where the file can be located.
+ * @returns {Result} { outcome: 'Ok' | 'Error', value: { extension, sizeBytes, sizeFormatted } | string }
+ */
 export function getFileExtensionAndSize(filePath) {
   try {
     // Get file statistics, which includes the file size
@@ -164,7 +176,7 @@ export function getFileExtensionAndSize(filePath) {
     // Format the file size for better readability
     const sizeFormatted = su.formatBytes(sizeBytes);
     // Return result
-    return su.result_ok({
+    return su.Ok({
       extension: extension,
       sizeBytes: sizeBytes,
       sizeFormatted: sizeFormatted,
@@ -174,7 +186,11 @@ export function getFileExtensionAndSize(filePath) {
   }
 }
 
-// Returns Ok({ directoryList, fileList }) =  [String], [String]
+/**
+ * Scans the provided folder returning an array of sub-directories and files.  
+ * @param {string} relativeFolderPath - relative folder path (container path) not host system path. 
+ * @returns {Result} { outcome: 'Ok' | 'Error', value: { directoryList[string], fileList[string] } | string }
+ */
 export async function scanFolderRecursively(relativeFolderPath) {
   // Construct the full path
   const targetDirectoryInContainer = path.join(
@@ -218,7 +234,7 @@ export async function scanFolderRecursively(relativeFolderPath) {
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
-  return su.result_ok({ directoryList, fileList }); // Ok({ directoryList, fileList }) =  [String], [String]
+  return su.Ok({ directoryList, fileList }); // Ok({ directoryList, fileList }) =  [String], [String]
 }
 
 function removeAppPrefix(str) {

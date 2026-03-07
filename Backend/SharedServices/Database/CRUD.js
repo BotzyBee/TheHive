@@ -1,7 +1,5 @@
-import { dirTableName, fileTableName, mgmtTableName } from '../constants.js';
-import { SharedUtils } from '../Utils/index.js';
-
-let su = new SharedUtils();
+import { dirTableName, fileTableName, mgmtTableName } from '../../constants.js';
+import * as su from '../Utils/index.js';
 
 // [][] -- CREATE -- [][]
 export async function addDirectoryToDB(
@@ -13,7 +11,7 @@ export async function addDirectoryToDB(
 ) {
   let encodedURL = encodeURIComponent(URL);
   try {
-    const dirRef = su.longID('DIR');
+    const dirRef = su.generateLongID('DIR');
     let result = await dbAgent.query(
       `INSERT INTO ${dirTableName} {
                 DirRef: '${dirRef}',
@@ -29,7 +27,7 @@ export async function addDirectoryToDB(
         mo: metaObj,
       }
     );
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (addDirectoryToDB) : ${error}`);
   }
@@ -45,7 +43,7 @@ export async function addFileToDB(
 ) {
   let encodedURL = encodeURIComponent(URL);
   try {
-    const filRef = su.longID('FIL');
+    const filRef = su.generateLongID('FIL');
     let result = await dbAgent.query(
       `
                 INSERT INTO ${fileTableName} {
@@ -65,7 +63,7 @@ export async function addFileToDB(
         m: metaObj, // does this need to be stringified?
       }
     );
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (addFileToDB) : ${error}`);
   }
@@ -102,7 +100,7 @@ export async function addVectorToDB(
       }
     );
 
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (addVectorToDB) : ${error}`);
   }
@@ -128,7 +126,7 @@ export async function getRecords(dbAgent, tableName, searchField, searchTerm) {
         }
       });
     }
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`"Error (getRecords) : ${error}`);
   }
@@ -166,7 +164,7 @@ export async function searchVectorRecords(
         }
       });
     }
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (searchVectors) : ${error}`);
   }
@@ -179,7 +177,7 @@ export async function getMgmtData(dbAgent) {
     if (resLen == 0) {
       return su.logAndErr('Error (getMgmtData) : DB returned no records');
     }
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (getMgmtData) : ${error}`);
   }
@@ -207,7 +205,7 @@ export async function getRecordById(dbAgent, tableName, id) {
         }
       });
     }
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (getRecordById) : ${error}`);
   }
@@ -228,7 +226,7 @@ export async function getDirsAndFilesFromUrl(dbAgent, Url) {
   // catch no root Dir
   let retLen = rootCheck.value[0].length ?? 0;
   if (retLen == 0) {
-    return su.result_ok({ directoryList: [], fileList: [] });
+    return su.Ok({ directoryList: [], fileList: [] });
   }
   // root directory exists.. search for files and sub-directories
   let dirRef = rootCheck.value[0][0].DirRef;
@@ -257,7 +255,7 @@ export async function getDirsAndFilesFromUrl(dbAgent, Url) {
   // extract any files
   fileList = files.value[0];
   // return results
-  return su.result_ok({ directoryList, fileList });
+  return su.Ok({ directoryList, fileList });
 }
 
 // Recursive - doesn't include input Dir Url in results.
@@ -275,7 +273,7 @@ export async function getDirsAndFilesRecursive(dbAgent, Url) {
   // catch no root Dir
   let retLen = rootCheck.value[0].length ?? 0;
   if (retLen == 0) {
-    return su.result_ok({ directoryList: [], fileList: [] });
+    return su.Ok({ directoryList: [], fileList: [] });
   }
   // root directory exists.. search for files and sub-directories
   let dirRef = rootCheck.value[0][0].DirRef;
@@ -351,7 +349,7 @@ export async function updateRecords(
         `;
     const vars = { value: searchTerm, ...updateData };
     const result = await dbAgent.query(query, vars);
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (updateRecords) : ${error}`);
   }
@@ -371,7 +369,7 @@ export async function updateMgmtData(dbAgent, updateData) {
 
     const vars = { ...updateData }; // Directly use updateData for the variables
     const result = await dbAgent.query(query, vars);
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (updateMgmtData) : ${error}`);
   }
@@ -393,7 +391,7 @@ export async function deleteRecordsByField(
       `DELETE FROM ${tableName} WHERE ${fieldName} = $value RETURN BEFORE`,
       { value: fieldValue }
     );
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (deleteRecordByField) : ${error}`);
   }
@@ -405,7 +403,7 @@ export async function deleteRecordsById(dbAgent, tableName, idRef) {
     let result = await dbAgent.query(
       `DELETE ${tableName}:${idRef} RETURN BEFORE`
     );
-    return su.result_ok(result);
+    return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`Error (deleteRecordsById) : ${error}`);
   }

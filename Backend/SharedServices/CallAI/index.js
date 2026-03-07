@@ -1,4 +1,4 @@
-import { SharedUtils } from '../Utils/index.js';
+import * as su from '../Utils/index.js';
 import {
   ModelTypes,
   AiQuality,
@@ -7,7 +7,6 @@ import {
   PROVIDER_DISPATCH,
   DEFAULT_PROVIDER,
 } from '../../constants.js';
-let su = new SharedUtils();
 
 export class AiCall {
   #models = [];
@@ -173,7 +172,7 @@ export class AiCall {
           `Error ( resolveModel ) : ${model} does not support ${missing.join(', ')}`
         );
       }
-      return su.result_ok(entry);
+      return su.Ok(entry);
     }
 
     // Filter models for other paths (filter capabilities & context size)
@@ -201,7 +200,7 @@ export class AiCall {
       let randomNum = Math.floor(
         Math.random() * contextSizeAndQualityApproved.length
       );
-      return su.result_ok(contextSizeAndQualityApproved[randomNum]);
+      return su.Ok(contextSizeAndQualityApproved[randomNum]);
     }
 
     // Path 3: Go with default provider (unless user specifies one) and closest model to quality
@@ -216,7 +215,7 @@ export class AiCall {
           (m) => m.maxContext >= contextSize
         );
         if (contextFit.length > 0) {
-          return su.result_ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
+          return su.Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
         }
         // No model from this provider fits the context — warn and fall through
         su.log(
@@ -225,7 +224,7 @@ export class AiCall {
         );
       } else {
         // No context constraint — just pick by quality proximity within provider
-        return su.result_ok(providerCandidates.sort(byQualityProximity)[0]);
+        return su.Ok(providerCandidates.sort(byQualityProximity)[0]);
       }
     } else if (provider) {
       // Caller explicitly named a provider that has no capable models — hard fail
@@ -253,13 +252,13 @@ export class AiCall {
         );
       }
     }
-    return su.result_ok(fallbackCandidates.sort(byQualityProximity)[0]);
+    return su.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
   }
 
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
-      return su.result_err(`#dispatch -> ` + entry.value);
+      return su.Err(`#dispatch -> ` + entry.value);
     }
     const callFn = this.#ProviderFunctions[entry.value.provider];
     if (!callFn) {

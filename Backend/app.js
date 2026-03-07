@@ -4,14 +4,14 @@ import {
   initDatabaseConnection,
   closeDatabaseConnection,
 } from './SharedServices/Database/index.js';
-import { SharedUtils } from './SharedServices/Utils/index.js';
-import { setupPool, pool } from './Engine/worker.js';
+import * as su from './SharedServices/Utils/index.js';
+import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
-import { indexTimerActive } from './Engine/worker.js';
+import { indexTimerActive } from './Engine/workers.js';
+import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 
 export let dbAgent = null;
 let servicesStarted = false;
-let su = new SharedUtils();
 
 // [][] -------------------------------------- [][]
 // init function - setup db connections/ timers etc
@@ -27,7 +27,6 @@ const initServices = async () => {
     }
     // Setup Piscina Pool
     setupPool();
-    su.shortID;
     //Knowledgebase re-indexing timer (every 60 seconds)
     Services.coreTools.timers.addNewTimer(
       'KB_Indexing_Timer',
@@ -38,7 +37,7 @@ const initServices = async () => {
       },
       60000
     );
-    // //New Job Scheduler (every 5 seconds)
+    //New Job Scheduler (every 5 seconds)
     // Services.coreTools.timers.addNewTimer("New_Job_Scheduler", async () => {
     //     // Only call if not already busy
     //     if (!nonAllocTimerActive) {
@@ -169,6 +168,8 @@ const gracefulShutdown = async (signal) => {
 
   // Clear all active timers
   Services.coreTools.timers.stopAndClearAllTimers();
+  // Print logs to file
+  await writeLogsToFile();
 
   // Terminate the Piscina worker pool gracefully
   if (pool) {

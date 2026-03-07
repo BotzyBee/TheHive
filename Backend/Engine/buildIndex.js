@@ -1,24 +1,13 @@
-// STARTED - NOT COMPLETE !!
-
-// Index knowledgebase
-import dotenv from 'dotenv';
-import { Ok, Err, indexJob } from '../sharedTypes.js';
-import {
-  getRecords,
-  getDirsAndFilesFromUrl,
-  updateMgmtData,
-  createDbAgent,
-} from '../DB/CRUD.js';
-import { getFilesAndDirectoriesFromDir } from '../fileStore/CRUD.js';
+import { Services } from '../SharedServices/index.js';
+import { indexJob } from './classes.js';
 import { dirTableName } from '../constants.js';
-import { SharedUtils } from '../SharedServices/Utils/index.js';
-
-let su = new SharedUtils();
+import dotenv from 'dotenv';
+import * as su from '../SharedServices/Utils/index.js';
 
 let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
 let deleteJobs = []; // array of files + dirs to be deleted from DB
-let deleteJobsReadable = []; // human readable version for error su.logging
+let deleteJobsReadable = []; // human readable version for error logging
 
 // Indexing Stats
 let kbTotal = 0; // knowledgebase checks
@@ -28,7 +17,7 @@ let totalJobCount = 0; // total number of jobs completed
 export async function indexKnowledgebase(dbAgent) {
   // Index in progress. Catch repeat timer calls & exit early
   if (indexingActive == true) {
-    return su.result_ok('Indexing is already in progress.');
+    return su.Ok('Indexing is already in progress.');
   }
   // reset Index Stats
   kbTotal = 0;
@@ -82,7 +71,7 @@ export async function indexKnowledgebase(dbAgent) {
   }
 
   // Update mgmt record with last change time for root directory
-  let updateMgmtRec = await updateMgmtData(dbAgent, {
+  let updateMgmtRec = await Services.database.updateManagementData(dbAgent, {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
@@ -98,7 +87,7 @@ export async function indexKnowledgebase(dbAgent) {
         Filesystem hits: ${kbTotal}
         Database hits: ${dbTotal}
         Changes made: ${totalJobCount}`);
-  return su.result_ok('All files/ Directories Indexed');
+  return su.Ok('All files/ Directories Indexed');
 }
 
 async function checkAndUpdateDirAndFiles(dbAgent, Url) {
@@ -115,7 +104,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let kbFiles = [];
 
   // Get this Url's Dir Ref
-  let getRec = await getRecords(dbAgent, dirTableName, 'Url', Url);
+  let getRec = await Services.database.getRecords(dbAgent, dirTableName, 'Url', Url);
   if (getRec.isErr()) {
     return su.logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : ${getRec.value}`
@@ -129,7 +118,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   }
   let thisDirRef = getRec.value[0][0].DirRef;
   // Get data from database
-  let subDirsFiles = await getDirsAndFilesFromUrl(dbAgent, Url);
+  let subDirsFiles = await Services.database.getDirsAndFilesFromUrl(dbAgent, Url);
   // catch error
   if (subDirsFiles.isErr()) {
     return su.logAndErr(
@@ -141,7 +130,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir = await Services.fileSystem.getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
     return su.logAndErr(
@@ -353,7 +342,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   kbTotal += kbFileCount + kbDirCount;
   dbTotal += dbFileCount + dbDirCount;
   totalJobCount += jobCount;
-  return su.result_ok(`Directory indexed : ${Url}`);
+  return su.Ok(`Directory indexed : ${Url}`);
 }
 
 async function processDeleteJobs() {
@@ -379,5 +368,5 @@ async function processDeleteJobs() {
     }
   }
   totalJobCount += deleteJobCount;
-  return su.result_ok('Delete Jobs Completed');
+  return su.Ok('Delete Jobs Completed');
 }

@@ -1,3 +1,1 @@
-export class Agents {
-  constructor() {}
-}
+export const Agents = null;

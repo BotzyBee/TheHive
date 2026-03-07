@@ -1,8 +1,6 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { SharedUtils } from '../Utils/index.js';
-
-let su = new SharedUtils();
+import * as su from '../Utils/index.js';
 
 /**
  * Unified Perplexity AI call handler (Synchronous only).
@@ -75,7 +73,7 @@ export async function callPerplexity(
       }
     }
 
-    return su.result_ok({
+    return su.Ok({
       searchResult: content,
       citations: data.citations || [],
     });

@@ -1,6 +1,6 @@
 services:
   indexdb:
-    container_name: botzybee_database
+    container_name: thehive_database
     image: surrealdb/surrealdb:latest
     ports:
       - '8000:8000'
@@ -9,11 +9,11 @@ services:
     command: start --bind 0.0.0.0:8000 --user ${dbRootUser} --pass ${dbRootPass} surrealkv:///data/AppFiles/surreal.db
     #restart: always
     networks:
-      - botzybee_network
+      - thehive_network
 
   aiserver:
-    container_name: botzybee
-    image: botzybee
+    container_name: thehive
+    image: thehive
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,7 +26,7 @@ services:
       - shared-data:/data # don't change this!
     # restart: always
     networks:
-      - botzybee_network
+      - thehive_network
 
 volumes:
   shared-data:
@@ -38,5 +38,5 @@ volumes:
       o: bind
 
 networks:
-  botzyai_network:
+  thehive_network:
     driver: bridge

@@ -1,12 +1,10 @@
-import { SharedUtils } from '../Utils/index.js';
+import * as su from '../Utils/index.js';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { makeSchemaStrict } from './index.js';
 
 // Uses Google API not Langchain interface
 // https://ai.google.dev/gemini-api/docs#javascript
-
-let su = new SharedUtils();
 
 /**
  * Unified Gemini AI call handler.
@@ -60,7 +58,7 @@ export async function callGemini(
         },
       });
 
-      return su.result_ok(JSON.parse(secondResponse.text));
+      return su.Ok(JSON.parse(secondResponse.text));
     }
 
     // Case 2 & 3: Standard Chat or Structured Output (Single step)
@@ -89,7 +87,7 @@ export async function callGemini(
       ? JSON.parse(response.text)
       : response.text;
 
-    return su.result_ok(finalResult);
+    return su.Ok(finalResult);
   } catch (error) {
     return su.logAndErr(`Error (callGemini): ${error}`);
   }

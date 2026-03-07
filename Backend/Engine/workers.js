@@ -4,40 +4,34 @@ Functions in this file should be prefixed 'pool' and simply call their normal co
 Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
-
 import { Piscina } from 'piscina';
-// import { indexKnowledgebase } from './cron_jobs/fileIndexing.js';
-// import { writeLogsToFile } from './utils.js';
-// import { getDbAgent } from './DB/CRUD.js';
-// import { Err, Ok } from './sharedTypes.js';
-// import { AIAgent } from "../AI/genericAgent/main.js";
-// import { AiJobEngine } from "../AI/engine/main.js";
+import { getDbAgent } from '../SharedServices/Database/index.js';
+import { indexKnowledgebase } from './buildIndex.js';
+import * as su from '../SharedServices/Utils/index.js';
 
 export let indexTimerActive = false;
 export let pool; // Piscina worker pool (multi-thread)
 
 export function setupPool() {
   pool = new Piscina({
-    filename: new URL('./worker.js', import.meta.url).href,
+    filename: new URL('./workers.js', import.meta.url).href,
     minThreads: 2, // Minimum number of worker threads to keep alive
     maxThreads: 4, // Maximum number of worker threads
   });
 }
 
-// export async function poolIndexKnowledgebase(){
-//     indexTimerActive = true;
-//     let dbAgent = await getDbAgent();
-//     if(dbAgent.isOk()){
-//         let call = await indexKnowledgebase(dbAgent.value);
-//         await writeLogsToFile(); // write app logs to AppfileDir
-//         indexTimerActive = false;
-//         return call;
-//     } else {
-//         await writeLogsToFile();
-//         indexTimerActive = false;
-//         return Err(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
-//     }
-// }
+export async function poolIndexKnowledgebase(){
+    indexTimerActive = true;
+    let dbAgent = await getDbAgent();
+    if(dbAgent.isOk()){
+        let call = await indexKnowledgebase(dbAgent.value);
+        indexTimerActive = false;
+        return call;
+    } else {
+        indexTimerActive = false;
+        return su.logAndErr(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
+    }
+}
 
 // // Process AI JOB
 // export async function poolAiJobEngine({jobClassObject}){

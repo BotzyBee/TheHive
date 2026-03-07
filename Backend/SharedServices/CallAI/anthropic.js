@@ -1,9 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
-import { SharedUtils } from '../Utils/index.js';
+import * as su from '../Utils/index.js';
 import { makeSchemaStrict } from './index.js';
-
-let su = new SharedUtils();
 
 /**
  * Unified Claude AI call handler.
@@ -59,7 +57,7 @@ export async function callAnthropic(
       ? JSON.parse(textBlock.text)
       : textBlock.text;
 
-    return su.result_ok(finalResult);
+    return su.Ok(finalResult);
   } catch (error) {
     return su.logAndErr(`Error (callClaude): ${error}`);
   }

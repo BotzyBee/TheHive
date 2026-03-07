@@ -1,8 +1,5 @@
-import { SharedUtils } from '../SharedServices/Utils/index.js';
-import { Database } from '../SharedServices/Database';
-
-let su = new SharedUtils();
-let db = new Database();
+import* as su from '../SharedServices/Utils/index.js';
+import * as db from '../SharedServices/Database/index.js';
 
 // [][] -- Change Job - Used to update DB with file/ Dir changes -- [][]
 export class indexJob {
@@ -14,7 +11,7 @@ export class indexJob {
   }
 
   async addFileToDB(dbAgent, dirRef, fileType, updateMillis, metaObj) {
-    let res = await db.addFile(
+    let res = await db.addFileToDB(
       dbAgent,
       dirRef,
       this.url,
@@ -36,7 +33,7 @@ export class indexJob {
   }
 
   async addDirToDB(dbAgent, parentDirRef, updateMillis, metaObj) {
-    let res = await db.addDirectory(
+    let res = await db.addDirectoryToDB(
       dbAgent,
       this.url,
       parentDirRef,

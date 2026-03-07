@@ -1,10 +1,9 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { SharedUtils } from '../Utils/index.js';
+import * as su from '../Utils/index.js';
 import { makeSchemaStrict } from './index.js';
 import dotenv from 'dotenv';
 
-let su = new SharedUtils();
 /**
  * Unified OpenAI call handler.
  * @param {string} systemMessage - Not needed for embeddings mode
@@ -40,7 +39,7 @@ export async function callOpenAI(
         openAIApiKey: apiKey,
       });
       const vectors = await embeddings.embedDocuments(inputDataVec);
-      return su.result_ok(vectors);
+      return su.Ok(vectors);
     } catch (error) {
       return su.logAndErr(`Error (callOpenAI - embeddings): ${error}`);
     }
@@ -82,10 +81,10 @@ export async function callOpenAI(
       const schemaWithStrictness = makeSchemaStrict(structuredOutput);
       const structured = chatModel.withStructuredOutput(schemaWithStrictness);
       const res = await structured.invoke(messages);
-      return su.result_ok(res);
+      return su.Ok(res);
     } else {
       const res = await chatModel.invoke(messages);
-      return su.result_ok(res.content);
+      return su.Ok(res.content);
     }
   } catch (error) {
     return su.logAndErr(`Error (callOpenAI): ${error}`);
