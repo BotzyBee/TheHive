@@ -5,7 +5,8 @@
   "type": "module",
   "main": "app.js",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "init": "node Setup/init.js"
   },
   "author": "BotzyBee",
   "dependencies": {
