@@ -31,13 +31,13 @@ async function createDbAgent(offline = false, options = {}) {
       password: dbPass,
     });
     await db.use({ namespace: namespaceName, database: databaseName });
-    dbAgent = db; // update global dbAgent var;
+    DATABASE_AGENT = db; // update global dbAgent var;
     return su.Ok(db);
   } catch (error) {
     // Try fallback DB URL - once!
     const { optAttemptNumber } = options;
     if (optAttemptNumber == null || optAttemptNumber == undefined) {
-      let dbAgent2 = await createDbAgent(true, 1); // attempt number stops never ending loop!
+      let dbAgent2 = await createDbAgent(true, {optAttemptNumber: 1}); // attempt number stops never ending loop!
       if (dbAgent2.isOk()) {
         return su.Ok(dbAgent2);
       }

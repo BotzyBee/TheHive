@@ -1,1 +1,5 @@
-export * from './timers.js';
+import * as Timers from './timers.js';
+
+export {
+    Timers,
+}
