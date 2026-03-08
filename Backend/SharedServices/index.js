@@ -4,12 +4,16 @@ import * as CoreTools from './CoreTools/index.js';
 import * as Utils from './Utils/index.js';
 import * as FileSystem from './FileSystem/index.js';
 import * as Database from './Database/index.js';
+import * as Classes from './Classes/index.js';
+import * as Constants from './constants.js';
 
 export const Services = {
   Agents,
   AiCall,
+  Classes,
   CoreTools,
-  Utils,
+  Constants,
+  Database,
   FileSystem,
-  Database
+  Utils,
 }

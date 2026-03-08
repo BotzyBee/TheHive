@@ -1,3 +1,3 @@
 export * from './misc.js';
-export * from './result.js';
+export * from './helperFunctions.js';
 export * from './refs.js';
