@@ -3,7 +3,7 @@ import {
   dbURL_Fallback,
   namespaceName,
   databaseName
-} from '../../constants.js';
+} from '../constants.js';
 import { Surreal } from 'surrealdb';
 import dotenv from 'dotenv';
 import * as su from '../Utils/index.js';

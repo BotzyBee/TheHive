@@ -1,4 +1,4 @@
-import { dirTableName, fileTableName, mgmtTableName } from '../../constants.js';
+import { dirTableName, fileTableName, mgmtTableName } from '../constants.js';
 import * as su from '../Utils/index.js';
 
 // [][] -- CREATE -- [][]
