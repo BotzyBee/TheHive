@@ -1,6 +1,6 @@
 import { Services } from '../SharedServices/index.js';
 import { indexJob } from './classes.js';
-import { dirTableName } from '../constants.js';
+import { dirTableName } from '../SharedServices/constants.js';
 import dotenv from 'dotenv';
 import * as su from '../SharedServices/Utils/index.js';
 
