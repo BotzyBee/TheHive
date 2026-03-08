@@ -6,7 +6,7 @@ import {
   MODEL_REGISTRY,
   PROVIDER_DISPATCH,
   DEFAULT_PROVIDER,
-} from '../../constants.js';
+} from '../constants.js';
 
 export class AiCall {
   #models = [];
@@ -255,6 +255,14 @@ export class AiCall {
     return su.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
   }
 
+  /**
+   * Dispatch function routes to the required AI provider
+   * @param {ModelTypes} capability 
+   * @param {string} systemMessage 
+   * @param {string} contentMessage 
+   * @param {object} options 
+   * @returns {Result( any | string )} - Result{ outcome: 'Ok' | 'Error', value: any | string }
+   */
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
@@ -267,7 +275,7 @@ export class AiCall {
       );
     }
     options.capability = capability;
-    return callFn(systemMessage, contentMessage, entry.value.model, options); // doesn't need return_ok() as underlying function has the return type.
+    return callFn(systemMessage, contentMessage, entry.value.model, options); // doesn't need Ok() as underlying function has the return type.
   }
 
   #estimateTokens(inputString) {
