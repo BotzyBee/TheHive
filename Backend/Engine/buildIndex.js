@@ -71,7 +71,7 @@ export async function indexKnowledgebase(dbAgent) {
   }
 
   // Update mgmt record with last change time for root directory
-  let updateMgmtRec = await Services.database.updateManagementData(dbAgent, {
+  let updateMgmtRec = await Services.Database.updateMgmtData(dbAgent, {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
@@ -104,7 +104,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let kbFiles = [];
 
   // Get this Url's Dir Ref
-  let getRec = await Services.database.getRecords(dbAgent, dirTableName, 'Url', Url);
+  let getRec = await Services.Database.getRecords(dbAgent, dirTableName, 'Url', Url);
   if (getRec.isErr()) {
     return su.logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : ${getRec.value}`
@@ -118,7 +118,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   }
   let thisDirRef = getRec.value[0][0].DirRef;
   // Get data from database
-  let subDirsFiles = await Services.database.getDirsAndFilesFromUrl(dbAgent, Url);
+  let subDirsFiles = await Services.Database.getDirsAndFilesFromUrl(dbAgent, Url);
   // catch error
   if (subDirsFiles.isErr()) {
     return su.logAndErr(
@@ -130,7 +130,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await Services.fileSystem.getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir = await Services.FileSystem.getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
     return su.logAndErr(
@@ -145,9 +145,6 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let dbDirCount = dbDirs.length ?? 0;
   let i, k;
   let found;
-
-  // console.su.log(`KB Files : ${kbFileCount}, KB Dirs : ${kbDirCount}`);
-  // console.su.log(`DB Files : ${dbFileCount}, DB Dirs : ${dbDirCount}`);
 
   // Knowledgebase structs
   // NOTE kbDirs List is an array of {url: String, updateMs: Int}
