@@ -1,7 +1,7 @@
-import { callOpenAI } from './SharedServices/CallAI/openAI.js';
-import { callGemini } from './SharedServices/CallAI/gemini.js';
-import { callAnthropic } from './SharedServices/CallAI/anthropic.js';
-import { callPerplexity } from './SharedServices/CallAI/perplexity.js';
+import { callOpenAI } from './CallAI/openAI.js';
+import { callGemini } from './CallAI/gemini.js';
+import { callAnthropic } from './CallAI/anthropic.js';
+import { callPerplexity } from './CallAI/perplexity.js';
 
 // INDEX ---------------
 // 1. Call Ai Constants
