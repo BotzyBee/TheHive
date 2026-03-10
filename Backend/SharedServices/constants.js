@@ -153,6 +153,7 @@ export const MODEL_REGISTRY = [
 // Note - if updating, check values in docker-compose.yml and .env match
 export const appFilesDir = 'AppFiles';
 export const userFilesDir = 'UserFiles';
+export const pluginDir = 'AppFiles/Plugins/'
 
 // Database
 export const namespaceName = 'FolderBot';
