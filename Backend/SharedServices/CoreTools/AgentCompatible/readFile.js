@@ -3,7 +3,7 @@
 */
 
 export const details = {
-    toolName:   "ReadFile",
+    toolName:   "readFile",
     version:    "2026.0.1",
     creator:    "Botzy Bee",
     overview:   "Reads a file on the host filesystem and returns the file contents. The tool can return base64 or utf-8 formats. \n"+

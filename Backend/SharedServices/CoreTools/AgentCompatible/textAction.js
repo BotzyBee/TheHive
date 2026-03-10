@@ -2,7 +2,7 @@
     Uses The Hive Plugin Tool Standard
 */
 export const details = {
-    toolName:   "AiTextAction",
+    toolName:   "aiTextAction",
     version:    "2026.0.1",
     creator:    "Botzy Bee",
     overview:   "This tool uses AI to create text, summarise text, extract information or modify a given text input. \n"+

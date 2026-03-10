@@ -3,7 +3,7 @@
 */
 
 export const details = {
-    toolName:   "WriteFile",
+    toolName:   "writeFile",
     version:    "2026.0.1",
     creator:    "Botzy Bee",
     overview:   "Writes (saves) data to a single file in a specified folder."+
