@@ -6,7 +6,7 @@ REMEMBER - Threads cannot access the global vars on the main thread... they have
 */
 import { Piscina } from 'piscina';
 import { getDbAgent } from '../SharedServices/Database/index.js';
-import { indexKnowledgebase } from './buildIndex.js';
+import { indexKnowledgebase } from './buildKbIndex.js'; 
 import * as su from '../SharedServices/Utils/index.js';
 
 export let indexTimerActive = false;
