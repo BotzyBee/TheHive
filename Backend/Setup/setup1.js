@@ -12,10 +12,10 @@ export async function setupFilesAndFolders(){
     try {
         console.log("Creating required folders 📂")
         const dirs = [
-            '/AppFiles/Guides', 
+            '/AppFiles/Plugins/Guides',
+            '/AppFiles/Plugins/Tools',
             '/AppFiles/surreal.db', 
             '/AppFiles/Logging',
-            '/AppFiles/Credentials',
             '/UserFiles/'
         ];
         dirs.forEach(dir => {
@@ -24,19 +24,19 @@ export async function setupFilesAndFolders(){
                 fs.mkdirSync(fullPath, { recursive: true })}
             });
         
-        // Create Guide Index File
-        const guideIndexUrl = path.join(rootDirUrl, '/AppFiles/Guides');
-        const filePath = path.join(guideIndexUrl, "index.json");
-        const fileContent = `
-{
-"guides": {
-    "guide1": {
-        "relativeUrl": "/example1.txt",
-        "description": "An example guide. Agents: Ignore this Guide, it is an example only!"
-        }
-    }
-}`;
-        await fsp.writeFile(filePath, fileContent, 'utf-8'); // write guide index file.
+        //         // Create Guide Index File
+        //         const guideIndexUrl = path.join(rootDirUrl, '/AppFiles/Guides');
+        //         const filePath = path.join(guideIndexUrl, "index.json");
+        //         const fileContent = `
+        // {
+        // "guides": {
+        //     "guide1": {
+        //         "relativeUrl": "/example1.txt",
+        //         "description": "An example guide. Agents: Ignore this Guide, it is an example only!"
+        //         }
+        //     }
+        // }`;
+        //         await fsp.writeFile(filePath, fileContent, 'utf-8'); // write guide index file.
         console.log('Files and Folders created ✔️')
     } catch (error) {
         console.log(`Error - (setupFilesAndFolders) : ${error}`);

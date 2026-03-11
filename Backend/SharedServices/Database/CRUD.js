@@ -2,6 +2,7 @@ import { dirTableName, fileTableName, mgmtTableName } from '../constants.js';
 import * as su from '../Utils/index.js';
 
 // [][] -- CREATE -- [][]
+// Directory Index - add directory to index
 export async function addDirectoryToDB(
   dbAgent,
   URL,
@@ -33,6 +34,7 @@ export async function addDirectoryToDB(
   }
 }
 
+// FILE INDEX - add file to index
 export async function addFileToDB(
   dbAgent,
   dirRef,
@@ -70,7 +72,7 @@ export async function addFileToDB(
 }
 
 // Add Vector To DB (File Vector)
-export async function addVectorToDB(
+export async function addVectorFileToDB(
   dbAgent,
   tableName,
   dirRef,
@@ -102,7 +104,44 @@ export async function addVectorToDB(
 
     return su.Ok(result);
   } catch (error) {
-    return su.logAndErr(`Error (addVectorToDB) : ${error}`);
+    return su.logAndErr(`Error (addVectorFileToDB) : ${error}`);
+  }
+}
+
+// Add Tool (Vector) to DB
+export async function addVectorToolToDB(
+  dbAgent,
+  tableName,
+  toolName,
+  toolDescription,
+  version,
+  filePath,
+  vector
+) {
+  let encodedFP = encodeURIComponent(filePath);
+  try {
+    let result = await dbAgent.query(
+      `
+            INSERT INTO ${tableName} {
+                ToolName: $tn,
+                ToolDescription: $td,
+                Version: $vi,
+                FilePath: $fp,
+                Vector: $vec
+            };
+        `,
+      {
+        tn: toolName,
+        td: toolDescription,
+        vi: version,
+        fp: encodedFP,
+        vec: vector, // Array of floats
+      }
+    );
+
+    return su.Ok(result);
+  } catch (error) {
+    return su.logAndErr(`Error (addVectorToolToDB) : ${error}`);
   }
 }
 
@@ -129,6 +168,29 @@ export async function getRecords(dbAgent, tableName, searchField, searchTerm) {
     return su.Ok(result);
   } catch (error) {
     return su.logAndErr(`"Error (getRecords) : ${error}`);
+  }
+}
+
+export async function getAllRecordsFromTable(dbAgent, tableName) {
+  try {
+    if (!tableName) { return su.Err('Error (getAllRecordsFromTable): tableName is missing or null!'); }
+     const query = `SELECT * FROM ${tableName}`;
+    const result = await dbAgent.query(query);
+    const rows = result?.[0] || [];
+    
+    const decodedRows = rows.map(row => {
+      if (row.Url) {
+        return {
+          ...row,
+          Url: decodeURIComponent(row.Url)
+        };
+      }
+      return row;
+    });
+
+    return su.Ok(decodedRows);
+  } catch (error) {
+    return su.Err(`Error (getAllRecordsFromTable): ${error.message || error}`);
   }
 }
 

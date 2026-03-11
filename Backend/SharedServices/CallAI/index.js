@@ -81,6 +81,7 @@ export class AiCall {
    * @param {object} [options]
    * @param {string} [options.model]           - Exact model string (optional)
    * @param {string} [options.provider]        - AiProviders value (optional)
+   * @param {number} [options.quality]         - AiQuality value (optional)
    * @param {string[]} [options.inputDataVec]   - Input data [string, string, ...]
    * @param {number} [options.dimensionSize]    - Embeddings dimension size
    */

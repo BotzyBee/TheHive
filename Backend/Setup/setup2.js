@@ -1,7 +1,7 @@
 import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
 import { namespaceName, databaseName, dirTableName, 
-    fileTableName, vectorTableName, vectorEmbedSize, mgmtTableName, toolTableName } from "../constants.js";
+    fileTableName, vectorTableName, vectorEmbedSize, mgmtTableName, toolTableName } from "../SharedServices/constants.js";
 import { addDirectoryToDB } from "../SharedServices/Database/CRUD.js";
 
 // Setup Namespace, Database and tables
@@ -107,12 +107,14 @@ export async function setupFolderBotDB() {
             TYPE F32;
         `);
         console.log(`${vectorTableName} table and index created.`)
-    
+
         // Define the schema for the Tool Vector Table
         await db.query(`
             DEFINE TABLE ${toolTableName} SCHEMAFULL;
             DEFINE FIELD ToolName ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD ToolDescription ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD Version ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD FilePath ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD Vector ON TABLE ${toolTableName} TYPE array<float>  ASSERT $value != NONE;
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;

@@ -156,8 +156,8 @@ export const userFilesDir = 'UserFiles';
 export const pluginDir = 'AppFiles/Plugins/'
 
 // Database
-export const namespaceName = 'FolderBot';
-export const databaseName = 'KnowledgeBaseIndex';
+export const namespaceName = 'BotzyBee';
+export const databaseName = 'TheHive';
 export const dirTableName = 'Directories';
 export const fileTableName = 'Files';
 export const mgmtTableName = 'mgmtData';
