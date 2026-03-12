@@ -10,6 +10,9 @@ Frontend/node_modules/
 !.env.example
 !.env.test
 
+# Tests
+*.test.js
+
 # Output
 .output
 .vercel
