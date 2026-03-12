@@ -1,6 +1,6 @@
 import { Services } from '../SharedServices/index.js';
 import * as coreToolCollection from '../SharedServices/CoreTools/AgentCompatible/index.js';
-import { pluginDir, containerVolumeRoot, toolTableName, vectorEmbedSize } from '../SharedServices/constants.js';
+import { pluginDir, containerVolumeRoot, toolTableName, vectorEmbedSize, builtInFilePath } from '../SharedServices/constants.js';
 import path from 'path';
 
 function fetchCoreAgentTools() {
@@ -14,7 +14,7 @@ function fetchCoreAgentTools() {
             const data = module.details;
             results.push(
                 {
-                    filePath: "Built-In", 
+                    filePath: builtInFilePath, 
                     toolName: data.toolName,
                     version: data.version,
                     overview: data.overview

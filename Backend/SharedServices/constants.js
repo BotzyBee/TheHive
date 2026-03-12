@@ -14,6 +14,8 @@ export const AiProviders = Object.freeze({
   gemini: 'gemini',
   anthropic: 'anthropic',
   perplexity: 'perplexity',
+  inception: 'inception',
+  test: 'doesnt_exist'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <- Default AI provider
 export const AiQuality = Object.freeze({
@@ -171,3 +173,4 @@ export const dbURL_Fallback = 'http://127.0.0.1:8000/rpc';
 
 // 3. FileSystem Constants
 export const containerVolumeRoot = '/data'; // set in docker-compose.yml *don't change this!
+export const builtInFilePath = "Built-In";
