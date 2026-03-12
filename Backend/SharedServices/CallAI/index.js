@@ -51,6 +51,7 @@ export class AiCall {
       contentMessage,
       options
     );
+    ;
   }
 
   /** Generate Text using web search grounding
@@ -161,7 +162,7 @@ export class AiCall {
     if (model !== null && typeof model == 'string') {
       const entry = this.#models.find((m) => m.model === model);
       if (!entry) {
-        return su.logAndErr(
+        return su.Err(
           `Error ( resolveModel ) : Unknown Model : ${model}`
         );
       }
@@ -169,7 +170,7 @@ export class AiCall {
         (c) => !entry.capabilities.includes(c)
       );
       if (missing.length) {
-        return su.logAndErr(
+        return su.Err(
           `Error ( resolveModel ) : ${model} does not support ${missing.join(', ')}`
         );
       }
@@ -182,8 +183,8 @@ export class AiCall {
     );
     // catch no models available for task
     if (capableCandidates.length === 0) {
-      su.logAndErr(
-        `Error ( resolveModel ) : No model found supporting capabilities: [${[...requiredCaps].join(', ')}].`
+      return su.Err(
+        `Error ( resolveModel ) : No model found supporting requested capabilities : ${[...requiredCaps].join(', ')}.`
       );
     }
     // Find models with right sized max context
@@ -192,7 +193,7 @@ export class AiCall {
       (m) => m.maxContext >= ctxRequired && m.quality == requestQuality
     );
     if (contextSizeAndQualityApproved.length === 0) {
-      su.logAndErr(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
+      su.Err(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
             Capabilities : [${[...requiredCaps].join(', ')}]. Context Size: ${ctxRequired}. Quality ${requestQuality}`);
     }
 
@@ -248,7 +249,7 @@ export class AiCall {
       if (contextFit.length > 0) {
         fallbackCandidates = contextFit;
       } else {
-        return su.logAndErr(
+        return su.Err(
           `Error ( resolveModel ) : No model across any provider has maxContext >= ${contextSize}. Unable to progress`
         );
       }
@@ -267,11 +268,11 @@ export class AiCall {
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
-      return su.Err(`#dispatch -> ` + entry.value);
+      return su.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
     }
     const callFn = this.#ProviderFunctions[entry.value.provider];
     if (!callFn) {
-      return su.logAndErr(
+      return su.Err(
         `Error : ( #dispatch ) No dispatch function registered for provider. ${entry.value.provider}`
       );
     }

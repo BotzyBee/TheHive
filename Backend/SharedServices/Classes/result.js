@@ -10,7 +10,7 @@ export class ToolOutput {
 export class Result {
   #ResultText = {
     Error: 'Error',
-    Ok: 'Ok',
+    Ok: 'Ok'
   };
   constructor(ok, value) {
     if (ok === true) {
