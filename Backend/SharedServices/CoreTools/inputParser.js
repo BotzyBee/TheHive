@@ -51,7 +51,7 @@ export function parseNunjucksTemplate(templateArray, dataObject) {
  * (Used for AI Agent finalisation to avoid limiting output to AI model response size &  research agent editor)
  * @param {string} inputString - Example -"The status is << complexObj.status >>" 
  * @param {object} dataObject - { complexObj: { id: 1, status: "active" } }
- * @returns {string} - merges the data from the data object. Eg.
+ * @returns {Result} - Result(string) merges the data from the data object. Eg.
  * The example above outputs 'The status is "active"'
  */
 export function addAnyDirectData(inputString, dataObject) {
