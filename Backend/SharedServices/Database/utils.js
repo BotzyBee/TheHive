@@ -39,7 +39,7 @@ async function createDbAgent(offline = false, options = {}) {
     if (optAttemptNumber == null || optAttemptNumber == undefined) {
       let dbAgent2 = await createDbAgent(true, {optAttemptNumber: 1}); // attempt number stops never ending loop!
       if (dbAgent2.isOk()) {
-        return su.Ok(dbAgent2);
+        return dbAgent2;
       }
     }
     // else return the original error
@@ -55,10 +55,7 @@ export async function closeDatabaseConnection() {
 
 export async function initDatabaseConnection(offline = false) {
   let db = await createDbAgent(offline);
-  if (db.isOk()) {
-    DATABASE_AGENT = db.value;
-  }
-  return db;
+  return db; // returning Ok/ Err for app.js init 
 }
 
 export async function getDbAgent() {
@@ -68,7 +65,7 @@ export async function getDbAgent() {
     // dbAgent not created yet
     let outcome = await createDbAgent();
     if (outcome.isOk()) {
-      return su.Ok(outcome.value);
+      return outcome;
     } else {
       return su.logAndErr(`Error (getDbAgent -> createDbAgent) : ${outcome.value}`);
     }
