@@ -14,8 +14,7 @@ export const AiProviders = Object.freeze({
   gemini: 'gemini',
   anthropic: 'anthropic',
   perplexity: 'perplexity',
-  inception: 'inception',
-  test: 'doesnt_exist'
+  inception: 'inception'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <- Default AI provider
 export const AiQuality = Object.freeze({
@@ -151,12 +150,6 @@ export const MODEL_REGISTRY = [
 
 // 2. Database Constants
 
-// Folder Names/ Locations
-// Note - if updating, check values in docker-compose.yml and .env match
-export const appFilesDir = 'AppFiles';
-export const userFilesDir = 'UserFiles';
-export const pluginDir = 'AppFiles/Plugins/'
-
 // Database
 export const namespaceName = 'BotzyBee';
 export const databaseName = 'TheHive';
@@ -172,5 +165,10 @@ export const dbURL = 'http://indexdb:8000/rpc';
 export const dbURL_Fallback = 'http://127.0.0.1:8000/rpc';
 
 // 3. FileSystem Constants
+// Note - if updating, check values in docker-compose.yml and .env match
 export const containerVolumeRoot = '/data'; // set in docker-compose.yml *don't change this!
 export const builtInFilePath = "Built-In";
+export const appFilesDir = 'AppFiles';
+export const userFilesDir = 'UserFiles';
+export const pluginDir = 'AppFiles/Plugins/'
+export const quickAskFolder = `${appFilesDir}/QuickAskOutputs/`
