@@ -9,6 +9,8 @@ import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
 import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
+import { getToolDetails } from './SharedServices/Database/index.js';
+import { initToolIndex } from './Engine/toolIndex.js';
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -28,7 +30,19 @@ const initServices = async () => {
     // Setup Piscina Pool
     setupPool();
 
-    //Knowledgebase re-indexing timer (every 60 seconds)
+    // Load Tools
+    su.log("Loading Tools...");
+    let tools = await initToolIndex();
+    if(tools.isErr()){
+      su.log(`Error (initServices -> initToolIndex ) : ${tools.value}`);
+      process.exit(1);
+    }
+    su.log(`${tools.value.tools} Tools loaded. \n`+
+      `${tools.value.added} are new. \n`+
+      `${tools.value.updated} were updated \n`+
+      `${tools.value.removed} were removed.`)
+    
+      //Knowledgebase re-indexing timer (every 60 seconds)
     Services.CoreTools.Timers.addNewTimer(
       'KB_Indexing_Timer',
       async () => {
@@ -58,6 +72,15 @@ app.use(express.json()); // Enable JSON body parsing
 // Root endpoint: check if API is online
 app.get('/', (req, res) => {
   res.status(200).send('The Hive is online 🐝');
+});
+
+// Test Endpoint: for testing 
+app.get('/test', async (req, res) => {
+  let tsk = req?.query?.tool;
+  let x = await getToolDetails(tsk);
+  //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
+  //console.log(x);
+  res.status(200).json({result: x });
 });
 
 // [][] --- Server Start/ Graceful shutdown --- [][]
@@ -107,6 +130,7 @@ initServices()
     su.log(`Failed to start application: ${err.message}`);
     process.exit(1); // Exit if init
   });
+
 
 // //    switch (aiResult.outcome) {
 // //         case Outcome.SUCCESS:
