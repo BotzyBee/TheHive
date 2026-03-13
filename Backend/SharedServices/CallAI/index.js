@@ -8,6 +8,10 @@ import {
   DEFAULT_PROVIDER,
 } from '../constants.js';
 
+/*
+Function flow for AiCall
+AiCall Method -> EstimateTokens -> dispatch -> resolveModel -> ProviderFunctions -> AI PROVIDER
+*/
 export class AiCall {
   #models = [];
   #AiQuality = {};
@@ -26,7 +30,7 @@ export class AiCall {
   } = {}) {
     this.#models = models;
     this.#AiQuality = quality;
-    this.#AiProviders = providers;
+    this.#AiProviders = providers; 
     this.#ModelTypes = capabilities;
     this.#ProviderFunctions = functions;
     this.#defaultProvider = defaultProvider;
@@ -144,7 +148,6 @@ export class AiCall {
       contextSize,
       randomModel,
     } = options;
-
     // Build the full capability requirements for this call
     const requiredCaps = new Set([requiredCapability]);
     if (structuredOutput) requiredCaps.add(this.#ModelTypes.structuredOutputs);
