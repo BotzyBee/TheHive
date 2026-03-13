@@ -289,28 +289,32 @@ export class AiCall {
 }
 
 /**
- * Recursively adds additionalProperties: false to all object nodes in a JSON schema.
- *  @param {object} schema - JSON Schema object for structured outputs
+ * Recursively adds additionalProperties: false to all object nodes in a JSON schema,
+ * only if additionalProperties is not already defined.
+ * @param {object} schema - JSON Schema object for structured outputs
  */
 export function makeSchemaStrict(schema) {
   if (typeof schema !== 'object' || schema === null) return schema;
-
   const newSchema = Array.isArray(schema) ? [...schema] : { ...schema };
-
-  if (newSchema.type === 'object') {
+  // Only set to false if the property is currently undefined
+  if (newSchema.type === 'object' && newSchema.additionalProperties === undefined) {
     newSchema.additionalProperties = false;
   }
-
-  // Recursively check properties, items (for arrays), etc.
+  // Recursively check properties
   if (newSchema.properties) {
     for (const key in newSchema.properties) {
       newSchema.properties[key] = makeSchemaStrict(newSchema.properties[key]);
     }
   }
-
+  // Recursively check items (for arrays)
   if (newSchema.items) {
     newSchema.items = makeSchemaStrict(newSchema.items);
   }
-
+  // Handle other keywords that might contain schemas, like anyOf, allOf, or oneOf
+  ['anyOf', 'allOf', 'oneOf'].forEach(keyword => {
+    if (Array.isArray(newSchema[keyword])) {
+      newSchema[keyword] = newSchema[keyword].map(makeSchemaStrict);
+    }
+  });
   return newSchema;
 }
