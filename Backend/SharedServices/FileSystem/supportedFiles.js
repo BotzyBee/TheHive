@@ -7,14 +7,16 @@ export default {
     mimeType: "text/plain",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   bin: {
     name: "Binary File",
     mimeType: "application/octet-stream",
     encoding: "binary",
     readFN: async (filePath) => { return await readFileContent(filePath, true) },
-    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   bmp: {
     name: "Bitmap Image",
@@ -226,4 +228,36 @@ export default {
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
     writeFN: null
   },
+  odt: {
+    name: "OpenDocument Text",
+    mimeType: "application/vnd.oasis.opendocument.text",
+    encoding: "binary",
+    readFN: async (filePath) => { return await readFileContent(filePath, true) },
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+  },
+  ods: {
+    name: "OpenDocument Spreadsheet",
+    mimeType: "application/vnd.oasis.opendocument.spreadsheet",
+    encoding: "binary",
+    readFN: async (filePath) => { return await readFileContent(filePath, true) },
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+  },
+  odp: {
+    name: "OpenDocument Presentation",
+    mimeType: "application/vnd.oasis.opendocument.presentation",
+    encoding: "binary",
+    readFN: async (filePath) => { return await readFileContent(filePath, true) },
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+  },
+  odg: {
+    name: "OpenDocument Graphic",
+    mimeType: "application/vnd.oasis.opendocument.graphics",
+    encoding: "binary",
+    readFN: async (filePath) => { return await readFileContent(filePath, true) },
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
+  }
 };
