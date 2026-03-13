@@ -35,7 +35,7 @@ export async function getToolsForTask(task, limit){
 /**
  * Fetches the tool 'details' object for plugin or built-in tools.
  * @param {string} toolName - the name of the tool 
- * @returns {Result(object)} - Result( { Data from the 'details' object in the tool file } )
+ * @returns {Result(object)} - Result( {filePath: string, details: details object from tool file. } )
  */
 export async function getToolDetails(toolName){
     // Get DB Agent

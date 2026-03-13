@@ -1,3 +1,5 @@
+import { generateLongID } from "../Utils/index.js";
+
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
 // [][] ------------------------------------------ [][]
@@ -107,7 +109,7 @@ export class ChatLog {
 export class AiJob {
   constructor({ idPrefix = "AI", } = {}){ 
     /**@type {string} */
-    this.id = su.generateLongID(idPrefix);
+    this.id = generateLongID(idPrefix);
 
     /**@type {TaskStatus} */
     this.status = new TaskStatus();
