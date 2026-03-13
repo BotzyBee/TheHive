@@ -1,7 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
+import { Services } from "../../index.js";
 
 export const details = {
     toolName:   "aiWebSearch",
@@ -41,7 +41,7 @@ export const details = {
  * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
  */
 export async function run( 
-    Shared, 
+    Shared = Services, 
     params = {}
 ){  
     // Destructure input
@@ -70,8 +70,8 @@ export async function run(
     let usrText = `Here are your instructions <task>${taskDescription}</task>. ${addText}. ${context}`;
     let providers = Shared.Constants.AiProviders;
     let allCalls = [
-        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { providers: providers.gemini }),
-        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { providers: providers.perplexity }),
+        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { provider: providers.gemini }),
+        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { provider: providers.perplexity }),
     ];
     let res = await Promise.all(allCalls);
     if (res[0].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
@@ -79,5 +79,6 @@ export async function run(
     let combined = { result: `<Gemini_Result> ${res[0].value} </Gemini_Result> `+
         `<Perplexity_Result> ${res[1].value.searchResult} </Perplexity_Result>`, sources: res[1].value.citations };
     let op = new Shared.Classes.ToolOutput("aiWebSearch", taskDescription, combined);
+    console.log("OP :: ", combined);
     return Shared.Utils.Ok(op);
 }
