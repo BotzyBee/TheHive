@@ -1,8 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-import { Services } from "../../index.js";
-
 export const details = {
     toolName:   "aiWebSearch",
     version:    "2026.0.1",
@@ -41,7 +39,7 @@ export const details = {
  * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
  */
 export async function run( 
-    Shared = Services, 
+    Shared, 
     params = {}
 ){  
     // Destructure input
@@ -79,6 +77,5 @@ export async function run(
     let combined = { result: `<Gemini_Result> ${res[0].value} </Gemini_Result> `+
         `<Perplexity_Result> ${res[1].value.searchResult} </Perplexity_Result>`, sources: res[1].value.citations };
     let op = new Shared.Classes.ToolOutput("aiWebSearch", taskDescription, combined);
-    console.log("OP :: ", combined);
     return Shared.Utils.Ok(op);
 }
