@@ -26,7 +26,7 @@
     "officeparser": "^5.1.1",
     "piscina": "^5.0.0",
     "puppeteer-core": "^24.12.1",
-    "surrealdb": "^1.3.2"
+    "surrealdb": "^2.0.2"
   },
   "devDependencies": {
     "prettier": "3.8.1",

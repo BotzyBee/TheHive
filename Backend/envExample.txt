@@ -10,8 +10,10 @@ knowledgebaseURL=/data/UserFiles
 
 knowledgebaseHostURL=C:/path/to/Knowledgebase 
 
-dbRootUser=YourUsername
-dbRootPass=YourPassword
+dbRootUser=YourRootUsername
+dbRootPass=YourRootPassword
+dbRegularUser=Your Regular User
+dbRegularPass=Your Regular Password
 
 # OPEN AI API KEY
 OAI_KEY=YourKeyHere

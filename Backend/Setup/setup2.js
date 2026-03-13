@@ -10,6 +10,8 @@ export async function setupFolderBotDB() {
     dotenv.config({ path: ".env" });
     const dbUser = process.env.dbRootUser;
     const dbPass = process.env.dbRootPass;
+    const dbUserRegular = process.env.dbRegularUser;
+    const dbPassRegular = process.env.dbRegularPass;
     const rootDirUrl = process.env.knowledgebaseURL;
 
     try {
@@ -20,8 +22,6 @@ export async function setupFolderBotDB() {
             username: dbUser,
             password: dbPass,
         });
-
-        // https://surrealdb.com/docs/surrealql/statements/define/access  <-- Create USER Access levels
 
         // --- Create Namespace if it doesn't exist ---
         await db.query(`DEFINE NAMESPACE IF NOT EXISTS ${namespaceName};`);
@@ -128,6 +128,12 @@ export async function setupFolderBotDB() {
             TYPE F32;
         `);
         console.log(`${toolTableName} table and index created.`);
+        
+        // Add 'Normal User' on database. https://surrealdb.com/docs/surrealql/statements/define/user
+        await db.query(`
+            DEFINE USER ${dbUserRegular} ON DATABASE PASSWORD '${dbPassRegular}' ROLES OWNER DURATION FOR SESSION 1d, FOR TOKEN 1d;
+        `);
+        console.log(`User ${dbUserRegular} created with OWNER permissions on database level.`);
 
     } catch (error) {
         //console.error('Error setting up SurrealDB:', error);

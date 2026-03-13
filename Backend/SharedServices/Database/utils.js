@@ -19,17 +19,23 @@ let DATABASE_AGENT = null;
 async function createDbAgent(offline = false, options = {}) {
   let db = new Surreal();
   dotenv.config({ path: '.env' });
-  const dbUser = process.env.dbRootUser;
-  const dbPass = process.env.dbRootPass;
+  // use regular user not root! 
+  const dbUser = process.env.dbRegularUser;
+  const dbPass = process.env.dbRegularPass;
   try {
     // Connect to the SurrealDB instance
     let url = offline ? dbURL_Fallback : dbURL;
-    await db.connect(url);
-    // Authenticate as a root user (required to define namespaces and databases)
-    await db.signin({
-      username: dbUser,
-      password: dbPass,
+    await db.connect(url, {
+      namespace: namespaceName,
+      database: databaseName
     });
+    // Authenticate as 'Database' level user (non-root!)
+    await db.signin({
+        namespace: namespaceName,
+        database: databaseName,
+        username: dbUser,
+        password: dbPass
+      });
     await db.use({ namespace: namespaceName, database: databaseName });
     DATABASE_AGENT = db; // update global dbAgent var;
     return su.Ok(db);
