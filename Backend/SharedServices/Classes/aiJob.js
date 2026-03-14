@@ -1,9 +1,17 @@
 import { generateLongID } from "../Utils/index.js";
 import { MessageLog } from "./aiMessages.js";
+import { ContextTemplate } from "./context.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
 // [][] ------------------------------------------ [][]
+
+/*
+* NOTE - Context handling. All messages (text, image, data, audio etc) are added to the message history.
+* Summerised versions of tool output is added to toolContext - for planning. 
+*/
+
+
 export const Status = {
     Complete: "Complete",
     Failed: "Failed",
@@ -59,18 +67,18 @@ export class TaskStatus {
 
 // Base Class for all AI Jobs / Agents 
 export class AiJob {
-  constructor({ idPrefix = "AI", } = {}){ 
+  constructor({ idPrefix = "AI", aiSettings } = {}){ 
     /**@type {string} */
     this.id = generateLongID(idPrefix);
 
     /**@type {TaskStatus} */
     this.status = new TaskStatus();
 
-    /**@type {object} - Default is {}*/
-    this.contextData = {};
+    /**@type {ContextTemplate} - Global and Summary Tool Data */
+    this.contextData = new ContextTemplate();
 
     /**@type {object} - Optional settings passed to aiCall eg. provider, quality */
-    this.aiSettings = {}
+    this.aiSettings = aiSettings || {}
 
     /**@type {any} - The final return from any AiJob. Default is null */
     this.taskOutput = null;
@@ -84,7 +92,7 @@ export class AiJob {
     /**@type {array[string]} - Array of errors for debugging. */
     this.errors = [];
 
-    /**@type {MessaageLog} - Chat log class for holding and managing user & agent messages */
+    /**@type {MessageLog} - Chat log class for holding and managing user & agent messages */
     this.conversationHistory = new MessageLog();
 
     /**@type {boolean} - true if job is actively being worked on. */
@@ -144,15 +152,3 @@ export class AiJob {
     return this.stats.loopNumber;
   }
 }
-
-// // Extending AiJob - Example
-// class ResearchAgent extends AiJob {
-//   constructor(){
-//     super() // <== anything put in super(here) will be passed to the parent constructor
-//   }
-//   searchAcademicPapers(topic) {
-//     this.id // <== inherets the value from parent. 
-//     super().addLoopCount(1) // <== can call a method on the parent.
-//     return `Searching papers about ${topic}...`;
-//   }
-// }

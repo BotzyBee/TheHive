@@ -1,9 +1,9 @@
 import { Services } from "../index.js";
 
 export const Roles = {
-    User,   // Messages from the user
-    Agent,  // Messages from Agent / AI 
-    Tool    // Messages or data from tools
+    User: "User",    // Messages from the user
+    Agent: "Agent",  // Messages from Agent / AI 
+    Tool: "Tool"     // Messages or data from tools
 }
 
 /**
@@ -22,19 +22,44 @@ export class MessageLog {
      */
     addMessage(messageInstance) {
         if (!(messageInstance instanceof BaseMessage)) {
-            return Services.Utils.Err(``);
+            return Services.Utils.Err('Messages must be an instance of BaseMessage or a class that extends it.');
         }
         this.allMessages.push(messageInstance);
     }
 
     /**
-     * Get all user and system messages as string
+     * Get all user and system messages as string - ALL TYPES !!
      * @returns {string} - returns all messages separated by \n\n
      */
     getAllMessagesString(){
         return this.allMessages
         .map(msg => JSON.stringify(msg))
         .join('\n\n');
+    }
+
+    /**
+     * Returns shortened version of all text messages between User and Agent. { role, message }
+     * @returns {string} - returns all 'Text' messages separated by \n\n 
+     */
+    getSimpleUserAgentComms() {
+    return this.allMessages
+        .filter(msg => msg?.type === 'Text' && (msg?.role === Roles.Agent || msg?.role === Roles.User ))
+        .map(msg => `${msg.role}: ${msg.textData}`) // Convert object to a string line
+        .join('\n\n');
+    }
+
+    /**
+     * Get all Tool messagegs from Message Log and return as object.
+     * @returns {object} - Object containing all Tool messages. Key is the message ID.
+     */
+    getToolMessagesAsObject(){
+      let rtnObject = {};
+      let allToolMsgs = this.allMessages.filter(msg => msg?.role === Roles.Tool );
+      const msgLen = allToolMsgs.length ?? 0;
+      for(let i=0; i<msgLen; i++){
+        rtnObject[allToolMsgs[i].id] = allToolMsgs[i];
+      }
+      return rtnObject;
     }
 
     /**
