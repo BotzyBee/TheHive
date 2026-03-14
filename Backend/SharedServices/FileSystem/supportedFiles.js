@@ -281,5 +281,26 @@ export default {
     readFN: async (filePath) => { return await readFileContent(filePath, true) },
     writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
       return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
-  }
+  },
+  mp3: {
+    name: "MPEG-3 Audio",
+    mimeType: "audio/mpeg",
+    encoding: "base64",
+    readFN: null, 
+    writeFN: null
+  },
+  wav: {
+    name: "Waveform Audio",
+    mimeType: "audio/wav",
+    encoding: "base64",
+    readFN: null, 
+    writeFN: null
+  },
+  m4a: {
+    name: "MPEG-4 Audio",
+    mimeType: "audio/mp4",
+    encoding: "base64",
+    readFN: null, 
+    writeFN: null
+  },
 };
