@@ -38,7 +38,7 @@ export async function readOfficeFileToString(params = {}){
         return Err(`Error (readImageFileToBase64) Paras needed filePath, mimeType. Provided: ${JSON.stringify(params)}`);
     }
     let call = await readFileContent(params.filePath, true);
-    if (call.isErr()){ return Err(`Error (readImageFileToBase64 -> readFileContent) : ${call.value}`)}
+    if (call.isErr()){ return Err(`Error (readOfficeFileToString -> readFileContent) : ${call.value}`)}
     // parse from buffer
     try {
         let data = await officeParser.parseOfficeAsync(call.value);
@@ -46,4 +46,21 @@ export async function readOfficeFileToString(params = {}){
     } catch (error) {
         return Err(`Error (readOfficeFileToString) : ${error}`)
     }
+}
+
+/**
+ * Converts a Base64 string or Data URI to a Node.js Buffer.
+ * @param {string} base64String - The raw base64 or data:image/... string.
+ * @returns {Buffer} - The decoded binary data.
+ */
+export function base64ToBuffer(base64String) {
+  // Check if it's a Data URI (contains a comma)
+  const hasMetadata = base64String.includes(',');
+  
+  // If it's a Data URI, split it and take the second part (the actual data)
+  const pureBase64 = hasMetadata 
+    ? base64String.split(',')[1] 
+    : base64String;
+
+  return Buffer.from(pureBase64, 'base64');
 }
