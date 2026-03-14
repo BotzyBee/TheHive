@@ -23,21 +23,24 @@ export default {
     mimeType: "image/bmp",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/bmp" }) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   css: {
     name: "Cascading Style Sheet",
     mimeType: "text/css",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   csv: {
     name: "Comma Separated Values",
     mimeType: "text/csv",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   doc: {
     name: "Microsoft Word Document (97-2003)",
@@ -58,70 +61,80 @@ export default {
     mimeType: "image/gif",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/gif" }) },
-    readFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   htm: {
     name: "HTML Document",
     mimeType: "text/html",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   html: {
     name: "HTML Document",
     mimeType: "text/html",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   ico: {
     name: "Icon Image",
     mimeType: "image/x-icon",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/x-icon" }) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   jpeg: {
     name: "JPEG Image",
     mimeType: "image/jpeg",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/jpeg"}) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   jpg: {
     name: "JPEG Image",
     mimeType: "image/jpeg",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/jpeg"}) },
-    readFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   js: {
     name: "JavaScript File",
     mimeType: "text/javascript",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   json: {
     name: "JSON File",
     mimeType: "application/json",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   mjs: {
     name: "JavaScript Module File",
     mimeType: "text/javascript",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   png: {
     name: "PNG Image",
     mimeType: "image/png",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/png"}) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   pdf: {
     name: "PDF Document",
@@ -149,28 +162,32 @@ export default {
     mimeType: "image/svg+xml",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   tif: {
     name: "TIFF Image",
     mimeType: "image/tiff",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/tiff"}) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   tiff: {
     name: "TIFF Image",
     mimeType: "image/tiff",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/tiff"}) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   webp: {
     name: "WebP Image",
     mimeType: "image/webp",
     encoding: "base64",
     readFN: async (filePath) => { return await readImageFileToBase64({ filePath, mimeType: "image/webp"}) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt, {encoding: "base64"})}
   },
   xls: {
     name: "Microsoft Excel Spreadsheet (97-2003)",
@@ -191,21 +208,24 @@ export default {
     mimeType: "application/xml",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   markdown: {
     name: "Markdown File",
     mimeType: "text/markdown",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   md: {
     name: "Markdown File",
     mimeType: "text/markdown",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   xlw: {
     name: "Microsoft Excel Worksheet (97-2003)",
@@ -219,14 +239,16 @@ export default {
     mimeType: "application/x-yaml",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   yaml: {
     name: "YAML File",
     mimeType: "application/x-yaml",
     encoding: "utf-8",
     readFN: async (filePath) => { return await readFileContent(filePath, false) },
-    writeFN: null
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => { 
+      return await saveFile(relativeFolderPath, fileContent, fileNameIncExt)}
   },
   odt: {
     name: "OpenDocument Text",
