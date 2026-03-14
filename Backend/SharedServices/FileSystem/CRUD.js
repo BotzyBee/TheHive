@@ -2,41 +2,58 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import * as su from '../Utils/index.js';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { containerVolumeRoot } from '../constants.js';
 
 // [][] ---- CREATE ---- [][]
 /**
- * Save Content to a file on the host system
+ * Save Content to a file using Streams for memory efficiency.
  * @param {string} folderPath - The full filepath on the host machine (not docker/ container path)
- * @param {string | buffer | object} fileContent 
+ * @param {string | Buffer | Uint8Array | object | Readable} fileContent 
  * @param {string} fileNameIncExt 
+ * @param {object} [options]
+ * @param {BufferEncoding} [options.encoding] - optional, specify encoding.
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
-export async function saveFile(folderPath, fileContent, fileNameIncExt) {
-  let savePath = path.join(folderPath, fileNameIncExt);
-  let dataToWrite;
-  let encoding = 'utf8';
-  // 1. Normalize the data
-  if (Buffer.isBuffer(fileContent) || fileContent instanceof Uint8Array) {
-    dataToWrite = fileContent;
-    encoding = null; // No encoding for binary
-  } else if (typeof fileContent === 'string') {
-    dataToWrite = fileContent;
-  } else if (
-    Array.isArray(fileContent) ||
-    (typeof fileContent === 'object' && fileContent !== null)
-  ) {
-    dataToWrite = JSON.stringify(fileContent, null, 2);
-  } else {
-    return su.logAndErr('Error - (saveFile) : Unsupported content type.');
-  }
-  // 2. Perform the action
+export async function saveFile(folderPath, fileContent, fileNameIncExt, options = {}) {
+  const savePath = path.join(folderPath, fileNameIncExt);
+  let sourceStream;
+  // Default encoding for strings/objects
+  let encoding = options.encoding || 'utf8';
+
   try {
+    // Normalize the data into a Readable Stream
+    if (fileContent instanceof Readable) {
+      // It's already a stream (e.g., an incoming HTTP request or another file)
+      sourceStream = fileContent;
+    } else if (Buffer.isBuffer(fileContent) || fileContent instanceof Uint8Array) {
+      // Raw binary data
+      sourceStream = Readable.from(fileContent);
+      encoding = undefined;
+    } else if (typeof fileContent === 'string') {
+      // Text or Base64 string
+      sourceStream = Readable.from(fileContent);
+    } else if (fileContent !== null && typeof fileContent === 'object') {
+      // JSON Objects/Arrays
+      const jsonString = JSON.stringify(fileContent, null, 2);
+      sourceStream = Readable.from(jsonString);
+    } else {
+      return su.Err('Error - (saveFile) : Unsupported content type.');
+    }
+
+    // Ensure directory exists
     await fsp.mkdir(folderPath, { recursive: true });
-    await fsp.writeFile(savePath, dataToWrite, encoding);
-    return su.Ok('File created');
+
+    // Create the Write Stream and Pipe
+    const writeStream = fs.createWriteStream(savePath, { encoding: encoding });
+
+    // pipeline automatically handles errors and closes streams properly
+    await pipeline(sourceStream, writeStream);
+
+    return su.Ok(`File created in ${folderPath} called ${fileNameIncExt}`);
   } catch (error) {
-    return su.logAndErr(`Error - (saveFile) : ${error}`);
+    return su.Err(`Error - (saveFile) : ${error.message}`);
   }
 }
 
@@ -45,21 +62,28 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt) {
  * Read file content from file on host machine.
  * @param {string} filePath - full filepath of file location on host machine (not docker/ container url) 
  * @param {boolean} asBuffer - true = file will be read as buffer.
+ * @param {object} options
+ * @param {string} [options.encoding] - optional, specify the encoding if not binary. 
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
-export async function readFileContent(filePath, asBuffer = false) {
+export async function readFileContent(filePath, asBuffer = false, options) {
+  const stats = await fsp.lstat(filePath);
+  if (!stats.isFile()) {
+    return su.Err(`Error: Path is not a file: ${filePath}`);
+  }
+  const encoding = options.encoding || 'utf8';
   try {
     if (asBuffer) {
       // Read as a binary Buffer
       const bufferContent = await fsp.readFile(filePath);
       return su.Ok(bufferContent);
     } else {
-      // Read as UTF-8 text by default
-      const textContent = await fsp.readFile(filePath, 'utf8');
+      // Read as UTF-8 text or user specified encoding
+      const textContent = await fsp.readFile(filePath, encoding);
       return su.Ok(textContent);
     }
   } catch (error) {
-    return su.logAndErr(`Error (readFileContent) : ${error}`);
+    return su.Err(`Error (readFileContent) : ${error}`);
   }
 }
 
@@ -81,7 +105,7 @@ export async function getUpdateStatsFromUrl(url) {
     data.birthtimeMs = Math.round(data.birthtimeMs);
     return su.Ok(data);
   } catch (error) {
-    return su.logAndErr(error);
+    return su.Err(error);
   }
 }
 
@@ -105,7 +129,7 @@ export async function getFilesAndDirectoriesFromDir(url) {
         const dirStats = await getUpdateStatsFromUrl(fullPath);
         // catch error
         if (dirStats.isErr()) {
-          return su.logAndErr(
+          return su.Err(
             `Error - getFilesAndDirectoriesFromDir -> getUpdateStatsFromUrl(1) : ${dirStats.value}`
           );
         }
@@ -117,7 +141,7 @@ export async function getFilesAndDirectoriesFromDir(url) {
         const fileUrl = path.resolve(fullPath);
         const fileStats = await getUpdateStatsFromUrl(fileUrl);
         if (fileStats.isErr()) {
-          return su.logAndErr(
+          return su.Err(
             `Error - getFilesAndDirectoriesFromDir -> getUpdateStatsFromUrl(2) : ${fileStats.value}`
           );
         }
@@ -130,7 +154,7 @@ export async function getFilesAndDirectoriesFromDir(url) {
       }
     }
   } catch (error) {
-    return su.logAndErr(`Error (getFilesAndDirectoriesFromUrl) : ${error}`);
+    return su.Err(`Error (getFilesAndDirectoriesFromUrl) : ${error}`);
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
@@ -182,7 +206,7 @@ export function getFileExtensionAndSize(filePath) {
       sizeFormatted: sizeFormatted,
     });
   } catch (error) {
-    return su.logAndErr(`Error (getFileExtensionAndSize) : ${error}`);
+    return su.Err(`Error (getFileExtensionAndSize) : ${error}`);
   }
 }
 
@@ -211,7 +235,7 @@ export async function scanFolderRecursively(relativeFolderPath) {
         directorySet.add(fullPath); // Add the current directory to the Set
         let recCall = await scanFolderRecursively(fullPath);
         if (recCall.isErr()) {
-          return su.logAndErr(
+          return su.Err(
             `Error (scanFolderRecursively) : Error scanning directory (recursive) ${fullPath} `
           );
         }
@@ -228,7 +252,7 @@ export async function scanFolderRecursively(relativeFolderPath) {
       }
     }
   } catch (error) {
-    return su.logAndErr(
+    return su.Err(
       `Error (scanFolderRecursively) : Error scanning directory ${relativeFolderPath} : ${error} `
     );
   }
