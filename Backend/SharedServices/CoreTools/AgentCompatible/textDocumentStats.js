@@ -29,7 +29,7 @@ export const details = {
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
  * @param {object}  options
  * @param {string}  options.filePath - Mandatory. The relative file path of the target text file. 
- * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -100,14 +100,20 @@ export async function run(
     } catch (err) {
         return Shared.Utils.Err(`Error (getTextDocumentStats) : ${err}`);
     }
-    let op = new Shared.Classes.ToolOutput("getTextDocumentStats", filePath, {
-        lines: lineCount,
-        words: wordCount,
-        characters: charCount,
-        nonWhitespaceCharacters: nonWhitespaceCharCount,
-        fileSize: fileSize,
-        fileSizeFormatted: fileSizeFormatted,
-        extension: fileExtension
+    let message = new Shared.Classes.DataMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: null, 
+        data: {
+            lines: lineCount,
+            words: wordCount,
+            characters: charCount,
+            nonWhitespaceCharacters: nonWhitespaceCharCount,
+            fileSize: fileSize,
+            fileSizeFormatted: fileSizeFormatted,
+            extension: fileExtension
+        },
+        toolName: "getTextDocumentStats",
+        instructions: `Get the file stats for ${filePath}.`
     });
-    return Shared.Utils.Ok(op);
+    return Shared.Utils.Ok([message]);
 }

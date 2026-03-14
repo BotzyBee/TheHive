@@ -52,7 +52,7 @@ export const details = {
  * @param {number}  options.quality - Optional. 1 is low, 3 is high.
  * @param {object}  options.structuredOutput - Optional (Schema). If used the AI model will output a structured output to match this schema.
  * @param {boolean} options.randomModel - If true, AI will use a random provider that matches the specs requested.
- * @returns {Result(ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -62,7 +62,7 @@ export async function run(
     const { taskDescription, context } = params;
     // Catch bad params
     if(taskDescription == null){
-        return Shared.Utils.logAndErr(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
+        return Shared.Utils.Err(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
     }
     // Prepare any context / reference text
     let ref = context ? context : "";
@@ -75,9 +75,15 @@ export async function run(
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
     let call = await aiCall.generateText(usrText, sysText, params );
     if(call.isErr()){
-        return Shared.Utils.logAndErr(`Error (AiTextAction -> Generate Text) : ${call.value}`);
-    }
-    let toolReturn = new Shared.Classes.ToolOutput("AiTextAction", params.taskDescription, call.value);
-    return Shared.Utils.Ok(toolReturn);
+        return Shared.Utils.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
+    } Shared.Classes.Roles.Tool
+    let message = new Shared.Classes.TextMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: "text/plain", 
+        textData: call.value,
+        toolName: "AiTextAction",
+        instructions: taskDescription
+    });
+    return Shared.Utils.Ok([message]);
 }
 

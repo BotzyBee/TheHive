@@ -30,7 +30,7 @@ export const details = {
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
  * @param {object}  options
  * @param {string}  options.searchTerm - Mandatory. The search term for finding a file or directory by name.
- * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -40,7 +40,7 @@ export async function run(
     const { searchTerm } = params;
     // Catch bad params
     if(searchTerm == null){
-        return Shared.Utils.logAndErr(`Error (findFileorFolder) : Params missing or incorrect. Param needed: searchTerm`);
+        return Shared.Utils.Err(`Error (findFileorFolder) : Params missing or incorrect. Param needed: searchTerm`);
     }
     let userFolder = Shared.Constants.userFilesDir;
     let allFoldersAndFiles = await Shared.FileSystem.scanFolderRecursively(`/${userFolder}`);
@@ -59,8 +59,14 @@ export async function run(
             matches.push(allFoldersAndFiles.value.fileList[i]);
         }
     }
-    let op = new Shared.Classes.ToolOutput("findFileorFolder", `Find: ${searchTerm}`, matches);
-    return Shared.Utils.Ok(op);
+    let message = new Shared.Classes.DataMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: null, 
+        data: matches,
+        toolName: "findFileorFolder",
+        instructions: `Find: ${searchTerm}`
+    });
+    return Shared.Utils.Ok([message]);
 }
 
 

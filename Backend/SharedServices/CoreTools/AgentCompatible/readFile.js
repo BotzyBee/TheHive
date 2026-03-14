@@ -27,7 +27,7 @@ export const details = {
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
  * @param {object}  options
  * @param {string}  options.filePath - Mandatory. The task or action needing undertaken.
- * @returns {Result(ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -37,14 +37,14 @@ export async function run(
     const { filePath } = params;
     // Catch bad params
     if(filePath == null){
-        return Shared.Utils.logAndErr(`Error (ReadFile Tool) - Input filePath missing or null.`);
+        return Shared.Utils.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
     }
     const root = Shared.Constants.containerVolumeRoot;
     const targetURL = Shared.Utils.pathHelper.join(root, filePath);
     // Get File data
     let fileInfo = Shared.FileSystem.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
     if(fileInfo.isErr()){
-        return Shared.Utils.logAndErr(`Error (readFile -> getFileExtensionAndSize) : ${fileInfo.value}`)
+        return Shared.Utils.Err(`Error (readFile -> getFileExtensionAndSize) : ${fileInfo.value}`)
     }
     // lookup correct read tool
     let fileSupported = false;
@@ -57,22 +57,21 @@ export async function run(
         }
     }
     if(fileSupported === false ){
-        return Shared.Utils.logAndErr(`Error (readFile) : Target file type is not supported. Target Type ${fileInfo.value.extension}`)
+        return Shared.Utils.Err(`Error (readFile) : Target file type is not supported. Target Type ${fileInfo.value.extension}`)
     }
     // Use the supplied read function;
     let toolCall = await fileMethods.readFN(targetURL);
     if(toolCall.isErr()){
-        return Shared.Utils.logAndErr(`Error (readFile -> fileMethods.readFN() : ${toolCall.value})`);
+        return Shared.Utils.Err(`Error (readFile -> fileMethods.readFN() : ${toolCall.value})`);
     }
-    let data = toolCall.value;
-    let metaData = { 
-        extension: fileInfo.extension, 
-        sizeBytes: fileInfo.sizeBytes, 
-        sizeFormatted: fileInfo.sizeFormatted, 
+
+    let message = new Shared.Classes.DataMessage({
+        role: Shared.Classes.Roles.Tool, 
         mimeType: fileMethods.mimeType, 
-        encoding: fileMethods.encoding 
-    }
-    let op = new Shared.Classes.ToolOutput("readFile", filePath, {fileData: data, fileMetaData: metaData });
-    return Shared.Utils.Ok(op);
+        data: toolCall.value,
+        toolName: "readFile",
+        instructions: `Read the file: ${targetURL}`
+    });
+    return Shared.Utils.Ok([message]);
 }
 

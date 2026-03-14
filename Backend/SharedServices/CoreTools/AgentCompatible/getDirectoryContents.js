@@ -28,7 +28,7 @@ export const details = {
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
  * @param {object}  options
  * @param {string}  options.relativeFolderPath - Mandatory. The relative path of the target folder. 
- * @returns {Result(ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -42,6 +42,13 @@ export async function run(
     }
     let call = await Shared.FileSystem.scanFolderRecursively(relativeFolderPath);
     if (call.isErr()){ return Shared.Utils.Err(`Error (getContentsOfDirectory -> scanFolderRecursively) : ${call.value}`)}
-    let op = new Shared.Classes.ToolOutput("getContentsOfDirectory", relativeFolderPath, call.value);
-    return Shared.Utils.Ok(op);
+
+    let message = new Shared.Classes.DataMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: null, 
+        data: call.value,
+        toolName: "getContentsOfDirectory",
+        instructions: `Get the contents of the directory ${relativeFolderPath}.`
+    });
+    return Shared.Utils.Ok([message]);
 }

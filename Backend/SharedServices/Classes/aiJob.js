@@ -1,4 +1,5 @@
 import { generateLongID } from "../Utils/index.js";
+import { MessageLog } from "./aiMessages.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
@@ -56,55 +57,6 @@ export class TaskStatus {
     }
 }
 
-export class ChatLog {
-  #messageCount;
-    constructor() {
-      this.#messageCount = 0;
-      this.allMessages = [];
-  }
-
-  /**
-   * Adds user message to chat log
-   * @param {any} message - can be text, object or other data 
-   */
-  addUserMessage(message){
-    this.allMessages.push({source: 'user', data: message});
-    this.#messageCount += 1;
-  }
-
-   /**
-   * Adds agent message to chat log
-   * @param {any} message - can be text, object or other data 
-   */
-  addAgentMessage(message){
-    this.allMessages.push({source: 'agent', data: message});
-    this.#messageCount += 1;
-  }
-
-  /**
-   * Get all user and system messages as string
-   * @returns {string} - returns all messages separated by \n\n
-   */
-  getAllMessagesString(){
-    return this.allMessages
-    .map(msg => JSON.stringify(msg))
-    .join('\n\n');
-  }
-
-    /**
-   * Get all user and system messages as an array of objects
-   * @returns {array[object]} - returns an array of {source: 'user' | 'agent', data: any} objects
-   */
-  getAllMessagesArray(){
-    return this.allMessages;
-  }
-
-  /**@returns {number} - total number of messages */
-  getMessageCount(){
-    return this.#messageCount;
-  }
-}
-
 // Base Class for all AI Jobs / Agents 
 export class AiJob {
   constructor({ idPrefix = "AI", } = {}){ 
@@ -132,8 +84,8 @@ export class AiJob {
     /**@type {array[string]} - Array of errors for debugging. */
     this.errors = [];
 
-    /**@type {ChatLog} - Chat log class for holding and managing user & agent messages */
-    this.conversationHistory = new ChatLog();
+    /**@type {MessaageLog} - Chat log class for holding and managing user & agent messages */
+    this.conversationHistory = new MessageLog();
 
     /**@type {boolean} - true if job is actively being worked on. */
     this.isRunning = false;

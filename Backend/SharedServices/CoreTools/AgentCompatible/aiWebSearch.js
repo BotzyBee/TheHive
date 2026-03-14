@@ -36,7 +36,7 @@ export const details = {
  * @param {string}  options.taskDescription - Mandatory. The task description or search term to be used when doing the online search. 
  * @param {string}  options.referenceText - Optional. Any reference text which might provide context or help the process. 
  * @param {string}  options.targetURL - Optional. A specific website to search if known.
- * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err.
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -76,6 +76,13 @@ export async function run(
     if (res[1].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
     let combined = { result: `<Gemini_Result> ${res[0].value} </Gemini_Result> `+
         `<Perplexity_Result> ${res[1].value.searchResult} </Perplexity_Result>`, sources: res[1].value.citations };
-    let op = new Shared.Classes.ToolOutput("aiWebSearch", taskDescription, combined);
-    return Shared.Utils.Ok(op);
+
+    let message = new Shared.Classes.TextMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: "text/plain", 
+        textData: combined,
+        toolName: "aiWebSearch",
+        instructions: taskDescription
+    });
+    return Shared.Utils.Ok([message]);
 }

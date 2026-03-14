@@ -1,7 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
 export const details = {
     toolName:   "writeFile",
     version:    "2026.0.1",
@@ -41,7 +40,7 @@ export const details = {
  * @param {string}  options.relativeFolderPath - The relative path to where the file should be saved (within the knowledgebase)
  * @param {any}  options.fileContent - the file content, does not need to be stringified. This is handled automagically. 
  * @param {string}  options.fileNameIncExt - eg filename.json
- * @returns {Result( ToolOutput | string)} - Returns a result and either ToolOutput or string depending if Ok or Err. 
+ * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 
@@ -51,19 +50,21 @@ export async function run(
     let { relativeFolderPath, fileContent, fileNameIncExt } = params;
     // Catch bad params
     if(relativeFolderPath == null || fileContent == null || fileNameIncExt == null ){
-        return Shared.Utils.logAndErr(`Error (writeFile) : Params missing or incorrect. Params: relativeFolderPath, fileContent, fileNameIncExt`);
+        return Shared.Utils.Err(`Error (writeFile) : Params missing or incorrect. Params: relativeFolderPath, fileContent, fileNameIncExt`);
     }
     // this is set in docker-compose.yml and maps to the UserFiles folder on the host machine
     const containerVolumeRoot = Shared.Constants.containerVolumeRoot; 
     //Construct the full path and save the content
     const targetDirectoryInContainer = Shared.Utils.pathHelper.join(containerVolumeRoot, relativeFolderPath);
     let call = await Shared.FileSystem.saveFile(targetDirectoryInContainer, fileContent, fileNameIncExt);
-    if (call.isErr()){ return Shared.Utils.logAndErr(`Error (writeFile -> saveFile) : ${call.value}`)}
+    if (call.isErr()){ return Shared.Utils.Err(`Error (writeFile -> saveFile) : ${call.value}`)}
 
-    let op = new Shared.Classes.ToolOutput(
-        'writeFile', 
-        'Write content to file' , 
-        `File created in ${relativeFolderPath} with filename ${fileNameIncExt} - using the data provided. Mark task as complete!`
-    );
-    return Shared.Utils.Ok(op);
+    let message = new Shared.Classes.TextMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: "text/plain", 
+        textData: `File created in ${relativeFolderPath} with filename ${fileNameIncExt} - using the data provided. Mark task as complete!`,
+        toolName: "writeFile",
+        instructions: `Write content to file`
+    });
+    return Shared.Utils.Ok([message]);
 }
