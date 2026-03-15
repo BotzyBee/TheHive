@@ -63,6 +63,16 @@ export class MessageLog {
     }
 
     /**
+     * Get a message by it's unique id
+     * @returns {TextMessage | ImageMessage | AudioMessage | DataMessage}
+     */
+    getMessagesById(messageID){
+      let allToolMsgs = this.allMessages.filter(msg => msg?.id === messageID );
+      let len = allToolMsgs.length ?? 0;
+      return len === 0 ? null : allToolMsgs[0];
+    }
+
+    /**
      * Get all user and system messages as an array of objects
      * @returns {array[object]} - returns an array of {source: 'user' | 'agent', data: any} objects
      */
@@ -80,12 +90,12 @@ export class MessageLog {
     }
 }
 
-class BaseMessage {
+export class BaseMessage {
   constructor(role, metadata = {}) {
     this.id = Services.Utils.generateShortID("MSG");
     this.role = role; // as defined in Roles object
     this.timestamp = new Date();
-    this.metadata = metadata;
+    this.metadata = metadata; // for counting ai calls etc
   }
 
   toJSON() {

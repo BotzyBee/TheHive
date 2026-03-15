@@ -80,8 +80,8 @@ export class AiJob {
     /**@type {object} - Optional settings passed to aiCall eg. provider, quality */
     this.aiSettings = aiSettings || {}
 
-    /**@type {any} - The final return from any AiJob. Default is null */
-    this.taskOutput = null;
+    /**@type {[]TextMessage | ImageMessage | AudioMessage | DataMessage } - The final return from any AiJob. This will be one or more 'messsages'. */
+    this.taskOutput = [];
 
     /**@type {number} - The start time (epoch) when the Job was started */
     this.startEpochMs = 0;
@@ -93,7 +93,7 @@ export class AiJob {
     this.errors = [];
 
     /**@type {MessageLog} - Chat log class for holding and managing user & agent messages */
-    this.conversationHistory = new MessageLog();
+    this.messageHistory = new MessageLog();
 
     /**@type {boolean} - true if job is actively being worked on. */
     this.isRunning = false;
