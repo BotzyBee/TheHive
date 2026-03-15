@@ -3,6 +3,7 @@ ALL Agent Compatable tools MUST adhere to the following to ensure compatability
 
 1. Tools must expose the following methods
 
+```
 export details = {
     toolName:   "theNameOfYourTool", // must be unique!
     version:    "",
@@ -16,6 +17,7 @@ export async function run(
     Shared, 
     params = {}
 ){ }
+```
 
 When called, Shared Services will be injected into Shared allowing you to utilise the core classes and functions. Any params expected should match the schema. 
 
