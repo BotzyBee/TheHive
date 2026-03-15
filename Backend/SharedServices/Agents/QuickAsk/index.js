@@ -4,8 +4,7 @@ import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
 import { parserPrompts, buildObject, addAnyDirectData } from '../../CoreTools/inputParser.js';
 import { callAgentTool } from '../../CoreTools/helperFunctions.js';
-import { quickAskFolder, builtInFilePath } from '../../constants.js';
-import { TextMessage, Roles } from '../../Classes/index.js';
+import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from '../../Classes/index.js';
 import { processMessageForContext } from '../agentUtils.js';
 
 /**
@@ -146,13 +145,13 @@ export class QuickAskAgent extends AiJob {
     
     // Finalise output
     let formattedOP = await this.#finialiseOutput();
-    // if( formattedOP.isErr()){
-    //   this.setFailed();
-    //   this.isRunning = false;
-    //   return formattedOP; // already has Result Class
-    // }
+    if( formattedOP.isErr()){
+      this.setFailed();
+      this.isRunning = false;
+      return formattedOP; // already has Result Class
+    }
 
-    // this.taskOutput = formattedOP.value;
+    this.taskOutput = formattedOP.value;
     this.setEndTime();
     this.setComplete();
     this.isRunning = false;
@@ -160,6 +159,7 @@ export class QuickAskAgent extends AiJob {
   }
 
   async #finialiseOutput(){
+    console.log("Finalising Output...");
     // Create OP Plan -> Process each message (auto adds to messageHistory ) -> add to taskOutput
 
     // Craft output array (overview)
@@ -189,45 +189,28 @@ export class QuickAskAgent extends AiJob {
       }
 
       if(outputPlan[i].type === "Image"){
-        
+        let img = await this.#processImage(outputPlan[i]?.contextKey || null);
+        if(img.isErr()) return img; // already has Result type
+        opMessages.push(img.value);
       }
 
       if(outputPlan[i].type === "Audio"){
-        
+        let aud = await this.#processAudio(outputPlan[i]?.contextKey || null);
+        if(aud.isErr()) return aud; // already has Result type
+        opMessages.push(aud.value);
       }
 
       if(outputPlan[i].type === "Data"){
-        
+        let dta = await this.#processData(outputPlan[i]?.contextKey || null);
+        if(dta.isErr()) return dta; // already has Result type
+        opMessages.push(dta.value);
       }
-      
+
       if(outputPlan[i].type === "Save"){
-        
+        // To Do !
       }      
     }
-
-
-    // // Save output as file
-    // if(AiCallOutput.value.output == "Save_Data"){
-    //     // Manage project and non-project tasks
-    //     let augmentedTextOutput = addAnyDirectData(AiCallOutput.value.data, context); 
-    //     if(augmentedTextOutput.isErr()){
-    //         return Err(`#finialiseOutput -> addAnyDirectData 2 : ${augmentedTextOutput.value}`);
-    //     }
-
-    //     let toolCall = await callAgentTool(
-    //       "writeFile",
-    //       builtInFilePath,
-    //       { relativeFolderPath: quickAskFolder, 
-    //         fileContent: augmentedTextOutput.value, 
-    //         fileNameIncExt: `QuickAsk_${this.id}_Result.txt`
-    //       }
-    //     );
-    //     if(toolCall.isErr()){
-    //       return Err(`Error: #finialiseOutput -> writeFile : ${toolCall.value}`)    
-    //     }     
-    //     return Ok(`Task has been completed and output saved to Task_${this.id}.txt in ${quickAskFolder} folder.`)
-    // }
-    // return Err(`Error (finialiseOutput) - AiCallOutput.value.output did not match any of the given options. Value: ${AiCallOutput.value.output}`)
+    return Ok(opMessages);
   }
 
   /**
@@ -250,9 +233,7 @@ export class QuickAskAgent extends AiJob {
       { ...this.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 
     ); // { output: [enum "Text_Output", "Quote_Text" ], data: string }
     if(formatCall.isErr()){
-      this.setFailed();
-      this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> formatCall ) : ${formatCall.value}`)    
+      return Err(`Error ( #processText ) : ${formatCall.value}`)    
     } 
 
     // Catch AI doesn't return output key
@@ -280,6 +261,109 @@ export class QuickAskAgent extends AiJob {
     this.messageHistory.addMessage(msg);
     return Ok(msg);
   }
+
+  /**
+   * 
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ ImageMessage | string]} - Result( Image Message | string )
+   */
+  async #processImage(contextKey){
+    if(contextKey == null){
+      return Err(`Error: (#processImage) - contextKey is missing`);
+    }
+    let check = this.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (#processImage) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let img = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    img.role = Roles.Agent;
+    let summaryMessage = new ImageMessage({
+      role: Roles.Agent,
+      base64: `[ Base 64 data removed due to size - Full data can be found in message ${contextKey} ]`,
+      url: img.url,
+      mimeType: img.mime,
+      altText: img.altText,
+      instructions: img.instructions,
+      toolName: img.toolName
+    });
+    img.toolName = "";
+    img.instructions = "";
+    // Push summary message to chat, return full message.
+    this.messageHistory.addMessage(summaryMessage);
+    return Ok(img);
+  }
+
+  /**
+   * 
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ AudioMessage | string]} - Result( Audio Message | string )
+   */
+  async #processAudio(contextKey){
+    if(contextKey == null){
+       return Err(`Error: (#processAudio) - contextKey is missing`);
+    }
+    let check = this.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (#processAudio) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let aud = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    aud.role = Roles.Agent;
+    let summaryMessage = new AudioMessage(
+      {
+        role: Roles.Agent,
+        mimeType: aud.mime,
+        url: aud.url,
+        base64: `[ Base 64 data removed due to size - Full data can be found in message ${contextKey} ]`,
+        transcript: aud.transcript
+      }
+    )
+    aud.toolName = "";
+    aud.instructions = "";
+    // Push summary message to chat, return full message.
+    this.messageHistory.addMessage(summaryMessage);
+    return Ok(aud);
+  }
+
+  /**
+   * 
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ DataMessage | string]} - Result( Data Message | string )
+   */
+  async #processData(contextKey){
+    if(contextKey == null){
+       return Err(`Error: (#processData) - contextKey is missing`);
+    }
+    let check = this.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (#processData) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let dta = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    dta.role = Roles.Agent;
+    // Handle Data
+    if(typeof dta.data == "object"){
+      dta.data = JSON.stringify(dta.data, null, 2);
+    } 
+    if(dta.data instanceof Uint8Array || dta.data instanceof ArrayBuffer){
+      // Binary Data 
+      dta.data = `[ Data object contained binary data - This feature is yet to be implimented ]`
+    }
+    let summaryMessage = new DataMessage(
+      {
+        role: Roles.Agent,
+        mimeType: dta.mime,
+        data: `[ Data object removed due to size - Full data can be found in message ${contextKey} ]`
+      }
+    )
+    dta.toolName = "";
+    dta.instructions = "";
+    // Push summary message to chat, return full message.
+    this.messageHistory.addMessage(summaryMessage);
+    return Ok(dta);
+  }
+
 }
 
 const PromptsAndSchemas = {
@@ -442,8 +526,3 @@ Here is the context data and tool outputs (may be empty) <contextData> ${context
   }
   },
 }
-
-// Save Data. Use the save file tool to save a tool’s output to a file in the user’s working directory. You must use << >> tags to reference the data that you want to save to file or create your own response text to save.
-// Some context may have notes such as [ Binary Data ] or [ Base64 Data ] if you choose to quote this the associated binary or base64 data will be included. 
-// If the output has already been saved as part of the plan, then you should avoid creating a duplicate file.
-
