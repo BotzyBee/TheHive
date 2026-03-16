@@ -116,7 +116,7 @@ export class AiJob {
     /**@type {object} - Optional settings passed to aiCall eg. provider, quality */
     this.aiSettings = aiSettings || {}
 
-    /**@type {[]TextMessage | ImageMessage | AudioMessage | DataMessage } - The final return from any AiJob. This will be one or more 'messsages'. */
+    /**@type {[]TextMessage | ImageMessage | AudioMessage | DataMessage } - For returning data to the user. This will be one or more 'messsages'. */
     this.taskOutput = [];
 
     /**@type {number} - The start time (epoch) when the Job was started */

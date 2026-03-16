@@ -55,7 +55,7 @@ export class ContextTemplate {
 
     /**
      * Returns the tool data object. Note tool data may have been shortened. 
-     * @returns {object} - 
+     * @returns {object} 
      */
     getAllToolsContext(){
         return this.toolData;
