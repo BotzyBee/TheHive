@@ -192,9 +192,14 @@ export class indexJob {
 }
 
 // For passing messages between Backend <> Frontend
+/**
+ * constructor { aiJobId, aiSettings }
+ * Data - this.messages, this.aiJobId, this.aiSettings
+ */
 export class FrontendMessageFormat{
- constructor({ aiJobId, aiSettings } = {}) {
+ constructor({ aiJobId, aiSettings, status } = {}) {
     this.aiJobId = aiJobId || null;
+    this.status = status || null;
     this.aiSettings = aiSettings || {};
     this.messages = [];
   }

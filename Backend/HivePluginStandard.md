@@ -8,7 +8,9 @@ export details = {
     toolName:   "theNameOfYourTool", // must be unique!
     version:    "",
     creator:    "",
-    overview:   "A clear overview of what the tool does and doesn't do - this is used by AI agents to determin if your tool should be used to complete a task. It should be clear and consise.", 
+    overview:   "A clear overview of what the tool does and doesn't do" 
+    +"This is used by AI agents to determin if your tool should be used to complete a task." 
+    +"It should be clear and consise.", 
     guide:      null | "Optional - more detailed instructions for the agent to follow.",
     schema: {} // JSON schema detailing the input parameters for the tool  
 }

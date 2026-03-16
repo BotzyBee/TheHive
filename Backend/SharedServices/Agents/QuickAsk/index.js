@@ -16,12 +16,12 @@ import { quickAskFolder } from '../../constants.js';
 export class QuickAskAgent extends AiJob {
     /**@type {AiCall} */
     #aiCall;
-    #task;
   constructor({ task = "", aiSettings = {} } = {}){
     super({aiSettings}) // setup parent class
     this.messageHistory.addMessage(new TextMessage({ role: Roles.User, textData: task}));
     this.#aiCall = new AiCall();
-    this.#task = task;
+    this.task = task;
+    this.agentType = "QuickAsk"; 
   }
 
   async run(){
@@ -38,11 +38,11 @@ export class QuickAskAgent extends AiJob {
         {...this.aiSettings }
       ); // @returns - Result(string)
       if(taskCall.isErr()){ return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
-      this.#task = taskCall.value;
+      this.task = taskCall.value;
     }
 
     // Get tool list
-    let tools = await getToolsForTask(this.#task, 7);
+    let tools = await getToolsForTask(this.task, 7);
     if(tools.isErr()){ 
       this.setFailed();
       this.isRunning = false;
@@ -52,7 +52,7 @@ export class QuickAskAgent extends AiJob {
     // Make call to determine the tool to use. 
     let routingCall = await this.#aiCall.generateText(
       PromptsAndSchemas.routingCall.sys,
-      PromptsAndSchemas.routingCall.usr(this.#task, JSON.stringify(tools.value)),
+      PromptsAndSchemas.routingCall.usr(this.task, JSON.stringify(tools.value)),
       { ...this.aiSettings, structuredOutput: PromptsAndSchemas.routingCall.schema } 
     ); 
     // @returns {Result(object)} - Result ({ nextAction: "no-suitable-tool" | "clarify-task" | "use-tool", toolName: "", message: "" })
@@ -89,7 +89,7 @@ export class QuickAskAgent extends AiJob {
     let paramsCall = await this.#aiCall.generateText(
       parserPrompts.craftParams.sys,
       parserPrompts.craftParams.usr(
-        this.#task, 
+        this.task, 
         this.contextData.getFullContextString(),
         JSON.stringify(toolDetails.value.details.inputSchema) 
       ),
@@ -166,7 +166,7 @@ export class QuickAskAgent extends AiJob {
     // Craft output array (overview)
     let outputOverview = await this.#aiCall.generateText(
       PromptsAndSchemas.outputOverview.sys,
-      PromptsAndSchemas.outputOverview.usr(this.#task, this.contextData.getToolContextString()),
+      PromptsAndSchemas.outputOverview.usr(this.task, this.contextData.getToolContextString()),
       { ...this.aiSettings, structuredOutput: PromptsAndSchemas.outputOverview.schema } 
     ); // { outputPlan: [ {type: Enum, instructions: string, contextKey}... ] }
     if(outputOverview.isErr()){
@@ -239,7 +239,7 @@ export class QuickAskAgent extends AiJob {
     let formatCall = await this.#aiCall.generateText(
       PromptsAndSchemas.processText.sys,
       PromptsAndSchemas.processText.usr(
-        this.#task,
+        this.task,
         JSON.stringify({ context: contextObj }),
       ),
       { ...this.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 

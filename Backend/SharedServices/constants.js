@@ -7,6 +7,7 @@ import { callPerplexity } from './CallAI/perplexity.js';
 // 1. Call Ai Constants
 // 2. Database Constants
 // 3. FileSystem Constants
+// 4. Engine Constants
 
 // 1. CALL AI CONSTANTS
 export const AiProviders = Object.freeze({
@@ -172,3 +173,6 @@ export const appFilesDir = 'AppFiles';
 export const userFilesDir = 'UserFiles';
 export const pluginDir = 'AppFiles/Plugins/'
 export const quickAskFolder = `${appFilesDir}/QuickAskOutputs/`
+
+// 4. Engine Constants
+export const useMultipleThreads = true;
