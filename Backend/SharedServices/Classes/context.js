@@ -71,4 +71,21 @@ export class ContextTemplate {
             return toolData;
         }
     }
+
+    /**
+     * Import a Context Template object - useful for passing between threads
+     * @param {object} data - Context object 
+     * @returns - returns this
+     */
+    import(data) {
+    if (!data || typeof data !== 'object') return;
+    // Iterate through the keys of the incoming object
+    Object.keys(data).forEach(key => {
+        // Only map if the property already exists in 'this'
+        if (Object.prototype.hasOwnProperty.call(this, key)) {
+            this[key] = data[key];
+        }
+    });
+    return this;
+    }
 }

@@ -1,6 +1,7 @@
 import { generateLongID } from "../Utils/index.js";
 import { MessageLog } from "./aiMessages.js";
 import { ContextTemplate } from "./context.js";
+import { processApiMessagesToClasses } from "../../Engine/routes/index.js";
 import { Err } from "../Utils/index.js";
 
 // [][] ------------------------------------------ [][]
@@ -64,6 +65,34 @@ export class TaskStatus {
             return this.taskStatus;
         }
     }
+
+    // Useful when passing between threads.
+    importStatus(status){
+        switch (status.taskStatus) {
+            case Status.Complete:
+                this.setComplete()
+            case Status.Failed:
+                this.setFailed()
+            case Status.NotStarted:
+                this.taskStatus = Status.NotStarted;
+            case Status.InProgress:
+                this.setInProgress()
+            case Status.MaxLoopsHit:
+                this.setMaxLoopsHit()
+            case Status.AwaitingUserInput:
+                this.setAwaitingUserInput()
+            case Status.NewInfoAdded:
+                this.setNewInfoAdded()
+            case Status.Stopped:
+                this.setStoppedByUser()
+            case Status.Custom:
+                this.taskStatus = Status.Custom;
+                this.customText = status.customText;
+            default:
+                this.taskStatus = Status.NotStarted;
+        }
+        return this;
+    }
 }
 
 // Base Class for all AI Jobs / Agents 
@@ -71,6 +100,12 @@ export class AiJob {
   constructor({ idPrefix = "AI", aiSettings } = {}){ 
     /**@type {string} */
     this.id = generateLongID(idPrefix);
+
+    /**@type {string} - used to differentiate between base class and classes that extend AiJob*/
+    this.agentType = "AiJob";
+
+    /**@type {string}  - for managing the overall user task. */
+    this.task = "";
 
     /**@type {TaskStatus} */
     this.status = new TaskStatus();
@@ -104,7 +139,7 @@ export class AiJob {
   }
 
   /** Run must be implemented in any subclasses - the run function must start / handle the main agent loop or actions. */
-  run() {
+  async run() {
     return Err("Method 'run()' must be implemented in the subclass");
   }
 
@@ -156,5 +191,35 @@ export class AiJob {
   addLoopCount(num){
     this.stats.loopNumber += num;
     return this.stats.loopNumber;
+  }
+
+  // Used to bulk import data to class (useful for passing between threads)
+  import(data) {
+    if (!data || typeof data !== 'object') return;
+    // Iterate through the keys of the incoming object
+    Object.keys(data).forEach(key => {
+      // Only map if the property already exists in 'this'
+      if (Object.prototype.hasOwnProperty.call(this, key)) {
+        if(key == "status"){
+            let st = new TaskStatus().importStatus(data[key]);
+            this.status = st;
+        } else if (key == "contextData"){
+            let cd = new ContextTemplate().import(data[key]);
+            this.contextData = cd;
+        } else if (key == "messageHistory"){
+            let msgs = processApiMessagesToClasses(data[key].allMessages).value;
+            let ml = new MessageLog();
+            ml.allMessages = msgs;
+            this.messageHistory = ml;
+        } else if(key == "taskOutput"){
+            let msgs = processApiMessagesToClasses(data[key]).value;
+            this.taskOutput = msgs;
+        }
+        else {
+            this[key] = data[key];
+        }
+      }
+    });
+    return this;
   }
 }
