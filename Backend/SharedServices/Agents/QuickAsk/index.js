@@ -2,7 +2,7 @@ import { AiJob } from '../../Classes/aiJob.js';
 import { AiCall } from "../../CallAI/index.js";
 import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
-import { parserPrompts, buildObject, addAnyDirectData } from '../../CoreTools/inputParser.js';
+import { parserPrompts, buildObject, addAnyDirectData, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
 import { callAgentTool, saveMessageContent } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from '../../Classes/index.js';
 import { processMessageForContext } from '../agentUtils.js';
@@ -62,23 +62,22 @@ export class QuickAskAgent extends AiJob {
       this.isRunning = false;
       return Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`)
     }
-    // catch no-suitable tool
-    if(routingCall.value.nextAction == "no-suitable-tool"){
-      this.status.setFailed()
+    // catch no-suitable tool Or clarify task
+    if(routingCall.value.nextAction == "no-suitable-tool" || 
+       routingCall.value.nextAction == "clarify-task"
+    ){
+      if(routingCall.value.nextAction == "no-suitable-tool"){
+        this.status.setFailed()
+      } else {
+        this.status.setAwaitingUserInput();
+      }
       this.isRunning = false;
-      this.messageHistory.addMessage(new TextMessage({ 
-        role: Roles.Agent, textData: routingCall.value.message}));
+      let msg = new TextMessage({ 
+        role: Roles.Agent, textData: routingCall.value.message});
+      this.messageHistory.addMessage(msg);
+      this.taskOutput.push(msg);
       return Ok("Agent has messaged the user.");
     }
-    // catch clarify task
-    if(routingCall.value.nextAction == "clarify-task"){
-      this.status.setAwaitingUserInput();
-      this.isRunning = false;
-      this.messageHistory.addMessage(new TextMessage({ 
-        role: Roles.Agent, textData: routingCall.value.message}));
-      return Ok("Agent has messaged the user.");    
-    }
-
     // Get tool details
     let toolDetails = await getToolDetails(routingCall.value.toolName);
     if(toolDetails.isErr()){
@@ -86,11 +85,12 @@ export class QuickAskAgent extends AiJob {
     };
      
     // Craft input params;
+    let summaryContext = { context: this.contextData.getAllToolsContext() }
     let paramsCall = await this.#aiCall.generateText(
       parserPrompts.craftParams.sys,
       parserPrompts.craftParams.usr(
         this.task, 
-        this.contextData.getFullContextString(),
+        JSON.stringify(summaryContext),
         JSON.stringify(toolDetails.value.details.inputSchema) 
       ),
       { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema } 
@@ -102,9 +102,11 @@ export class QuickAskAgent extends AiJob {
       return Err(`Error (Quick Task Agent -> startTask -> paramsCall ) : ${paramsCall.value}`)
     }
 
-    // Build params into object (UPDATE TO parseNunjucksTemplate)
-    let paramObject = buildObject(paramsCall.value.params);
-    if(paramObject?.outcome == "Error"){ // May or may not be result class.
+    // Build params into object (injecting data if needed)
+    let fullContext = { context: this.messageHistory.getToolMessagesAsObject()}
+    let paramObject = parseNunjucksTemplate(paramsCall.value.params, fullContext );
+
+    if(paramObject.isErr()){ 
       this.setFailed();
       this.isRunning = false;
       return Err(`Error (Quick Task Agent -> startTask -> buildObject ) : ${JSON.stringify(paramObject)}`)
@@ -115,7 +117,7 @@ export class QuickAskAgent extends AiJob {
     let toolCall = await callAgentTool(
       toolDetails.value.details.toolName,
       toolDetails.value.filePath,
-      paramObject
+      paramObject.value
     ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
     if(toolCall.isErr()){
       this.setFailed();
