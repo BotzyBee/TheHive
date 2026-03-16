@@ -6,11 +6,11 @@ import {
 } from './SharedServices/Database/index.js';
 import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
-import { EngineTools } from './Engine/index.js';
 import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getToolDetails } from './SharedServices/Database/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
+import { handleQAMessaage } from './Engine/routes/quickAsk.js';
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -86,33 +86,9 @@ app.post("/quickAsk", async (req, res) => {
         error: `Error : fmf is either missing or not a FrontendMessageFormat`
     });
   }
-  console.log("Processing Messages");
-  // Process Messages
-  let id = frontendMessage.aiJobId;
-  let msg = new EngineTools.EngineClasses.FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });
-  let processedMsg = EngineTools.Routes.processApiMessagesToClasses(frontendMessage.messages);
-  if( processedMsg.isErr() ){ 
-    return res.status(400).json({
-        error: `Error : could not process the messages into classes. ${processedMsg.value}`
-    });
-  }
-  msg.addMessages(processedMsg.value);
-  // No ID - New Task
-  if(id == null){
-    console.log("NEW JOB!");
-    let newJob = await EngineTools.Routes.QuickAskRoute.createQuickAskJob(msg);
-    if(newJob.isErr()){
-      return res.status(400).json({
-        error: `Error : (createQuickAskJob) - ${newJob.value}`
-      });
-    }
-    res.status(200).json(newJob.value);
-  } else {
-    // Existing Task
-    // To Do
-    console.log("Existing JOb")
-    res.status(200).json({result: x });
-  }
+  let msg = await handleQAMessaage(frontendMessage);
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  res.status(200).json(msg.value);
 });
 
 // Test Endpoint: for testing 

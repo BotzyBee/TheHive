@@ -2,6 +2,7 @@ import { FrontendMessageFormat } from "../classes.js";
 import { Services } from "../../SharedServices/index.js";
 import { JOBS } from "../jobManager.js";
 import { TextMessage } from "../../SharedServices/Classes/index.js";
+import { processApiMessagesToClasses } from './index.js';
 
 /**
  * Creates a new QuickAsk Agent and adds it to non-allocated jobs.
@@ -36,4 +37,27 @@ export async function createQuickAskJob(frontendMessage){
     });
     rtnMessage.addMessages([msg]);
     return Services.Utils.Ok(rtnMessage);
+}
+
+export async function handleQAMessaage(frontendMessage){
+    // Process Messages
+    let id = frontendMessage.aiJobId;
+    let msg = new FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });
+    let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
+    if( processedMsg.isErr() ){ 
+    return Services.Utils.Err(`Error : could not process the messages into classes. ${processedMsg.value}`);
+    }
+    msg.addMessages(processedMsg.value);
+    // No ID - New Task
+    if(id == null){
+    let newJob = await createQuickAskJob(msg);
+    if(newJob.isErr()){
+        return Services.Utils.Err(`Error : (createQuickAskJob) - ${newJob.value}`);
+    }
+    return newJob; // has Result already
+    } else {
+    // Existing Task
+    // To Do
+    console.log("Existing Job");
+    }
 }
