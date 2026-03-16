@@ -4,9 +4,9 @@ import {
   initDatabaseConnection,
   closeDatabaseConnection,
 } from './SharedServices/Database/index.js';
-import * as su from './SharedServices/Utils/index.js';
 import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
+import { EngineTools } from './Engine/index.js';
 import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getToolDetails } from './SharedServices/Database/index.js';
@@ -16,7 +16,8 @@ export let dbAgent = null;
 let servicesStarted = false;
 
 // [][] -------------------------------------- [][]
-// init function - setup db connections/ timers etc
+//                init function
+//        setup db connections/ timers etc
 // [][] -------------------------------------- [][]
 const initServices = async () => {
   // only call once
@@ -24,20 +25,19 @@ const initServices = async () => {
     // init Surreal DB agent
     let dbTools = await initDatabaseConnection(false);
     if (dbTools.isErr()) {
-      su.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`);
+      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`);
       process.exit(1);
     }
     // Setup Piscina Pool
     setupPool();
-
     // Load Tools
-    su.log("Loading Tools...");
+    Services.Utils.log("Loading Tools...");
     let tools = await initToolIndex();
     if(tools.isErr()){
-      su.log(`Error (initServices -> initToolIndex ) : ${tools.value}`);
+      Services.Utils.log(`Error (initServices -> initToolIndex ) : ${tools.value}`);
       process.exit(1);
     }
-    su.log(`${tools.value.tools} Tools loaded. \n`+
+    Services.Utils.log(`${tools.value.tools} Tools loaded. \n`+
       `${tools.value.added} are new. \n`+
       `${tools.value.updated} were updated \n`+
       `${tools.value.removed} were removed.`)
@@ -64,14 +64,55 @@ const initServices = async () => {
   }
 };
 // Express init
-const app = express();
+export const app = express();
 const port = 3000;
-app.use(cors()); // Enable CORS for all origins <=== should be reviewed for production ****** )
+app.use(cors()); // Enable CORS for all origins <=== should be changed if not running locally !!)
 app.use(express.json()); // Enable JSON body parsing
+
+// [][] -------------------------------------- [][]
+//                 API ENDPOINTS
+// [][] -------------------------------------- [][]
 
 // Root endpoint: check if API is online
 app.get('/', (req, res) => {
   res.status(200).send('The Hive is online 🐝');
+});
+
+// QuickAsk Agent Endpoing
+app.post("/quickAsk", async (req, res) => {
+  const frontendMessage = req.body?.fmf || null;
+  if(frontendMessage == null ){ 
+    return res.status(400).json({
+        error: `Error : fmf is either missing or not a FrontendMessageFormat`
+    });
+  }
+  console.log("Processing Messages");
+  // Process Messages
+  let id = frontendMessage.aiJobId;
+  let msg = new EngineTools.EngineClasses.FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });
+  let processedMsg = EngineTools.Routes.processApiMessagesToClasses(frontendMessage.messages);
+  if( processedMsg.isErr() ){ 
+    return res.status(400).json({
+        error: `Error : could not process the messages into classes. ${processedMsg.value}`
+    });
+  }
+  msg.addMessages(processedMsg.value);
+  // No ID - New Task
+  if(id == null){
+    console.log("NEW JOB!");
+    let newJob = await EngineTools.Routes.QuickAskRoute.createQuickAskJob(msg);
+    if(newJob.isErr()){
+      return res.status(400).json({
+        error: `Error : (createQuickAskJob) - ${newJob.value}`
+      });
+    }
+    res.status(200).json(newJob.value);
+  } else {
+    // Existing Task
+    // To Do
+    console.log("Existing JOb")
+    res.status(200).json({result: x });
+  }
 });
 
 // Test Endpoint: for testing 
@@ -83,78 +124,47 @@ app.get('/test', async (req, res) => {
   res.status(200).json({result: x });
 });
 
-// [][] --- Server Start/ Graceful shutdown --- [][]
+// [][] -------------------------------------- [][]
+//             LISTENERS & SERVER START
+// [][] -------------------------------------- [][]
+
 let server;
 const startServer = () => {
   server = app.listen(port, () => {
-    su.log(`Server running on port ${port}`);
+    Services.Utils.log(`Server running on port ${port}`);
   });
 };
-const gracefulShutdown = async (signal) => {
-  su.log('Graceful Shutdown Started');
 
+// [][] --- Graceful Sutdown --- [][]
+const gracefulShutdown = async (signal) => {
+  Services.Utils.log('Graceful Shutdown Started');
   // Stop the Express server from accepting new connections
   if (server) {
     server.close(() => {
-      su.log('Server closed');
+      Services.Utils.log('Server closed');
     });
   }
-
   // Clear all active timers
   Services.CoreTools.Timers.stopAndClearAllTimers();
   // Print logs to file
   await writeLogsToFile();
-
   // Terminate the Piscina worker pool gracefully
-  if (pool) {
-    await pool.destroy();
-  }
-
+  if (pool) { await pool.destroy();}
   // Close database connection
   await closeDatabaseConnection();
-
-  su.log('Graceful shutdown complete. Exiting process.');
+  Services.Utils.log('Graceful shutdown complete. Exiting process.');
   process.exit(0); // Exit the process once all cleanup is done
 };
-
 // Listen for termination signals from Docker (SIGTERM) and Ctrl+C (SIGINT)
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// init services and start the server
+// [][] -- Init & Trigger Start -- [][]
 initServices()
   .then(() => {
     startServer();
   })
   .catch((err) => {
-    su.log(`Failed to start application: ${err.message}`);
+    Services.Utils.log(`Failed to start application: ${err.message}`);
     process.exit(1); // Exit if init
   });
-
-
-// //    switch (aiResult.outcome) {
-// //         case Outcome.SUCCESS:
-// //             // Sucess Result
-// //             res.setHeader("Content-Type", "text/plain; charset=utf-8");
-// //             res.status(200).send(aiResult.data)
-// //             break;
-// //         case Outcome.FAILURE:
-// //             console.log("ERROR Sending response - ", aiResult.data);
-// //             return res.status(500).json({ error: "Sorry there has been an internal server error and no result could be generated" });
-// //             break;
-// //         case Outcome.NORES:
-// //             console.log("NO Result from Pinecone - Prompt : ", pmpt);
-// //             res.status(200).send(`Sorry I could not find any information in my files to answer that question.`);
-// //             break;
-// //         default:
-// //             return res.status(500).json({ error: "Sorry there has been an internal server error and no result could be generated" });
-// //     }
-//     // if (!pmpt || !ac){
-//     //     return res.status(400).json({ error: "You need to include a prompt and AC code /ask?prompt='your question here'&ac=abc123" });
-//     // }
-//         // // not authorised
-//         // return res.status(401).json({ error: "Not authorised - Contact Policing Smarter DevTeam if this issue persists" });
-
-// // app.post("/checkCR", async (req, res) => {
-// //     let report = req.body.report;
-// //     let ac = req.body.ac;

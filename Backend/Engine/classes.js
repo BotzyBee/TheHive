@@ -1,6 +1,8 @@
 import* as su from '../SharedServices/Utils/index.js';
 import * as db from '../SharedServices/Database/index.js';
 import { fileTableName, dirTableName } from '../SharedServices/constants.js';
+import { Services } from '../SharedServices/index.js';
+import { BaseMessage } from '../SharedServices/Classes/index.js';
 
 // [][] -- Change Job - Used to update DB with file/ Dir changes -- [][]
 export class indexJob {
@@ -187,6 +189,35 @@ export class indexJob {
     }
     return this; // return this for chaining calls.
   }
+}
+
+// For passing messages between Backend <> Frontend
+export class FrontendMessageFormat{
+ constructor({ aiJobId, aiSettings } = {}) {
+    this.aiJobId = aiJobId || null;
+    this.aiSettings = aiSettings || {};
+    this.messages = [];
+  }
+
+  clearMessages(){
+    this.messages = [];
+    return this;
+  }
+
+  /**
+   * Adds one or more messages to the Frontend Message Class.
+   * @param {array<BaseMessage>} messageArray - Array of BaseMessage class or any class that extends it.
+   */
+  addMessages(messageArray){
+    if(Array.isArray(messageArray)){
+      messageArray.forEach((msg) => {
+        if(msg instanceof Services.Classes.BaseMessage){
+          this.messages.push(msg);
+        }
+      })
+    }
+  }
+
 }
 
 

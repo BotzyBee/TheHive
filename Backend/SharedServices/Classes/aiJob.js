@@ -1,6 +1,7 @@
 import { generateLongID } from "../Utils/index.js";
 import { MessageLog } from "./aiMessages.js";
 import { ContextTemplate } from "./context.js";
+import { Err } from "../Utils/index.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
@@ -100,6 +101,11 @@ export class AiJob {
 
     /**@type {object} -  { toolCount: 0, aiCount: 0, loopNumber: 0, custom: {} }*/
     this.stats = { toolCount: 0, aiCount: 0, loopNumber: 0, custom: {} }
+  }
+
+  /** Run must be implemented in any subclasses - the run function must start / handle the main agent loop or actions. */
+  run() {
+    return Err("Method 'run()' must be implemented in the subclass");
   }
 
   /** Set status to complete and isRunning to false */

@@ -3,9 +3,10 @@ import { AiCall } from "../../CallAI/index.js";
 import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
 import { parserPrompts, buildObject, addAnyDirectData } from '../../CoreTools/inputParser.js';
-import { callAgentTool } from '../../CoreTools/helperFunctions.js';
+import { callAgentTool, saveMessageContent } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from '../../Classes/index.js';
 import { processMessageForContext } from '../agentUtils.js';
+import { quickAskFolder } from '../../constants.js';
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -33,7 +34,7 @@ export class QuickAskAgent extends AiJob {
     if(this.messageHistory.getMessageCount() > 1 ){
       const taskCall = await this.#aiCall.generateText(
         PromptsAndSchemas.newTask.sys,
-        PromptsAndSchemas.newTask.usr(this.messageHistory.getShortenedTextMsgString()),
+        PromptsAndSchemas.newTask.usr(this.messageHistory.getSimpleUserAgentComms()),
         {...this.aiSettings }
       ); // @returns - Result(string)
       if(taskCall.isErr()){ return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
@@ -101,7 +102,7 @@ export class QuickAskAgent extends AiJob {
       return Err(`Error (Quick Task Agent -> startTask -> paramsCall ) : ${paramsCall.value}`)
     }
 
-    // Build params into object
+    // Build params into object (UPDATE TO parseNunjucksTemplate)
     let paramObject = buildObject(paramsCall.value.params);
     if(paramObject?.outcome == "Error"){ // May or may not be result class.
       this.setFailed();
@@ -207,7 +208,18 @@ export class QuickAskAgent extends AiJob {
       }
 
       if(outputPlan[i].type === "Save"){
-        // To Do !
+        let check = this.messageHistory.getMessagesById(outputPlan[i]?.contextKey);
+        if(check == null){
+          return Err(`Error: (finialiseOutput -> save) - Could not located any data for ${outputPlan[i]?.contextKey}`);
+        }
+        let save = await saveMessageContent(check, quickAskFolder, null);
+        if( save.isErr()){ return save }
+        let msg = new TextMessage({
+          role: Roles.Agent,
+          textData: `Message ${check.id} has been saved to ${quickAskFolder}`,
+        })
+        this.messageHistory.addMessage(msg);
+        opMessages.push(msg);
       }      
     }
     return Ok(opMessages);
@@ -276,7 +288,7 @@ export class QuickAskAgent extends AiJob {
       return Err(`Error: (#processImage) - Could not located any data for ${contextKey}`);
     }
     // Clone & strip out unnessessary data. 
-    let img = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    let img = structuredClone(check); // clone of the message
     img.role = Roles.Agent;
     let summaryMessage = new ImageMessage({
       role: Roles.Agent,
@@ -308,7 +320,7 @@ export class QuickAskAgent extends AiJob {
       return Err(`Error: (#processAudio) - Could not located any data for ${contextKey}`);
     }
     // Clone & strip out unnessessary data. 
-    let aud = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    let aud = structuredClone(check); // clone of the message
     aud.role = Roles.Agent;
     let summaryMessage = new AudioMessage(
       {
@@ -340,7 +352,7 @@ export class QuickAskAgent extends AiJob {
       return Err(`Error: (#processData) - Could not located any data for ${contextKey}`);
     }
     // Clone & strip out unnessessary data. 
-    let dta = structuredClone(this.messageHistory.getMessagesById(contextKey)); // clone of the message
+    let dta = structuredClone(check); // clone of the message
     dta.role = Roles.Agent;
     // Handle Data
     if(typeof dta.data == "object"){
@@ -369,7 +381,7 @@ export class QuickAskAgent extends AiJob {
 const PromptsAndSchemas = {
   routingCall: {
     sys: `Your job is to review the user provided task and ascertain which tool is the most likely to complete the task. You will be given a list of tools to choose from.
-Only one tool will be called (note - requests to save the output or result of this job does not need a tool call. This will be handled automatically). 
+Only one tool will be called - even with a single tool call you can still save the output at the end of the task process. 
 You should only select a tool if you are confident that it will achieve the user task. 
 To select a tool output  nextAction: “use-tool”, toolName: [the name of the tool to use], and message: [instructions for the tool to follow – based on the user task.]
 If there are no tools that can complete the user task then you should output nextAction: “no-suitable-tool” and message: [a suitable, polite, professional and helpful message to the user.]
