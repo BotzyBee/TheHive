@@ -175,4 +175,4 @@ export const pluginDir = 'AppFiles/Plugins/'
 export const quickAskFolder = `${appFilesDir}/QuickAskOutputs/`
 
 // 4. Engine Constants
-export const useMultipleThreads = true;
+export const useMultipleThreads = false;

@@ -8,8 +8,11 @@ import { Piscina } from 'piscina';
 import { getDbAgent } from '../SharedServices/Database/index.js';
 import { indexKnowledgebase } from './buildKbIndex.js'; 
 import * as su from '../SharedServices/Utils/index.js';
+import { AiJob } from '../SharedServices/Classes/index.js';
+import { QuickAskAgent } from '../SharedServices/Agents/QuickAsk/index.js';
 
 export let indexTimerActive = false;
+/**@type {Piscina} */
 export let pool; // Piscina worker pool (multi-thread)
 
 export function setupPool() {
@@ -29,31 +32,35 @@ export async function poolIndexKnowledgebase(){
         return call;
     } else {
         indexTimerActive = false;
-        return su.logAndErr(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
+        return su.Err(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
     }
 }
 
-// // Process AI JOB
-// export async function poolAiJobEngine({jobClassObject}){
-//     // Create new AI Agent in thread
-//     let params = {};
-//     params.userPlanReview = jobClassObject.userPlanReview;
-//     params.conversationHistory = jobClassObject.conversationHistory;
-//     params.tools = jobClassObject.tools;
-//     params.aiProvider = jobClassObject.aiProvider;
-//     params.aiProviderLarge = jobClassObject.aiProviderLarge;
-//     params.maxIterations = jobClassObject.maxIterations;
-//     let task = new AIAgent(params);
-//     // Make the Call
-//     let call = await AiJobEngine(task);
-//     if(call.isErr()){
-//         return Err({
-//                 jobClassObject: call.value.jobClassObject,
-//                 errorText: `Error (poolAiJobEngine -> AiJobEngine) : ${call.value.errorText}`
-//             })
-//     }
-//     return Ok(call.value); // Note non-standard Err() format!
-// }
+// Process AI JOB
+export async function poolRunAiJob({jobClassObject}){
+    let job = processObjectToClass(jobClassObject); 
+    if(job == null){ return su.Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
+    // Run the Job
+    let call = await job.run();
+    if(call.isErr()){ return su.Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
+    return su.Ok(job); // return class
+}
+
+/**
+ * Re-instantiate class after thread hand-off
+ * @param {object} jobClassObject - Instance of AiJob or sub-class.
+ * @returns - the associated class object.
+ */
+export function processObjectToClass(jobClassObject){
+    let rtn = null;
+    switch (jobClassObject.agentType) {
+        case "AiJob": // Base Class
+            rtn = new AiJob().import(jobClassObject);
+        case "QuickAsk":
+            rtn = new QuickAskAgent().import(jobClassObject);
+    }
+    return rtn;
+}
 
 // [][] -------------------------------------------------------------------------- [][]
 // Example functions in worker.js
