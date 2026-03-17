@@ -2,7 +2,7 @@ import { AiJob } from '../../Classes/aiJob.js';
 import { AiCall } from "../../CallAI/index.js";
 import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
-import { parserPrompts, buildObject, addAnyDirectData, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
+import { parserPrompts, addAnyDirectData, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
 import { callAgentTool, saveMessageContent } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from '../../Classes/index.js';
 import { processMessageForContext } from '../agentUtils.js';
