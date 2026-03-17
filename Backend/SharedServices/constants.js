@@ -140,6 +140,26 @@ export const MODEL_REGISTRY = [
     maxContext: 127072,
     quality: AiQuality.Advanced,
   },
+    {
+    model: 'gemini-2.5-flash-image',
+    provider: AiProviders.gemini,
+    capabilities: [
+      ModelTypes.image,
+      ModelTypes.structuredOutputs
+    ],
+    maxContext: 65536,
+    quality: AiQuality.Advanced,
+  },
+  {
+    model: 'gemini-2.5-flash-preview-tts',
+    provider: AiProviders.gemini,
+    capabilities: [
+      ModelTypes.textToSpeech
+    ],
+    maxContext: 32000,
+    quality: AiQuality.Advanced,
+  },
+
   // {
   //     model:        "sonar-reasoning-pro",
   //     provider:     AiProviders.perplexity,
