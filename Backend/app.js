@@ -11,6 +11,7 @@ import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getToolDetails } from './SharedServices/Database/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
 import { handleQAMessaage } from './Engine/routes/quickAsk.js';
+import { JOBS } from './Engine/jobManager.js';
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -54,12 +55,12 @@ const initServices = async () => {
     );
 
     //New Job Scheduler (every 5 seconds)
-    // Services.coreTools.timers.addNewTimer("New_Job_Scheduler", async () => {
-    //     // Only call if not already busy
-    //     if (!nonAllocTimerActive) {
-    //         await checkNonAllocated();
-    //     }
-    // }, 5000);
+    Services.CoreTools.Timers.addNewTimer("New_Job_Scheduler", async () => {
+        // Only call if not already busy
+        if (JOBS.isAllocatorActive() == false) {
+            await JOBS.checkNonAllocated();
+        }
+    }, 5000);
     servicesStarted = true;
   }
 };
@@ -87,6 +88,19 @@ app.post("/quickAsk", async (req, res) => {
     });
   }
   let msg = await handleQAMessaage(frontendMessage);
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  res.status(200).json(msg.value);
+});
+
+// ALL - Get Update or Result
+app.get("/getUpdate", async (req, res) => {
+  const jobID = req.query?.jobID || null;
+  if(jobID == null ){ 
+    return res.status(400).json({
+        error: `Error : JobID parameter is missing or null!`
+    });
+  }
+  let msg = await JOBS.getUpdateOrResult(jobID);
   if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
   res.status(200).json(msg.value);
 });
