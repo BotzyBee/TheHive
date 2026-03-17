@@ -95,3 +95,41 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
     return Services.Utils.Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
   }
 }
+
+
+// Helper function for processBase64Audio_ToWavBuffer
+function createWavHeader(dataLength, sampleRate, numChannels, bitDepth) {
+  const header = Buffer.alloc(44);
+  const blockAlign = (numChannels * bitDepth) / 8;
+  const byteRate = sampleRate * blockAlign;
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataLength, 4); 
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);           // Subchunk1Size (16 for PCM)
+  header.writeUInt16LE(1, 20);            // AudioFormat (1 for PCM)
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitDepth, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataLength, 40);
+  return header;
+}
+
+/**
+ * Used to convert audio/L16;codec=pcm;rate=24000 to a Wav buffer for saving. 
+ * @param {string} base64_Audio - Base64 audio (audio/L16;codec=pcm;rate=24000) 
+ * @returns {Buffer | Null} - Returns Buffer or null.  
+ */
+export function processBase64Audio_ToWavBuffer(base64_Audio, mime){
+  if(mime == "audio/L16;codec=pcm;rate=24000"){
+    const pcmData = Buffer.from(base64_Audio, 'base64');
+    const header = createWavHeader(pcmData.length, 24000, 1, 16);
+    const finalBuffer = Buffer.concat([header, pcmData]);
+    return finalBuffer;
+  }
+  return null;
+}
+
