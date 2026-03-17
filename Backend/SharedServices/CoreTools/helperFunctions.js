@@ -46,12 +46,6 @@ export const MIME_MAP = Object.entries(SupportedFiles.default).reduce((acc, [ext
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
   try {
-    // Resolve Extension and Config
-    const fileInfo = MIME_MAP[message.mime] || { ext: 'bin', encoding: 'utf8' };
-    const finalFileName = fileName 
-      ? `${fileName}.${fileInfo.ext}` 
-      : `${message.id}.${fileInfo.ext}`;
-
     let contentToSave;
     let options = { encoding: fileInfo.encoding };
 
@@ -64,11 +58,23 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
         break;
 
       case 'image':
-      case 'audio':
         // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
         if (message.base64) {
           contentToSave = message.base64;
           options.encoding = 'base64'; 
+        } else if (message.url) {
+          return Services.Utils.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
+        }
+      case 'audio':
+        // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
+        if (message.base64) {
+          // Can only handle audio/L16;codec=pcm;rate=24000 at the moment! 
+          if(message.mime == "audio/L16;codec=pcm;rate=24000"){
+            contentToSave = processBase64Audio_ToWavBuffer(message.base64, message.mime); 
+            message.mime = "audio/wav"; // update for ext lookup.
+          } else {
+            return Services.Utils.Err(`Error (saveMessageContent) : Only audio/L16;codec=pcm;rate=24000 type audio can be saved at this time.`);
+          }
         } else if (message.url) {
           return Services.Utils.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
@@ -87,6 +93,12 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
     if (!contentToSave) {
         return Services.Utils.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
     }
+
+    // Resolve Extension and Config
+    const fileInfo = MIME_MAP[message.mime] || { ext: 'bin', encoding: 'utf8' };
+    const finalFileName = fileName 
+      ? `${fileName}.${fileInfo.ext}` 
+      : `${message.id}.${fileInfo.ext}`;
 
     // Delegate to the optimized saveFile function
     return await saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);

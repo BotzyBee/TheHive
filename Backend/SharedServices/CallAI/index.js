@@ -96,11 +96,25 @@ export class AiCall {
     return this.#dispatch(ModelTypes.embedding, '', '', options);
   }
 
-  // async generateImage(systemMessage, contentMessage, options = {}) {
-  //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
-  //     options.contextSize = tkns;
-  //     return this.#dispatch(ModelTypes.image, systemMessage, contentMessage, options);
-  // }
+  /**
+   * Generates an Image using AI 
+   * @param {string} contentMessage - Input prompt for the AI to follow 
+   * @param {object} options
+   * @param {string} [options.model] - Exact model string (optional)
+   * @param {string} [options.provider] - AiProviders value (optional)
+   * @param {number} [options.quality] - AiQuality value (optional)
+   * @param {object} [options.imageOptions] - Image Options (all optional)
+   * @param {string}  [options.imageOptions.aspectRatio] - eg 4:3 16:9 etc
+   * @param {string}  [options.imageOptions.resolution] - 1K, 2K, 4K etc
+   * @param {ImageMessage} [options.imageOptions.contextImage] - Image to be edited or used as part of the process.
+   * @returns {Result<[ImageMessage] | String>} - Result< [ ImageMessage ] | String >
+   */
+  async generateImage(contentMessage, options = {}) {
+      const sys = "N/A";
+      const tkns = this.#estimateTokens(contentMessage);
+      options.contextSize = tkns;
+      return this.#dispatch(ModelTypes.image, sys, contentMessage, options);
+  }
 
   // async generateCode(systemMessage, contentMessage, options = {}) {
   //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
@@ -114,11 +128,24 @@ export class AiCall {
   //     return this.#dispatch(ModelTypes.maps, systemMessage, contentMessage, options);
   // }
 
-  // async textToSpeech(systemMessage, contentMessage, options = {}) {
-  //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
-  //     options.contextSize = tkns;
-  //     return this.#dispatch(ModelTypes.textToSpeech, systemMessage, contentMessage, options);
-  // }
+  /**
+ * Generates an audio (speech) from input text. 
+ * @param {string} contentMessage - The text to be converted to speech
+ * @param {object} options - further options
+ * @param {string} [options.model] - Exact model string (optional)
+ * @param {string} [options.provider] - AiProviders value (optional)
+ * @param {number} [options.quality] - AiQuality value (optional)
+ * @param {boolean} [options.useWeb] - If true, AI uses web grounding (Optional)
+ * @param {object}  [options.ttsOptions] - Object for voice configurations (Optional)
+ * @param {string}  [options.ttsOptions.gender ] - Optional, [ "Male" | "Female" ] specify if male or female voice should be used.
+ * @returns {Result< [AudioMessage] | string > } - Result< [ AudioMessage, ...] | string >
+ */
+  async textToSpeech(contentMessage, options = {}) {
+      const tkns = this.#estimateTokens(contentMessage);
+      const sys = "N/A";
+      options.contextSize = tkns;
+      return this.#dispatch(ModelTypes.textToSpeech, sys, contentMessage, options);
+  }
 
   // async speechToText(systemMessage, contentMessage, options = {}) {
   //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);

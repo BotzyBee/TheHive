@@ -51,10 +51,6 @@ export async function callGemini(
     case ModelTypes.deepResearch:
       return su.Err('Error (callGemini) : Gemini does not have deep research capability.');
 
-    // case ModelTypes.structuredOutputs:
-    //   // Enforce JSON schema response
-    //   return await handleStructuredOutput(systemMessage, contentMessage, model, structuredOutput);
-
     case ModelTypes.websearch:
       return await generateText(systemMessage, contentMessage, model, options);
 
@@ -79,6 +75,16 @@ export async function callGemini(
 }
 
 // Generate Text 
+/**
+ * Uses Gemini to generate text
+ * @param {*} systemMessage - System message for the AI to follow.
+ * @param {string} contentMessage - Prompt for the AI to follow
+ * @param {string} model - Model to use,, optional
+ * @param {object} options - further options, optional
+ * @param {boolean} [options.useWeb] - if true, AI uses web grounding.
+ * @param {object}  [options.structuredOutput] - a JSON schema for structured outputs, optional.
+ * @returns {Result} - Result( [ TextMessage, ...] )
+ */
 async function generateText(
   systemMessage,
   contentMessage,
@@ -158,7 +164,7 @@ async function generateText(
 
 // Generate Image - https://ai.google.dev/gemini-api/docs/image-generation#javascript
 /**
- * Generates or edits images using AI
+ * Generates or edits images using Gemini
  * @param {string} contentMessage - Prompt for the AI to follow
  * @param {string} model - Model to use
  * @param {object} options - further options
@@ -226,16 +232,16 @@ async function generateImage(
 }
 
 /**
- * Generates audio (Text-to-Speech) using AI
+ * Generates audio (Text-to-Speech) using Gemini
  * @param {string} contentMessage - The text to be converted to speech
  * @param {string} model - Optional, TTS Model to use (e.g., "gemini-2.5-flash-preview-tts")
  * @param {object} options - further options
  * @param {boolean} [options.useWeb] - Optional, if true, AI uses web grounding
- * @param {object}  [options.speechOptions] - Optional, Object for voice configurations
- * @param {string}  [options.speechOptions.voiceName] - Optional, Built in voices to use (e.g., 'Kore', 'Puck')
+ * @param {object}  [options.ttsOptions] - Optional, Object for voice configurations
+ * @param {string}  [options.ttsOptions.gender ] - Optional, [ "Male" | "Female" ] specify if male or female voice should be used.
  * @returns {Result} - Ok( [ AudioMessage ] )
  */
-export async function generateAudio( // TODO - * @param {object}  [options.speechOptions.multiSpeaker] - Configuration for multiple speakers
+async function generateAudio( // TODO - * @param {object}  [options.speechOptions.multiSpeaker] - Configuration for multiple speakers
   contentMessage,
   model,
   options = {}
@@ -248,9 +254,14 @@ export async function generateAudio( // TODO - * @param {object}  [options.speec
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
-  const { speechOptions = {}, useWeb = false } = options;
-  const { voiceName = 'sadaltager', multiSpeaker = null } = speechOptions;
+  const { ttsOptions = {}, useWeb = false } = options;
+  const { gender, multiSpeaker = null } = ttsOptions;
   
+  let voiceName = 'sadaltager'; // Male
+  if(gender == "Female"){
+    voiceName = 'despina';  // Female
+  }
+
   // Example of MultiSpeaker (TO DO !)
   // multiSpeaker: {
   //    speakerVoiceConfigs: [{ speaker: 'Joe',
