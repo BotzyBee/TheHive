@@ -76,7 +76,7 @@ export async function run(
     let call = await aiCall.generateText(usrText, sysText, params );
     if(call.isErr()){
         return Shared.Utils.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
-    } Shared.Classes.Roles.Tool
+    }
     let message = new Shared.Classes.TextMessage({
         role: Shared.Classes.Roles.Tool, 
         mimeType: "text/plain", 
