@@ -85,12 +85,11 @@ export class QuickAskAgent extends AiJob {
     };
      
     // Craft input params;
-    let summaryContext = { context: this.contextData.getAllToolsContext() }
     let paramsCall = await this.#aiCall.generateText(
       parserPrompts.craftParams.sys,
       parserPrompts.craftParams.usr(
         this.task, 
-        JSON.stringify(summaryContext),
+        this.getSummaryContextString(),
         JSON.stringify(toolDetails.value.details.inputSchema) 
       ),
       { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema } 
@@ -103,9 +102,8 @@ export class QuickAskAgent extends AiJob {
     }
 
     // Build params into object (injecting data if needed)
-    let fullContext = { context: this.messageHistory.getToolMessagesAsObject()}
+    let fullContext = this.getRawContext();
     let paramObject = parseNunjucksTemplate(paramsCall.value.params, fullContext );
-
     if(paramObject.isErr()){ 
       this.setFailed();
       this.isRunning = false;
@@ -271,7 +269,7 @@ export class QuickAskAgent extends AiJob {
         opText =augmentedTextOutput.value;
     }
     // Full Output
-    let msg = new TextMessage({ role: Roles.Agent, textData: opText });
+    let msg = new TextMessage({ role: Roles.Agent, textData: opText, mime: contextObj.mime });
     this.messageHistory.addMessage(msg);
     return Ok(msg);
   }

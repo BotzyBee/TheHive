@@ -143,6 +143,24 @@ export class AiJob {
     return Err("Method 'run()' must be implemented in the subclass");
   }
 
+  /**
+   * Fetches all global and tool context (summarised to save tokens)
+   * @returns {object} - { context : { globalData: {}, toolData: {} } }  
+   */
+  getSummaryContextString(){
+    return JSON.stringify({ context: this.contextData.getAllContext() });
+  }
+
+    /**
+    * Fetches all global and tool context (Full Values)
+    * @returns {object} - { context : { globalData: {}, toolData: {} } }  
+    */
+  getRawContext(){
+    let toolData = this.messageHistory.getToolMessagesAsObject();
+    let globalData = this.contextData.globalData;
+    return { context: globalData, toolData };
+  }
+
   /** Set status to complete and isRunning to false */
   setComplete(){ 
       this.isRunning = false;
