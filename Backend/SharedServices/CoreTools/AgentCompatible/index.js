@@ -8,6 +8,7 @@ export * as getTextDocumentStats from './textDocumentStats.js';
 export * as aiWebSearch from './aiWebSearch.js';
 export * as aiImageTool from './aiImageTool.js';
 export * as textToSpeech from './textToSpeech.js';
+export * as createCodeTool from './createCode.js';
 // READ THE NOTE AT THE TOP !!
 
 
