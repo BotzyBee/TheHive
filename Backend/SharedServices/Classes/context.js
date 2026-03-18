@@ -72,6 +72,10 @@ export class ContextTemplate {
         }
     }
 
+    getAllContext(){
+        return this;
+    }
+
     /**
      * Import a Context Template object - useful for passing between threads
      * @param {object} data - Context object 

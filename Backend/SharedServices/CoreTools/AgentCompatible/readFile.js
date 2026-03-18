@@ -1,7 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
 export const details = {
     toolName:   "readFile",
     version:    "2026.0.1",
@@ -49,11 +48,11 @@ export async function run(
     // lookup correct read tool
     let fileSupported = false;
     let fileMethods = undefined;
-    for(let key in Shared.FileSystem.SupportedFiles.default){
-        if(fileInfo.value.extension == key){
-            fileMethods = Shared.FileSystem.SupportedFiles.default[key];
+    for (const value of Services.FileSystem.MIME_MAP.values()) {
+        if (value.extension === fileInfo.value.extension) {
+            fileMethods = value;
             fileSupported = true;
-            break;
+            break; 
         }
     }
     if(fileSupported === false ){

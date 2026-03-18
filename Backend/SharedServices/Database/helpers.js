@@ -6,8 +6,8 @@ import { Services } from '../index.js';
  * Performs a vector search on the DB to get tools that match the task. 
  * @param {string} task - the task needing completed 
  * @param {number} limit - the number of tools to return 
- * @returns {Result(object)} - Result(
- * { ToolName: string, ToolDescription: string, Version: string, FilePath: string,  Vector: [] } );
+ * @returns {Result<Array<object>} - Result([
+ * { ToolName: string, ToolDescription: string, Version: string, FilePath: string,  Vector: [] } ]);
  */
 export async function getToolsForTask(task, limit){
     // Get DB Agent

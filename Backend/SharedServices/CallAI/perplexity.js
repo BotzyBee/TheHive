@@ -10,7 +10,7 @@ import * as su from '../Utils/index.js';
  * @param {string} options.model            - Required: The specific Perplexity model to use
  * @param {object} [options.structuredOutput] - If provided, returns parsed JSON
  * @param {string[]} [options.domains]      - Array of domains to include/exclude (max 20)
- * @param {boolean} [options.capability]    - What capability is required for the call (for routing)
+ * @param {ModelTypes} [options.capability]    - What capability is required for the call (for routing)
  */
 export async function callPerplexity(
   systemMessage,

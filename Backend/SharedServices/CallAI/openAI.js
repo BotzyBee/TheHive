@@ -14,7 +14,7 @@ import dotenv from 'dotenv';
  * @param {boolean} [options.embeddingsMode]  - If true, runs embeddings instead
  * @param {string[]} [options.inputDataVec]   - Required when embeddingsMode is true
  * @param {number} [options.dimensionSize]    - Embeddings dimension override
- * @param {boolean} [options.capability]    - What capability is required for the call (for routing)
+ * @param {ModelTypes} [options.capability]    - What capability is required for the call (for routing)
  */
 export async function callOpenAI(
   systemMessage,

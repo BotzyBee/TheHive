@@ -1,6 +1,6 @@
 import { Services } from "../index.js";
-import { SupportedFiles } from "../FileSystem/index.js";
 import { saveFile } from "../FileSystem/index.js";
+import { MIME_MAP } from "../FileSystem/supportedFiles.js";
 import path from 'path';
 
 /**
@@ -28,15 +28,6 @@ export async function callAgentTool(toolName, filePath, params){
     }
 }
 
-
-/**
- * Creates a new object where the key is the mime type rather than extension. 
- */
-export const MIME_MAP = Object.entries(SupportedFiles.default).reduce((acc, [ext, config]) => {
-  acc[config.mimeType] = { ext, ...config };
-  return acc;
-}, {});
-
 /**
  * Saves the core content of a Message class.
  * @param {BaseMessage} message - Any instance of Text, Image, Audio, or DataMessage
@@ -47,6 +38,13 @@ export const MIME_MAP = Object.entries(SupportedFiles.default).reduce((acc, [ext
 export async function saveMessageContent(message, folderPath, fileName = null) {
   try {
     let contentToSave;
+    // Resolve Extension and Config
+    let fileInfo = MIME_MAP.get(message.mime);
+    if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8' };
+    const finalFileName = fileName 
+      ? `${fileName}.${fileInfo.extension}` 
+      : `${message.id}.${fileInfo.extension}`;
+
     let options = { encoding: fileInfo.encoding };
 
     const targetDirectoryInContainer = path.join( Services.Constants.containerVolumeRoot, folderPath);
@@ -69,12 +67,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
         // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
         if (message.base64) {
           // Can only handle audio/L16;codec=pcm;rate=24000 at the moment! 
-          if(message.mime == "audio/L16;codec=pcm;rate=24000"){
             contentToSave = processBase64Audio_ToWavBuffer(message.base64, message.mime); 
-            message.mime = "audio/wav"; // update for ext lookup.
-          } else {
-            return Services.Utils.Err(`Error (saveMessageContent) : Only audio/L16;codec=pcm;rate=24000 type audio can be saved at this time.`);
-          }
         } else if (message.url) {
           return Services.Utils.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
@@ -94,12 +87,6 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
         return Services.Utils.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
     }
 
-    // Resolve Extension and Config
-    const fileInfo = MIME_MAP[message.mime] || { ext: 'bin', encoding: 'utf8' };
-    const finalFileName = fileName 
-      ? `${fileName}.${fileInfo.ext}` 
-      : `${message.id}.${fileInfo.ext}`;
-
     // Delegate to the optimized saveFile function
     return await saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);
 
@@ -107,7 +94,6 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
     return Services.Utils.Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
   }
 }
-
 
 // Helper function for processBase64Audio_ToWavBuffer
 function createWavHeader(dataLength, sampleRate, numChannels, bitDepth) {
@@ -145,3 +131,50 @@ export function processBase64Audio_ToWavBuffer(base64_Audio, mime){
   return null;
 }
 
+// WIP! 
+// import { spawn } from 'child_process';
+
+// /**
+//  * Converts PCM L16 (24kHz) to Ogg Opus for Telegram Voice Messages.
+//  * @param {Buffer} pcmBuffer - Raw PCM data from Gemini
+//  * @returns {Promise<Buffer>} - Telegram-ready Ogg/Opus Buffer
+//  */
+// export function convertToTelegramVoice(pcmBuffer) {
+//   return new Promise((resolve, reject) => {
+//     // FFmpeg settings:
+//     // -f s16le: Input is raw 16-bit little-endian PCM
+//     // -ar 24000: Input sample rate is 24kHz (Gemini standard)
+//     // -ac 1: Input is mono
+//     // -c:a libopus: Encode to Opus codec
+//     // -f opus: Wrap in Ogg container (Telegram voice format)
+//     const ffmpeg = spawn('ffmpeg', [
+//       '-f', 's16le', '-ar', '24000', '-ac', '1', '-i', 'pipe:0',
+//       '-c:a', 'libopus', '-b:a', '32k', '-vbr', 'on', 
+//       '-f', 'opus', 'pipe:1'
+//     ]);
+
+//     const chunks = [];
+//     ffmpeg.stdout.on('data', (chunk) => chunks.push(chunk));
+//     ffmpeg.stderr.on('data', (data) => {
+//         // Log errors/info from FFmpeg if needed
+//         // console.error(`FFmpeg Log: ${data}`);
+//     });
+
+//     ffmpeg.on('close', (code) => {
+//       if (code === 0) {
+//         resolve(Buffer.concat(chunks));
+//       } else {
+//         reject(new Error(`FFmpeg exited with code ${code}`));
+//       }
+//     });
+
+//     ffmpeg.stdin.on('error', (err) => {
+//         // Prevent app crash if FFmpeg closes stdin early
+//         console.error('FFmpeg Stdin Error:', err);
+//     });
+
+//     // Feed the raw PCM buffer into FFmpeg
+//     ffmpeg.stdin.write(pcmBuffer);
+//     ffmpeg.stdin.end();
+//   });
+// }

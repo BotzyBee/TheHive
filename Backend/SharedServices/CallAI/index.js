@@ -116,11 +116,21 @@ export class AiCall {
       return this.#dispatch(ModelTypes.image, sys, contentMessage, options);
   }
 
-  // async generateCode(systemMessage, contentMessage, options = {}) {
-  //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
-  //     options.contextSize = tkns;
-  //     return this.#dispatch(ModelTypes.code, systemMessage, contentMessage, options);
-  // }
+    /** Generate Text (model only - no tools)
+   * @param {string} systemMessage
+   * @param {string} contentMessage
+   * @param {object} [options]
+   * @param {string} [options.context] - Optional. For passing any context or reference text along with the task. 
+   * @param {string} [options.model]           - Exact model string (optional)
+   * @param {string} [options.provider]        - AiProviders value (optional)
+   * @param {number} [options.quality]         - AiQuality value (optional)
+   * @param {bool}   [options.randomModel]       - If true a random model fitting the requirements will be chosen.
+   */
+  async generateCode(systemMessage, contentMessage, options = {}) {
+      const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
+      options.contextSize = tkns;
+      return this.#dispatch(ModelTypes.code, systemMessage, contentMessage, options);
+  }
 
   // async mapSearch(systemMessage, contentMessage, options = {}) {
   //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);

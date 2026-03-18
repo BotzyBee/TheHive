@@ -159,7 +159,27 @@ export const MODEL_REGISTRY = [
     maxContext: 32000,
     quality: AiQuality.Advanced,
   },
+  {
+    model: 'gpt-5.1-codex-mini',
+    provider: AiProviders.openAI,
+    capabilities: [
+      ModelTypes.code
+    ],
+    maxContext: 400000,
+    quality: AiQuality.Base,
+  },
+  {
+    model: 'gpt-5.3-codex',
+    provider: AiProviders.openAI,
+    capabilities: [
+      ModelTypes.code
+    ],
+    maxContext: 400000,
+    quality: AiQuality.Pro,
+  },
+  
 
+  
   // {
   //     model:        "sonar-reasoning-pro",
   //     provider:     AiProviders.perplexity,

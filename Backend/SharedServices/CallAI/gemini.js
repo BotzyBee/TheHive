@@ -231,7 +231,8 @@ async function generateImage(
   }
 }
 
-/**
+// https://ai.google.dev/gemini-api/docs/speech-generation
+/** 
  * Generates audio (Text-to-Speech) using Gemini
  * @param {string} contentMessage - The text to be converted to speech
  * @param {string} model - Optional, TTS Model to use (e.g., "gemini-2.5-flash-preview-tts")

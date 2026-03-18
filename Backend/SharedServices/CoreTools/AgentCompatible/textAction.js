@@ -52,7 +52,7 @@ export const details = {
  * @param {number}  options.quality - Optional. 1 is low, 3 is high.
  * @param {object}  options.structuredOutput - Optional (Schema). If used the AI model will output a structured output to match this schema.
  * @param {boolean} options.randomModel - If true, AI will use a random provider that matches the specs requested.
- * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
+ * @returns {Result[[ TextMessage ] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
     Shared, 

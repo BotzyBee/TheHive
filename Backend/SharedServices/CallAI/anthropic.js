@@ -9,7 +9,7 @@ import { makeSchemaStrict } from './index.js';
  * @param {string} contentMessage - User prompt/content
  * @param {object} options
  * @param {object} [options.structuredOutput] - If provided, returns parsed JSON via schema
- * @param {boolean} [options.capability]    - What capability is required for the call (for routing)
+ * @param {ModelTypes} [options.capability]    - What capability is required for the call (for routing)
  */
 export async function callAnthropic(
   systemMessage,
