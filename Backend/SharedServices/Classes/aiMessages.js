@@ -28,7 +28,7 @@ export class MessageLog {
     }
 
     /**
-     * Get all user and system messages as string - ALL TYPES !!
+     * Get All messages as string - ALL TYPES FULL DATA!
      * @returns {string} - returns all messages separated by \n\n
      */
     getAllMessagesString(){
@@ -113,8 +113,8 @@ export class BaseMessage {
  * @param {any} [input.instructions] - optional, the instructions passed to the tool.
  */
 export class TextMessage extends BaseMessage {
-  constructor({ role, mimeType, textData, toolName, instructions } = {}) {
-    super(role);
+  constructor({ role, mimeType, textData, toolName, instructions, metadata } = {}) {
+    super(role, metadata);
     this.type = 'text';
     this.mime = mimeType || "text/plain";
     this.textData = textData;
@@ -135,8 +135,8 @@ export class TextMessage extends BaseMessage {
  * @param {any} [input.instructions] - optional, the instructions passed to the tool.
  */
 export class ImageMessage extends BaseMessage {
-  constructor({ role, mimeType, url, base64, altText, toolName, instructions } = {}) {
-    super(role);
+  constructor({ role, mimeType, url, base64, altText, toolName, instructions, metadata } = {}) {
+    super(role, metadata);
     this.type = 'image';
     this.mime = mimeType || "image/png";
     this.url = url;
@@ -159,8 +159,8 @@ export class ImageMessage extends BaseMessage {
  * @param {any} [input.instructions] - optional, the instructions passed to the tool.
  */
 export class AudioMessage extends BaseMessage {
-  constructor({ role, mimeType, url, base64, transcript, toolName, instructions } = {}) {
-    super(role);
+  constructor({ role, mimeType, url, base64, transcript, toolName, instructions, metadata } = {}) {
+    super(role, metadata);
     this.type = 'audio';
     this.mime = mimeType || "audio/mp4";
     this.url = url;
@@ -181,8 +181,8 @@ export class AudioMessage extends BaseMessage {
  * @param {any} [input.instructions] - optional, the instructions passed to the tool.
  */
 export class DataMessage extends BaseMessage {
-  constructor({ role, mimeType, data, toolName, instructions } = {}) {
-    super(role);
+  constructor({ role, mimeType, data, toolName, instructions, metadata } = {}) {
+    super(role, metadata);
     this.type = 'data';
     this.mime = mimeType || null;
     this.data = data;

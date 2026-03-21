@@ -10,7 +10,8 @@ import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getToolDetails } from './SharedServices/Database/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
-import { handleQAMessaage } from './Engine/routes/quickAsk.js';
+import { handleQAMessage } from './Engine/routes/quickAsk.js';
+import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
 
 export let dbAgent = null;
@@ -79,7 +80,7 @@ app.get('/', (req, res) => {
   res.status(200).send('The Hive is online 🐝');
 });
 
-// QuickAsk Agent Endpoing
+// QuickAsk Agent Endpoint
 app.post("/quickAsk", async (req, res) => {
   const frontendMessage = req.body?.fmf || null;
   if(frontendMessage == null ){ 
@@ -87,7 +88,20 @@ app.post("/quickAsk", async (req, res) => {
         error: `Error : fmf is either missing or not a FrontendMessageFormat`
     });
   }
-  let msg = await handleQAMessaage(frontendMessage);
+  let msg = await handleQAMessage(frontendMessage);
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  res.status(200).json(msg.value);
+});
+
+// Task Agent Endpoint
+app.post("/taskAgent", async (req, res) => {
+  const frontendMessage = req.body?.fmf || null;
+  if(frontendMessage == null ){ 
+    return res.status(400).json({
+        error: `Error : fmf is either missing or not a FrontendMessageFormat`
+    });
+  }
+  let msg = await handleTAMessage(frontendMessage);
   if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
   res.status(200).json(msg.value);
 });

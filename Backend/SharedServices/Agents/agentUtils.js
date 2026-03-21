@@ -1,4 +1,8 @@
 import { Services } from "../index.js";
+import { saveMessageContent } from "../CoreTools/helperFunctions.js";
+import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from "../Classes/index.js";
+import { addAnyDirectData } from "../CoreTools/inputParser.js";
+import { Ok, Err } from "../Utils/helperFunctions.js";
 
 // Curated data object
 /**
@@ -100,8 +104,7 @@ async function createSummary(stringRes, aiOptions = {}){
         PromptsAndSchemas.summaryUsrPrompt(stringRes),
         aiOptions
     );
-    if(dataSummary.isErr()){ 
-        this.errors.push(`Error (curateToolData) : ${dataSummary.value}`);
+    if(dataSummary.isErr()){ ;
         return Services.Utils.Err(`Error (curateToolData) : ${dataSummary.value}`)
     }
     // handle if object or not
@@ -136,14 +139,352 @@ function isBase64(str) {
     return true;
 }
 
+
+/**
+ * Takes the task and all outputs and formats a suitable response to the user. 
+ * Output messages are added to messageHistory
+ * Full return messages are outputted. 
+ * @param {object} agentObject - the 'this' object for the agent calling the function. (Must be AiJob Class) 
+ * @param {string} saveFolder - the folder where outputs should be saved.
+ * @returns {Result} - Result - Array of AI messages (text, image, audio data etc..)
+ */
+export async function finialiseOutput(agentObject, saveFolder){
+    if(!saveFolder) saveFolder = 'UserFiles/aiOutputs';
+    console.log("Finalising Output...");
+    // Create OP Plan -> Process each message (auto adds to messageHistory ) -> add to taskOutput
+    if(agentObject == null){ return Err(`Error (finialiseOutput) : agentObject is missing or null`)}
+    // Craft output array (overview)
+    let outputOverview = await agentObject.aiCall.generateText(
+      PromptsAndSchemas.outputOverview.sys,
+      PromptsAndSchemas.outputOverview.usr(agentObject.task, agentObject.contextData.getToolContextString()),
+      { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.outputOverview.schema } 
+    ); // { outputPlan: [ {type: Enum, instructions: string, contextKey}... ] }
+    if(outputOverview.isErr()){
+      agentObject.setFailed();
+      agentObject.isRunning = false;
+      return Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
+    }   
+    let outputPlan = outputOverview.value.outputPlan || [];
+    if(outputPlan.length == 0){
+      return Err(`Error (finialiseOutput -> outputOverview ) : Returned empty output plan!`); 
+    }
+
+    // Process Output Plan
+    let opMessages = [];
+    for(let i=0; i<outputPlan.length; i++){
+
+      if(outputPlan[i].type === "Text"){
+        let txt = await processText(agentObject, outputPlan[i]?.contextKey || null);
+        if(txt.isErr()) return txt; // already has Result type
+        opMessages.push(txt.value);
+      }
+
+      if(outputPlan[i].type === "Image"){
+        let img = await processImage(agentObject, outputPlan[i]?.contextKey || null);
+        if(img.isErr()) return img; // already has Result type
+        opMessages.push(img.value);
+      }
+
+      if(outputPlan[i].type === "Audio"){
+        let aud = await processAudio(agentObject, outputPlan[i]?.contextKey || null);
+        if(aud.isErr()) return aud; // already has Result type
+        opMessages.push(aud.value);
+      }
+
+      if(outputPlan[i].type === "Data"){
+        let dta = await processData(agentObject, outputPlan[i]?.contextKey || null);
+        if(dta.isErr()) return dta; // already has Result type
+        opMessages.push(dta.value);
+      }
+
+      if(outputPlan[i].type === "Save"){
+        let check = agentObject.messageHistory.getMessagesById(outputPlan[i]?.contextKey);
+        if(check == null){
+          return Err(`Error: (finialiseOutput -> save) - Could not located any data for ${outputPlan[i]?.contextKey}`);
+        }
+        let save = await saveMessageContent(check, saveFolder, null);
+        if( save.isErr()){ return save }
+        let msg = new TextMessage({
+          role: Roles.Agent,
+          textData: `Message ${check.id} has been saved to ${saveFolder}`,
+        })
+        agentObject.messageHistory.addMessage(msg);
+        opMessages.push(msg);
+      }      
+    }
+    return Ok(opMessages);
+  }
+
+  /**
+   * Helper function for finialiseOutput
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ TextMessage | string]} - Result( Text Message | string )
+   */
+  async function processText(agentObject, contextKey = null){
+    // FORMAT TEXT
+    let contextObj = contextKey ? 
+        agentObject.contextData.getSingleToolContext(contextKey) :
+        agentObject.contextData.getFullContextString()
+
+    let formatCall = await agentObject.aiCall.generateText(
+      PromptsAndSchemas.processText.sys,
+      PromptsAndSchemas.processText.usr(
+        agentObject.task,
+        JSON.stringify({ context: contextObj }),
+      ),
+      { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 
+    ); // { output: [enum "Text_Output", "Quote_Text" ], data: string }
+    if(formatCall.isErr()){
+      return Err(`Error ( processText ) : ${formatCall.value}`)    
+    } 
+
+    // Catch AI doesn't return output key
+    if(formatCall.value?.output === undefined || formatCall.value?.data === undefined){
+        return Err(`Error: (processText) - AI agent has not returned 'output' and/or 'data' key. Unable to progress.`);
+    }
+    // Return standard message
+    let opText = "";
+    if(formatCall.value.output == "Text_Output"){
+        opText = formatCall.value.data;
+    }
+    // Return 'quoted' data from tool
+    if(formatCall.value.output == "Quote_Text"){
+        let contextObj = contextKey ? 
+          agentObject.messageHistory.getMessagesById(contextKey) :
+          agentObject.messageHistory.getToolMessagesAsObject();
+        let augmentedTextOutput = addAnyDirectData(formatCall.value.data, { context: contextObj }); 
+        if(augmentedTextOutput.isErr()){
+            return Err(`Error: (processText) : ${augmentedTextOutput.value}`);
+        }
+        opText =augmentedTextOutput.value;
+    }
+    // Full Output
+    let msg = new TextMessage({ role: Roles.Agent, textData: opText, mime: contextObj.mime });
+    agentObject.messageHistory.addMessage(msg);
+    return Ok(msg);
+  }
+
+  /**
+   * Helper function for finialiseOutput
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ ImageMessage | string]} - Result( Image Message | string )
+   */
+  async function processImage(agentObject, contextKey){
+    if(contextKey == null){
+      return Err(`Error: (processImage) - contextKey is missing`);
+    }
+    let check = agentObject.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (processImage) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let img = structuredClone(check); // clone of the message
+    img.role = Roles.Agent;
+    let summaryMessage = new ImageMessage({
+      role: Roles.Agent,
+      base64: `[ Base 64 data removed due to size - Full data can be found in message ${contextKey} ]`,
+      url: img.url,
+      mimeType: img.mime,
+      altText: img.altText,
+      instructions: img.instructions,
+      toolName: img.toolName
+    });
+    img.toolName = "";
+    img.instructions = "";
+    // Push summary message to chat, return full message.
+    agentObject.messageHistory.addMessage(summaryMessage);
+    return Ok(img);
+  }
+
+  /**
+   * Helper function for finialiseOutput
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ AudioMessage | string]} - Result( Audio Message | string )
+   */
+  async function processAudio(agentObject, contextKey){
+    if(contextKey == null){
+       return Err(`Error: (processAudio) - contextKey is missing`);
+    }
+    let check = agentObject.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (processAudio) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let aud = structuredClone(check); // clone of the message
+    aud.role = Roles.Agent;
+    let summaryMessage = new AudioMessage(
+      {
+        role: Roles.Agent,
+        mimeType: aud.mime,
+        url: aud.url,
+        base64: `[ Base 64 data removed due to size - Full data can be found in message ${contextKey} ]`,
+        transcript: aud.transcript
+      }
+    )
+    aud.toolName = "";
+    aud.instructions = "";
+    // Push summary message to chat, return full message.
+    agentObject.messageHistory.addMessage(summaryMessage);
+    return Ok(aud);
+  }
+
+  /**
+   * Helper function for finialiseOutput
+   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @returns {Result[ DataMessage | string]} - Result( Data Message | string )
+   */
+  async function processData(agentObject, contextKey){
+    if(contextKey == null){
+       return Err(`Error: (processData) - contextKey is missing`);
+    }
+    let check = agentObject.messageHistory.getMessagesById(contextKey);
+    if(check == null){
+      return Err(`Error: (processData) - Could not located any data for ${contextKey}`);
+    }
+    // Clone & strip out unnessessary data. 
+    let dta = structuredClone(check); // clone of the message
+    dta.role = Roles.Agent;
+    // Handle Data
+    if(typeof dta.data == "object"){
+      dta.data = JSON.stringify(dta.data, null, 2);
+    } 
+    if(dta.data instanceof Uint8Array || dta.data instanceof ArrayBuffer){
+      // Binary Data 
+      dta.data = `[ Data object contained binary data - This feature is yet to be implimented ]`
+    }
+    let summaryMessage = new DataMessage(
+      {
+        role: Roles.Agent,
+        mimeType: dta.mime,
+        data: `[ Data object removed due to size - Full data can be found in message ${contextKey} ]`
+      }
+    )
+    dta.toolName = "";
+    dta.instructions = "";
+    // Push summary message to chat, return full message.
+    agentObject.messageHistory.addMessage(summaryMessage);
+    return Ok(dta);
+  }
+
 const PromptsAndSchemas = {
     summarySysPrompt: `You are a specialized data processing engine. 
     Your objective is to perform lossy compression on user-provided data structures by summarizing long text values while strictly maintaining the original schema and metadata
     Structural Integrity: You must return a data object or array with the exact same keys and hierarchy as the input.
     Key Matching: Input keys and output keys must be identical. Do not rename, omit, or add keys.
     When summarizing long strings ensure you prioritize the inclusion of key facts, entities, names, locations, file paths etc.
-    If the data is encoded and/ or not plaintext then return a description of the data eg '[ Encoded data ]' or '[ Javascript Code ] etc.'`,
+    If the data is encoded, Base64 or other non-plaintext output (eg Javascirpt or json objects) then return a description of the data eg '[ Encoded data ]' or '[ Javascript Code ] etc.'`,
     summaryUsrPrompt: (inputData) => {
         return `Here is the input data needing summarized. Remember to match the return data structure to the input structure. Aim for 1-2 information dense short paragraphs. ### ${inputData} `
-    }
+    },
+    outputOverview: {
+        sys: `Your task is to craft a high-level plan for what information will be returned to the user. This is the final step in an agentic workflow.
+You will be provided the user task, and tool data outputs to help you.
+ 
+If the task asks for data or information then your plan should deliver this in the fullest extent possible. You should also aim to complete any other tasks such as requests to save data.
+Your output plan will consist of one or more 'messages' which will be delivered together as a final output. 
+You have the option of including any of the following message types 
+      - Text : Returns a block of text.
+      - Image : Returns an image
+      - Audio : Returns audio
+      - Data : Returns data such as JSON.
+      - Save : Saves data to the user's system. 
+      
+For Image, Audio, Data and Save messages you must provide the associated context key for where to find the data Eg 'MSG_h4d2'. 
+A context key can be inlcuded for Text messages however is not always necessary. 
+Instructions should be directed at the next AI agent who will process each message. Instructions are not returned to the user.
+
+Example output could be 
+[{
+  type: Text,
+  instructions: Answer the users question using the result of the internet research tool.
+  contextKey: 'MSG_h4d2' 
+},
+{
+  type: Image,
+  instructions: Adding a helpful graphic to the response to help the user understand.
+  contextKey: 'MSG_udm3'
+},
+{
+  type: Save,
+  instructions: Save the graphic as the user has requested this.
+  contextKey: 'MSG_udm3'
+},
+{
+  type: Text,
+  instructions: Suggest further research questions, or potential next steps for the user.
+  contextKey: null
+}
+]`,
+    usr: (task,  contextData) => {
+        return `<task> ${task} </task>
+Here is the context data and tool outputs (may be empty) <contextData> ${contextData} </contextData>`;
+    },
+    schema: {
+    "description": "A schema defining the execution plan for an agent's multi-modal output.",
+    "type": "object",
+    "properties": {
+      "outputPlan": {
+        "type": "array",
+        "description": "An ordered list of output steps or components.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["Text", "Image", "Audio", "Data", "Save"],
+              "description": "The format or action type of the output component."
+            },
+            "instructions": {
+              "type": "string",
+              "description": "Concise instructions to help the next AI Agent to include the correct data. This is not for the user!"
+            },
+            "contextKey": {
+              "type": "string",
+              "description": "The key relating to any data to be added (optional)."
+            }
+          },
+          "required": ["type", "instructions"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["outputPlan"],
+    "additionalProperties": false
+  }
+  },
+  processText: {
+        sys: `Answer in UK English. Your task is to provide a clean, well formatted and comprehensive final output text. 
+You will be provided the user task, and tool data outputs. 
+If the task asks for data or information then provide this in the fullest extent possible. 
+If the task doesn't ask for data or information then summarise the tasks that were completed. 
+
+You have two options for completing the task:  
+Text Output: Use the data provided to craft your own detailed text response. This is best for short answers and relatively simple tasks.  
+Quote Text. Use the ‘quote tool’ to directly copy the output from one of the tool listed in the context and provide this as a text answer to the user. You must use << >> tags to reference the data location in your answer. 
+   
+Example of how to use << >> quotes:  
+Context Data = { context: { potato: "Example Quote Data", cheese: ["More info..", "Another bit of info.."] } } 
+Your answer = '<< context.potato >>'  will output ‘Example Quote Data’. 
+
+You can only quote the text DO NOT add string functions like .split() etc. You can combine multiple tags if you want to output multiple chunks of data.`,
+    
+    usr: (task,  contextData) => {
+        return `<task> ${task} </task>
+Here is the context data and tool outputs (may be empty) <contextData> ${contextData} </contextData>`;
+    },
+    schema: {
+        "type": "object",
+        "description": "An object for returning clean, well formatted text to the user.",
+        "properties": {
+            "output": {
+            "type": "string",
+            "enum": ["Text_Output", "Quote_Text"]
+            },
+            "data": {
+            "type": "string"
+            }
+        },
+        "required": ["output", "data"]
+      }
+  }
 }

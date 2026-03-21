@@ -7,8 +7,12 @@ const nunEnv = nunjucks.configure({
 
 // This filter will stringify the input data into a JSON string.
 nunEnv.addFilter('tojson', function(obj, spaces) {
-    const jsonString = JSON.stringify(obj, null, spaces || 0);
-    return jsonString;
+    // If the object is undefined, return the string "null" 
+    // so the JSON remains valid: {"key": null}
+    if (typeof obj === 'undefined') {
+        return 'null';
+    }
+    return JSON.stringify(obj, null, spaces || 0);
 });
 
 /**
@@ -168,14 +172,13 @@ Do NOT try to answer the query and do NOT add your own thoughts or comments to t
 
 In the value field you can include data directly or include a reference to the context data via a property access path.
 Any property access paths must be wrapped in << >> and have the type field set to 'ref'.
-Note use an array if you want to combine multiple property access paths - example: [<< path.1 >>, << path.here >>, << another.path >>] .
-If you are wanting to output mutiple objects you should nest them in the output array - example: [ [...array of objects] ,  [...array of objects] ]
+Note use an array if you want to combine multiple property access paths - example: [<< path.1 >>, << path.here >>, << another.path >>]
 
 Examples of how to use property access paths (if needed):
-contextData: { ACT_XXXX: { tool: "the tool used", action: "what the tool did.", data: { a: "some output data", b: false }} }
+context: { ACT_XXXX: { tool: "the tool used", action: "what the tool did.", data: { a: "some output data", b: false }} }
 param output = [
-    { key : 'key_from_schema' , type: 'ref', value: '<< contextData.ACT_XXXX.data.b >>' },
-    { key : 'key_from_schema2' , type: 'ref', value: '<< contextData.ACT_XXXX.data.a >> can be combined in the output.' }
+    { key : 'key_from_schema' , type: 'ref', value: '<< context.ACT_XXXX.data.b >>' },
+    { key : 'key_from_schema2' , type: 'ref', value: '<< context.ACT_XXXX.data.a >> can be combined in the output.' }
 ]`,
     usr: (task, contextObject, toolSchema) => {
         return `<task> ${task} </task>
