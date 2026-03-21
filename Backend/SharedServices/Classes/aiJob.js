@@ -67,6 +67,15 @@ export class TaskStatus {
         }
     }
 
+    //** Used for checking if current status == something. */
+    isStatus(status){
+        if(this.taskStatus == status){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     // Useful when passing between threads.
     importStatus(status){
         switch (status.taskStatus) {

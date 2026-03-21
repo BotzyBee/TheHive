@@ -43,7 +43,7 @@ export class MessageLog {
      */
     getSimpleUserAgentComms() {
     return this.allMessages
-        .filter(msg => msg?.type === 'Text' && (msg?.role === Roles.Agent || msg?.role === Roles.User ))
+        .filter(msg => msg?.type === 'text' && (msg?.role === Roles.Agent || msg?.role === Roles.User ))
         .map(msg => `${msg.role}: ${msg.textData}`) // Convert object to a string line
         .join('\n\n');
     }

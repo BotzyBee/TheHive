@@ -1,6 +1,6 @@
 import { Services } from "../index.js";
 import { saveMessageContent } from "../CoreTools/helperFunctions.js";
-import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage } from "../Classes/index.js";
+import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage, AiJob } from "../Classes/index.js";
 import { addAnyDirectData } from "../CoreTools/inputParser.js";
 import { Ok, Err } from "../Utils/helperFunctions.js";
 
@@ -9,10 +9,11 @@ import { Ok, Err } from "../Utils/helperFunctions.js";
  * 
  * @param {TextMessage | ImageMessage | AudioMessage | DataMessage}  messageObject 
  * @param {number} summaryDataSizeThreshold - max size (chars) before being summerised. Default 500.
- * @param {object} aiOptions - Any settings/ options for AI the ai call(s). 
+ * @param {object} aiOptions - Any settings/ options for AI the ai call(s).
+ * @param {AiJob} jobObject - Optional - pass a jobObject to allow counting ai calls.
  * @returns {Result[object]} - { key: [messageId], [messageId] : { ...Message content } }
  */
-export async function processMessageForContext( messageObject, summaryDataSizeThreshold = 500, aiOptions = {} ) {
+export async function processMessageForContext( messageObject, summaryDataSizeThreshold = 500, aiOptions = {}, jobObject ) {
     if (!(messageObject instanceof Services.Classes.BaseMessage)) {
             return Services.Utils.Err(
             'Error (processMessageForContext) : messageObject must be an instance of BaseMessage or a class that extends it.');
@@ -59,6 +60,7 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
             }
             // Else create summary
             const summary = await createSummary(data,  aiOptions = {});
+            if(jobObject) jobObject.addAiCount(1);
             return summary.isErr() ? summary : Services.Utils.Ok(summary.value);
         }
         return Services.Utils.Ok(data);
@@ -156,14 +158,19 @@ export async function finialiseOutput(agentObject, saveFolder){
     // Craft output array (overview)
     let outputOverview = await agentObject.aiCall.generateText(
       PromptsAndSchemas.outputOverview.sys,
-      PromptsAndSchemas.outputOverview.usr(agentObject.task, agentObject.contextData.getToolContextString()),
+      PromptsAndSchemas.outputOverview.usr(
+        agentObject.task, 
+        agentObject.contextData.getToolContextString(),
+        JSON.stringify(agentObject.plan, null, 2)
+      ),
       { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.outputOverview.schema } 
     ); // { outputPlan: [ {type: Enum, instructions: string, contextKey}... ] }
     if(outputOverview.isErr()){
       agentObject.setFailed();
       agentObject.isRunning = false;
       return Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
-    }   
+    } 
+    agentObject.addAiCount(1);
     let outputPlan = outputOverview.value.outputPlan || [];
     if(outputPlan.length == 0){
       return Err(`Error (finialiseOutput -> outputOverview ) : Returned empty output plan!`); 
@@ -231,12 +238,14 @@ export async function finialiseOutput(agentObject, saveFolder){
       PromptsAndSchemas.processText.usr(
         agentObject.task,
         JSON.stringify({ context: contextObj }),
+
       ),
       { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 
     ); // { output: [enum "Text_Output", "Quote_Text" ], data: string }
     if(formatCall.isErr()){
       return Err(`Error ( processText ) : ${formatCall.value}`)    
-    } 
+    }
+    agentObject.addAiCount(1);
 
     // Catch AI doesn't return output key
     if(formatCall.value?.output === undefined || formatCall.value?.data === undefined){
@@ -406,7 +415,7 @@ Example output could be
 },
 {
   type: Save,
-  instructions: Save the graphic as the user has requested this.
+  instructions: Save the graphic as the user has requested this and previous tools haven't saved this.
   contextKey: 'MSG_udm3'
 },
 {
@@ -415,9 +424,11 @@ Example output could be
   contextKey: null
 }
 ]`,
-    usr: (task,  contextData) => {
+    usr: (task,  contextData, plan) => {
         return `<task> ${task} </task>
-Here is the context data and tool outputs (may be empty) <contextData> ${contextData} </contextData>`;
+Here is the context data and tool outputs (may be empty) <contextData> ${contextData} </contextData>
+Here is the plan which details what has been completed <plan> ${plan} </plan>
+Make sure not to save data that has already been saved as part of the plan.`;
     },
     schema: {
     "description": "A schema defining the execution plan for an agent's multi-modal output.",

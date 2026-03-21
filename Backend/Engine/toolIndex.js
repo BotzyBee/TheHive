@@ -71,6 +71,7 @@ export async function initToolIndex(){
     const db = getDB.value;
     let stats = { tools: 0, added: 0, updated: 0, removed: 0 }
     for( let i=0; i<cLen; i++ ){
+        console.log("Checking : ", combined[i].toolName);
         // check if exists
         let check = await Services.Database.getRecords( db, toolTableName, "ToolName", combined[i].toolName );
         if(check.isErr()){ return Services.Utils.Err(`Error ( initToolIndex -> getRecords ) : ${getDB.value}`); }

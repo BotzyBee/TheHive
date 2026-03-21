@@ -1,7 +1,7 @@
 import { FrontendMessageFormat } from "../classes.js";
 import { Services } from "../../SharedServices/index.js";
 import { JOBS } from "../jobManager.js";
-import { TextMessage } from "../../SharedServices/Classes/index.js";
+import { AiJob, TextMessage } from "../../SharedServices/Classes/index.js";
 import { processApiMessagesToClasses } from './index.js';
 
 /**
@@ -47,22 +47,56 @@ export async function createTaskAgentJob(frontendMessage){
 export async function handleTAMessage(frontendMessage){
     // Process Messages
     let id = frontendMessage.aiJobId;
-    let msg = new FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });
-    let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
-    if( processedMsg.isErr() ){ 
-    return Services.Utils.Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
-    }
-    msg.addMessages(processedMsg.value);
     // No ID - New Task
     if(id == null){
-    let newJob = await createTaskAgentJob(msg);
-    if(newJob.isErr()){
-        return Services.Utils.Err(`Error : (handleTAMessage) - ${newJob.value}`);
-    }
-    return newJob; // has Result already
+        let rtnMsg = new FrontendMessageFormat({ 
+            aiJobId: id, 
+            aiSettings: frontendMessage.aiSettings,
+            status: Services.Classes.Status.NotStarted
+        });
+        let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
+        if( processedMsg.isErr() ){ 
+        return Services.Utils.Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
+        }
+        rtnMsg.addMessages(processedMsg.value);
+        let newJob = await createTaskAgentJob(rtnMsg);
+        if(newJob.isErr()){
+            return Services.Utils.Err(`Error : (handleTAMessage) - ${newJob.value}`);
+        }
+        return newJob; // has Result already
     } else {
     // Existing Task
-    // To Do
-    console.log("Existing Job");
+        
+        // Get JOB Object
+        let job = await JOBS.jobListManager({getJob: id});
+        if(job.isErr()){
+            return Services.Utils.Err(`Error : (handleTAMessage) - ${job.value}`);
+        } 
+        let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
+        if( processedMsg.isErr() ){ 
+            return Services.Utils.Err(`Error (handleTAMessage 2) : could not process the messages into classes. ${processedMsg.value}`);
+        }
+        // Handle Stop
+        if(frontendMessage.status == Services.Classes.Status.Stopped){
+            job.value.isRunning = false;
+            job.value.status.setStoppedByUser();
+            return Services.Utils.Ok("Job has been stopped.");
+        }
+
+        // Catch still running
+        if(job.value.isRunning == true){
+            return Services.Utils.Err(`Job ${id} is still running. Cannot add new instructions unless stopped or complete.`)
+        }
+
+        // add new messages to messageHistory
+        processedMsg.value.forEach(
+            msg => job.value.messageHistory.addMessage(msg)
+        );
+        // Setup to review new messages
+        job.value.status.setNewInfoAdded();
+        job.value.nextPhase = Services.Agents.TaskAgent.TaskPhases.Review;
+        // Add to un-allocated
+        JOBS.NON_ALLOCATED.push(job.value.id);
+        return Services.Utils.Ok("New Information Added.")
     }
 }

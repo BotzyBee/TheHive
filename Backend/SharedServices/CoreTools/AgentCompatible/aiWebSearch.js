@@ -76,8 +76,8 @@ export async function run(
     let res = await Promise.all(allCalls);
     if (res[0].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
     if (res[1].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
-    let combined = { result: `<Gemini_Result> ${res[0].value} </Gemini_Result> `+
-        `<Perplexity_Result> ${res[1].value.searchResult} </Perplexity_Result>`, sources: res[1].value.citations };
+    let combined = { result: `Gemini_Result : ${res[0].value} `+
+        `Perplexity Result : ${res[1].value.searchResult}`, sources: res[1].value.citations };
 
     let message = new Shared.Classes.TextMessage({
         role: Shared.Classes.Roles.Tool, 

@@ -1,9 +1,8 @@
 import { ContextTemplate } from "../../Classes/context.js";
-import { Roles, TextMessage } from "../../Classes/index.js";
+import { Roles, Status, TextMessage, AiJob } from "../../Classes/index.js";
 import { Services } from "../../index.js";
 import { Ok, Err } from "../../Utils/helperFunctions.js";
 import { getToolsForTask, getToolDetails } from "../../Database/helpers.js";
-import { TaskStatus, AiJob } from "../../Classes/index.js";
 import { processMessageForContext, finialiseOutput } from "../agentUtils.js";
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js'
 import { callAgentTool } from "../../CoreTools/helperFunctions.js";
@@ -148,7 +147,7 @@ export class TaskAgent extends AiJob {
         for (let i = 0; i < this.toolRetryCount; i++) {
             call = await this.aiCall.generateText(systemMessage, userMessage, options); 
             this.addAiCount(1);
-            if (call.isOk()) return call;
+            if (call.isOk()) return call; // already has result
         }
         const errorMsg = `Error ( TaskAgent - #generateText ) : ${call.value}`;
         this.errors.push(errorMsg);
@@ -162,7 +161,7 @@ export class TaskAgent extends AiJob {
      * @param {boolean} [options.useTaskPlanGuides ] - if true planning engine will search for relevant guides. 
      */
     async #planningEngine(options = {}) {
-        console.log("Starting Planning.")
+        console.log("Starting Planning.");
         const { isUpdate = false, } = options;
         const statusLabel = isUpdate ? "Updating Task Plan..." : "Creating Task Plan...";
         this.status.setCustomStatus(statusLabel);
@@ -203,18 +202,18 @@ export class TaskAgent extends AiJob {
         if (actionResponse.status === 'need info') {
             this.isRunning = false;
             this.status.setAwaitingUserInput();
-            this.messageHistory.push(
-                new TextMessage({ role: Roles.Agent, textData: actionResponse.failText })
-            );
+            let msg = new TextMessage({ role: Roles.Agent, textData: actionResponse.failText })
+            this.messageHistory.addMessage(msg);
+            this.taskOutput.push(msg);
             return Ok('Agent Needs More Information from the User.');
         }
 
         if (actionResponse.status === 'cant plan' || actionResponse?.plan.length == 0) {
             this.isRunning = false;
             this.status.setFailed();
-            this.messageHistory.push(
-                new TextMessage({ role: Roles.Agent, textData: actionResponse.failText })
-            );
+            let msg = new TextMessage({ role: Roles.Agent, textData: actionResponse.failText });
+            this.messageHistory.addMessage(msg);
+            this.taskOutput.push(msg);
             return Ok(`Error (planningEngine) - ${actionResponse.failText}`);
         }
 
@@ -286,7 +285,7 @@ export class TaskAgent extends AiJob {
             // Shorten & add to context
             if(toolOutputArray[i].role === Roles.Tool){
                 console.log("Processing Tool Message... ");
-                let processed = await processMessageForContext(toolOutputArray[i], this.summaryDataSizeThreshold, this.aiSettings );
+                let processed = await processMessageForContext(toolOutputArray[i], this.summaryDataSizeThreshold, this.aiSettings, this );
                 if(processed.isErr()){
                     return Err(`Error : ( processToolOutput ) : ${processed.value}`);   
                 }
@@ -302,7 +301,7 @@ export class TaskAgent extends AiJob {
      * Tool calling stage
      */
     async #performNextAction(){ 
-        if(this.status == TaskStatus.Stopped ){ 
+        if(this.status == Status.Stopped ){ 
             return Ok("Task Agent is showing stopped status.");
         }
         this.toolOutputData = []
@@ -418,17 +417,18 @@ export class TaskAgent extends AiJob {
      */
     // Review & Return 
     async #reviewAndReturn(){
+
         // [][] -- STATUS & USER ACTIONS -- [][]
         let saveFolder = this.contextData.globalData.isProject 
                 ? this.contextData.globalData.projectIndexUrl
                 : this.contextData.globalData.workingDirectory;
 
         // Catch Complete, Stopped & all actions complete.
-        const outstandingActionCount = this.#getOustandingActionCount(); 
-        if(this.status == TaskStatus.Complete || this.status == TaskStatus.Stopped || outstandingActionCount === 0){
+        if(this.status.isStatus(Status.Complete)  || this.status.isStatus(Status.Stopped)){
+            console.log("Stopped Or Complete");
             // All context should have been processed at this point.. just output the final message.
             this.isRunning = false; // stop looping.
-            if(this.status != TaskStatus.Stopped && this.taskOutput == null){ 
+            if(this.status.taskStatus != Status.Stopped && this.taskOutput == null){ 
                 let output = await finialiseOutput(this, saveFolder); 
                 if(output.isErr()){ 
                     this.errors.push(`Error: reviewAndReturn -> finialiseOutput : ${output.value}`);
@@ -441,7 +441,8 @@ export class TaskAgent extends AiJob {
         } 
         
         // Catch new message from User 
-        if(this.status == TaskStatus.NewInfoAdded){ 
+        if( this.status.isStatus(Status.NewInfoAdded) ){ 
+            console.log("Processing message from user...");
             this.status.setCustomStatus("Processing message from user..."); 
             // user message will have been added to message history by jobManager
             let convoHistory = this.messageHistory.getSimpleUserAgentComms();
@@ -473,7 +474,7 @@ export class TaskAgent extends AiJob {
             if(processUserMessage.value.action == "update task & plan"){
                 this.status.setCustomStatus("Re-wording task and updating plan...");
                 // Craft new task
-                let newTaskWording = this.#generateText(
+                let newTaskWording = await this.#generateText(
                     PromptsAndSchemas.newTaskWording.sys,
                     PromptsAndSchemas.newTaskWording.usr(
                         this.task,
@@ -510,9 +511,9 @@ export class TaskAgent extends AiJob {
                 this.isRunning = false; 
                 this.status.setAwaitingUserInput();
                 this.nextPhase = TaskPhases.Review;
-                this.messageHistory.push(
-                    new TextMessage({role: Roles.Agent, textData: `I couldn't process the last user message. ${processUserMessage.value.instruction}` })
-                )
+                let msg = new TextMessage({role: Roles.Agent, textData: `I couldn't process the last user message. ${processUserMessage.value.instruction}` });
+                this.messageHistory.addMessage(msg);
+                this.taskOutput.push(msg);
                 this.phaseMessage = `I couldn't process the last user message. ${processUserMessage.value.instruction}`;
                 return Ok("Last user message needs clarification.")
             }
@@ -521,7 +522,11 @@ export class TaskAgent extends AiJob {
         }
 
         // Not complete, but need to alert the user to something or ask them to OK something. 
-        if(this.status == TaskStatus.Failed || this.status == TaskStatus.AwaitingUserInput || this.status == TaskStatus.MaxLoopsHit){
+        if( this.status.isStatus(Status.Failed) || 
+            this.status.isStatus(Status.AwaitingUserInput) || 
+            this.status.isStatus(Status.MaxLoopsHit)
+        ){
+            console.log("Failed | Await User | Max Loops... IE Break for now...");
             this.isRunning = false;
             let returnMessage = await this.#generateText(
                 PromptsAndSchemas.returnMessage.sys,
@@ -537,8 +542,9 @@ export class TaskAgent extends AiJob {
                 this.errors.push(`Error ( reviewAndReturn -> craft return message ) : ${returnMessage.value}`);
                 return Err(`Error ( reviewAndReturn -> craft return message ) : ${returnMessage.value}`);     
             }
-            this.messageHistory.push(
-                new TextMessage({role: Roles.Agent, textData: returnMessage.value}));
+            let msg = new TextMessage({role: Roles.Agent, textData: returnMessage.value});
+            this.messageHistory.addMessage(msg);
+            this.taskOutput.push(msg);
             this.phaseMessage = "";
             return Ok("Agent has crafted message to user.");
         }
@@ -654,7 +660,7 @@ export class TaskAgent extends AiJob {
             // (Only gets here if 'returnToUser' tool isn't added to the plan)
             const newOustandingActionCount = this.#getOustandingActionCount();
             if (newOustandingActionCount === 0) {
-                this.status = TaskStatus.Complete;
+                this.status.setComplete();
                 this.isRunning = false;
                 this.phaseMessage = "";
                 this.setEndTime();
@@ -677,16 +683,15 @@ export class TaskAgent extends AiJob {
         console.log("Starting Task Agent Job")
         // Start / Re-start the agent
         this.isRunning = true;
-        this.status.setInProgress();
-        this.taskOutput = null; 
+        this.taskOutput = []; 
         
-
         // Main Loop :: Plan -> Act -> Review
         while(this.isRunning == true){
             // PLAN
             if(this.nextPhase == TaskPhases.Plan){
                 let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan});
                 if(plan.isErr()){ 
+                    console.log("ERROR Plan - ", plan.value);
                     this.status.setFailed();
                     this.isRunning = false;
                     return Err(`Error (Run -> plan) : ${plan.value}`);
@@ -698,6 +703,7 @@ export class TaskAgent extends AiJob {
                 let action = await this.#performNextAction();
                 console.log(JSON.stringify(action.value));
                 if(action.isErr()){ 
+                    console.log("ERROR Action - ", action.value);
                     this.status.setFailed(); // sets isRunning to false
                     return Err(`Error (Run -> action) : ${action.value}`);
                 }
@@ -709,6 +715,7 @@ export class TaskAgent extends AiJob {
                 let review = await this.#reviewAndReturn();
                 console.log(JSON.stringify(review.value));
                 if(review.isErr()){ 
+                    console.log("ERROR Review - ", review.value);
                     this.status.setFailed(); // sets isRunning to false
                     return Err(`Error (Run -> review) : ${review.value}`);
                 }
@@ -721,7 +728,12 @@ export class TaskAgent extends AiJob {
             }
             this.addLoopCount(1);
         }// end main loop
-
+    
+    // TEMP - Save output for de-bugging.
+    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
+    await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
+    
     return Ok("Task Agent has stopped or completed");
     }
 }// end Task Agent
