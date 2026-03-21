@@ -3,6 +3,7 @@ import { MessageLog } from "./aiMessages.js";
 import { ContextTemplate } from "./context.js";
 import { processApiMessagesToClasses } from "../../Engine/routes/index.js";
 import { Err } from "../Utils/index.js";
+import { AiCall } from "../CallAI/index.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
@@ -107,6 +108,8 @@ export class AiJob {
     /**@type {string}  - for managing the overall user task. */
     this.task = "";
 
+    this.aiCall = new AiCall(); // for making aiCalls.
+
     /**@type {TaskStatus} */
     this.status = new TaskStatus();
 
@@ -147,7 +150,7 @@ export class AiJob {
    * Fetches all global and tool context (summarised to save tokens)
    * @returns {object} - { context : { globalData: {}, toolData: {} } }  
    */
-  getSummaryContextString(){
+  getAllContextSummaryString(){
     return JSON.stringify({ context: this.contextData.getAllContext() });
   }
 
@@ -155,10 +158,10 @@ export class AiJob {
     * Fetches all global and tool context (Full Values)
     * @returns {object} - { context : { globalData: {}, toolData: {} } }  
     */
-  getRawContext(){
+  getAllContextRaw(){
     let toolData = this.messageHistory.getToolMessagesAsObject();
     let globalData = this.contextData.globalData;
-    return { context: globalData, toolData };
+    return { context: { globalData, toolData } };
   }
 
   /** Set status to complete and isRunning to false */

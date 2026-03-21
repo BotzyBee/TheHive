@@ -45,6 +45,7 @@ export class AiCall {
    * @param {number} [options.quality]         - AiQuality value (optional)
    * @param {object} [options.structuredOutput]  - If set, returns parsed JSON; (auto-filters structuredOutputs)
    * @param {bool}   [options.randomModel]       - If true a random model fitting the requirements will be chosen.
+   * @returns {Result (string | object)} - Result (string or object) - depending on if structured outputs are used.
    */
   async generateText(systemMessage, contentMessage, options = {}) {
     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);

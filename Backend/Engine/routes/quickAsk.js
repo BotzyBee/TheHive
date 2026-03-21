@@ -39,7 +39,7 @@ export async function createQuickAskJob(frontendMessage){
     return Services.Utils.Ok(rtnMessage);
 }
 
-export async function handleQAMessaage(frontendMessage){
+export async function handleQAMessage(frontendMessage){
     // Process Messages
     let id = frontendMessage.aiJobId;
     let msg = new FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });

@@ -5,7 +5,9 @@ export const details = {
     toolName:   "aiWebSearch",
     version:    "2026.0.1",
     creator:    "Botzy Bee",
-    overview:   "Use AI to search the internet for information - either a specific website or a general web-search.", 
+    overview:   "Use AI to search the internet for information - either a specific website or a general web-search. "+
+    "This tool simply returns the search results. It does not format or extract data from these results. "
+    +"You should use other tools to format the output if required.", 
     guide:      null,  
     inputSchema: {
         "type": "object",
@@ -61,7 +63,7 @@ export async function run(
     if(typeof referenceText == "object"){
         referenceText = JSON.stringify(referenceText);
     }
-    if( referenceText != null ){ context = `Use this context to help you complete the task <context> ${refText} </context>` }
+    if( referenceText != null ){ context = `Use this context to help you complete the task <context> ${referenceText} </context>` }
         let sysText = 
     `You are a tool which searches for information online. Focus on quality and accuracy in completing the task.
     Do NOT add your own thoughts, comments or working notes.`;
