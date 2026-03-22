@@ -366,9 +366,6 @@ export class TaskAgent extends AiJob {
             return Err(`Error (performAction -> craft input params) : ${craftedParams.value}`)
         }
 
-        this.errors.push(`SUM CONTEXT : ${JSON.stringify(this.getAllContextSummaryString(), null, 2)}`);
-        this.errors.push(`CRAFTED PARAMS : ${JSON.stringify(craftedParams.value, null, 2)}` )
-
         // Build params into object (injecting data if needed)
         let fullContext = this.getAllContextRaw();
         let resolvedParams = parseNunjucksTemplate(craftedParams.value.params, fullContext );
@@ -630,7 +627,7 @@ export class TaskAgent extends AiJob {
             const ac = actionObj.attempt + 1; 
             this.#incrimentActionCount(this.actionReviewID);
             // Tool has exceeded the maximum number of attempts
-            if(ac >= this.toolRetryCount){
+            if(ac > this.toolRetryCount){
                 this.nextPhase = TaskPhases.Plan;
                 this.phaseMessage = `Tool: ${actionObj.tool}  ID: ${this.actionReviewID} - Has failed multiple times when attempting to complete the action.`+
                 `\n Action: ${actionObj.action}.`+
