@@ -9,13 +9,14 @@ export * as aiWebSearch from './aiWebSearch.js';
 export * as aiImageTool from './aiImageTool.js';
 export * as textToSpeech from './textToSpeech.js';
 export * as createCodeTool from './createCode.js';
+export * as calculatorTool from './calculator.js';
+export * as findAndReplaceTextTool from './findReplaceText.js';
+export * as timeAndDateTool from './timeAndDate.js';
 // READ THE NOTE AT THE TOP !!
 
 
 // TO DO
 // Update file tool
 // deepResearch
-// calculateExpression
-// findAndReplaceText
 // combineText
 // currentTimeAndDate

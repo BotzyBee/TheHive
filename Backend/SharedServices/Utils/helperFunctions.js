@@ -4,6 +4,7 @@ import { Result } from "../Classes/result.js";
 import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
+import { evaluate } from 'mathjs';
 
 /**
  * Return Ok
@@ -36,3 +37,4 @@ export function logAndErr(value){
 export const pathHelper = path;
 export const fsHelper = fs;
 export const readlineHelper = readline;
+export const evaluateHelper = (input) => { evaluate(input) }

@@ -1,5 +1,6 @@
 import { readFileContent, saveFile } from "./CRUD.js";
 import { readImageFileToBase64, readOfficeFileToString } from "./utils.js";
+import { processBase64Audio_ToWavBuffer } from "../CoreTools/helperFunctions.js";
 
 export const MIME_MAP = new Map([
   ["text/plain", 
@@ -174,10 +175,13 @@ export const MIME_MAP = new Map([
       readFN: null, 
       writeFN: null }
     ],
-  ["audio/wav", 
-    { extension: "audio/L16;codec=pcm;rate=24000", name: "PCM Audio", encoding: "base64", 
+  ["audio/L16;codec=pcm;rate=24000", 
+    { extension: "wav", name: "PCM Audio", encoding: "base64", 
       readFN: null, 
-      writeFN: null }
+      writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => {
+        let process = processBase64Audio_ToWavBuffer(fileContent, "audio/L16;codec=pcm;rate=24000");
+        await saveFile(relativeFolderPath, process, fileNameIncExt)
+      } }
     ],
   ["audio/mp4", 
     { extension: "m4a", name: "MPEG-4 Audio", encoding: "base64", 
