@@ -1,4 +1,4 @@
-import { FrontendMessageFormat } from "../classes.js";
+import { FrontendMessageFormat } from "../../SharedServices/Classes/index.js";
 import { Services } from "../../SharedServices/index.js";
 import { JOBS } from "../jobManager.js";
 import { AiJob, TextMessage } from "../../SharedServices/Classes/index.js";
@@ -38,7 +38,7 @@ export async function createTaskAgentJob(frontendMessage){
     });
     let msg = new TextMessage({
         role: Services.Classes.Roles.Agent,
-        textData: `Ai Task-Agent Job has been created and is awaiting allocation. Ref: ${job.id}`
+        textData: `Task-Agent Job has been created and is awaiting allocation. Ref: ${job.id}`
     });
     rtnMessage.addMessages([msg]);
     return Services.Utils.Ok(rtnMessage);

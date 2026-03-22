@@ -2,7 +2,7 @@ import { AiJob } from "../SharedServices/Classes/index.js";
 import { Services } from "../SharedServices/index.js";
 import { useMultipleThreads } from "../SharedServices/constants.js";
 import { pool, processObjectToClass } from "./workers.js";
-import { FrontendMessageFormat } from "./classes.js";
+import { FrontendMessageFormat } from "../SharedServices/Classes/aiMessages.js";
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -199,7 +199,7 @@ class AI_JOB_MANAGER{
         if(data.isErr()){
           return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
         }
-        let msg = new FrontendMessageFormat({ aiJobId: jobID, status: data.value.status });
+        let msg = new FrontendMessageFormat({ aiJobId: jobID, status: data.value.status, isRunning: data.value.isRunning });
         if(data.value.isRunning == true){
             return Services.Utils.Ok(msg);
         }

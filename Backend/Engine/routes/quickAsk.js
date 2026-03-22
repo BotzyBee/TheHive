@@ -1,4 +1,4 @@
-import { FrontendMessageFormat } from "../classes.js";
+import { FrontendMessageFormat } from "../../SharedServices/Classes/index.js";
 import { Services } from "../../SharedServices/index.js";
 import { JOBS } from "../jobManager.js";
 import { TextMessage } from "../../SharedServices/Classes/index.js";
@@ -33,7 +33,7 @@ export async function createQuickAskJob(frontendMessage){
     });
     let msg = new TextMessage({
         role: Services.Classes.Roles.Agent,
-        textData: `Ai Quick-Ask Job has been created and is awaiting allocation. Ref: ${job.id}`
+        textData: `Quick-Ask Job has been created and is awaiting allocation. Ref: ${job.id}`
     });
     rtnMessage.addMessages([msg]);
     return Services.Utils.Ok(rtnMessage);
