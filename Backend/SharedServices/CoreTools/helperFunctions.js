@@ -19,7 +19,7 @@ export async function callAgentTool(toolName, filePath, params){
         return Services.CoreTools.AgentCompatible[toolName].run(Services, params); // tools must return Ok/ Err.
     } else {
         // plug-in tool
-        let readFile = await import(filePath);
+        let readFile = await import(/* @vite-ignore */ filePath);
         if(readFile){
             return readFile.run(Services, params);
         } else {

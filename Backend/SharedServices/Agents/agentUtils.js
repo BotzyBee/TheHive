@@ -60,7 +60,6 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
             }
             // Else create summary
             const summary = await createSummary(data,  aiOptions = {});
-            if(jobObject) jobObject.addAiCount(1);
             return summary.isErr() ? summary : Services.Utils.Ok(summary.value);
         }
         return Services.Utils.Ok(data);
@@ -268,7 +267,7 @@ export async function finialiseOutput(agentObject, saveFolder){
         opText =augmentedTextOutput.value;
     }
     // Full Output
-    let msg = new TextMessage({ role: Roles.Agent, textData: opText, mime: contextObj.mime });
+    let msg = new TextMessage({ role: Roles.Agent, textData: opText, mimeType: contextObj?.mime || "text/plain" });
     agentObject.messageHistory.addMessage(msg);
     return Ok(msg);
   }

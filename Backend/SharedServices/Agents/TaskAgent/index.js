@@ -263,6 +263,11 @@ export class TaskAgent extends AiJob {
             this.status.setAwaitingUserInput();
             this.nextPhase = TaskPhases.Review; // skip to review stage & return to user.
             this.phaseMessage = "Plan requires user approval."; 
+            this.taskOutput.push(
+                new TextMessage({ 
+                    role: Roles.Agent, 
+                    textData: `The task plan has been created and is awaiting your approval. \n` 
+                    +`${JSON.stringify(this.plan, null, 2)}` }))
         } else {
             this.nextPhase = TaskPhases.Action; // continue to action phase
             this.phaseMessage = "";
@@ -305,7 +310,7 @@ export class TaskAgent extends AiJob {
             return Ok("Task Agent is showing stopped status.");
         }
         this.toolOutputData = []
-        this.status.setCustomStatus("Performing Tool Action...");
+        this.status.setCustomStatus("Preparing to perform next action...");
         let nextAction = this.#getNextAction(); // {id: string, action: string, complete: bool, attempt: num, tool: string } 
         // catch null output
         if(nextAction == null){
@@ -326,25 +331,26 @@ export class TaskAgent extends AiJob {
                 { role: Roles.Tool, textData: "Re-planning tool has created an updated plan.", 
                     toolName: "rePlanTool", instructions: this.phaseMessage, metadata: {actionID: nextAction.id }});
             this.toolOutputData.push(msg);
-            let processOP = await this.#processToolOutput([msg]);
-            if(processOP.isErr()) return processOP; // has result.
-            processOP.value.rawMessages.forEach( msg => this.messageHistory.addMessage(msg));
-            this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
+            // let processOP = await this.#processToolOutput([msg]);
+            // if(processOP.isErr()) return processOP; // has result.
+            // processOP.value.rawMessages.forEach( msg => this.messageHistory.addMessage(msg));
+            // this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
             // Next-Phase and phase message handled in updatePlan();
             return Ok("Re-Planning Complete - moving to action phase.");
         }
         if(nextAction.tool == 'returnToUser'){ 
             this.nextPhase = TaskPhases.Review;
-            this.phaseMessage = `Final tool - The return to user tool was called. Task: ${JSON.stringify(nextAction)}. 
-            Mark this tool as complete - this will trigger return to user actions.`;
+            this.phaseMessage = `Final tool - The return to user tool was called. `
+            +`This tool does not perform any operations, but signals that the agent has completed its task and is ready to return the final output to the user. `+ 
+            `You MUST mark this tool as complete.`;
             const msg = new TextMessage(
                 { role: Roles.Tool, textData: this.phaseMessage, 
                     toolName: "returnToUser", instructions: "Return the output to user.", metadata: {actionID: nextAction.id }});
             this.toolOutputData.push(msg);
-            let processOP = await this.#processToolOutput([msg]); 
-            this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
-            // Note - we don't need to push OP to messageHistory as this is done by finaliseOutput in review stage.
-            if(processOP.isErr()) return processOP; // has result.
+            // let processOP = await this.#processToolOutput([msg]); 
+            // this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
+            // // Note - we don't need to push OP to messageHistory as this is done by finaliseOutput in review stage.
+            // if(processOP.isErr()) return processOP; // has result.
             return Ok("Return to user tool was called");
         }
 
@@ -374,7 +380,8 @@ export class TaskAgent extends AiJob {
         }
 
         // Call Tool
-        console.log(`Calling ${toolObj.value.details.toolName} ...`);
+        this.status.setCustomStatus(`Using Tool: ${toolObj.value.details.toolName}`)
+        console.log(`Calling tool ${toolObj.value.details.toolName}`);
         let toolCall = await callAgentTool(
             toolObj.value.details.toolName,
             toolObj.value.filePath,
@@ -564,22 +571,15 @@ export class TaskAgent extends AiJob {
             this.errors.push('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
             return Err('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
         }
-        // Catch already reviewed (toolId is in context) 
-        let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
-        if(contextData != null){
-            this.nextPhase = TaskPhases.Action;
-            this.phaseMessage = "";
-            this.#setActionComplete(this.actionReviewID);
-            Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
-        }
+
         // Catch rePlan tool (skip review and go back to planning).. should never get here in normal circs. 
-        if(toolOutput[0].tool == 'rePlanTool'){
+        if(toolOutput[0].toolName == 'rePlanTool'){
             this.nextPhase = TaskPhases.Plan;
             this.planUpdateNeeded = true;
             return Ok("Skipping review to allow Re-Planning");
         }
         // Catch return to user tool (tool to end task) 
-        if(toolOutput[0].tool == 'returnToUser'){
+        if(toolOutput[0].toolName == 'returnToUser'){
             this.status.setComplete();
             this.isRunning = false;
             this.phaseMessage = "";
@@ -594,8 +594,17 @@ export class TaskAgent extends AiJob {
             return Ok("Return to user tool called. Final output completed.")
         }
 
+        // Catch already reviewed (toolId is in context) 
+        let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
+        if(contextData != null){
+            this.nextPhase = TaskPhases.Action;
+            this.phaseMessage = "";
+            this.#setActionComplete(this.actionReviewID);
+            Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
+        }
+
         // Process the tool output(s)
-        this.status.setCustomStatus("Processing tool output for context");
+        this.status.setCustomStatus("Processing tool output into context");
         let processedToolOp = await this.#processToolOutput(toolOutput); 
         if(processedToolOp.isErr()){ 
             this.errors.push(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
@@ -680,7 +689,8 @@ export class TaskAgent extends AiJob {
         console.log("Starting Task Agent Job")
         // Start / Re-start the agent
         this.isRunning = true;
-        this.taskOutput = []; 
+        this.taskOutput = [];
+        if(this.startEpochMs == 0) this.setStartTime();
         
         // Main Loop :: Plan -> Act -> Review
         while(this.isRunning == true){
@@ -727,6 +737,7 @@ export class TaskAgent extends AiJob {
         }// end main loop
     
     // TEMP - Save output for de-bugging.
+    this.setEndTime();
     const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
     const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
     await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
@@ -1046,89 +1057,3 @@ You can only quote the text DO NOT add string functions like .split() etc. You c
     }
     },
 }
-
-// New AI Task Engine - Uses Task Agent to complete tasks. 
-// export async function TaskEngine(agent = new TaskAgent()){
-//     try {
-//         // Start / Re-start the agent
-//         agent.isRunning = true;
-//         agent.status.setInProgress();
-//         agent.taskOutput = null; 
-
-//         // Main Loop :: Plan -> Act -> Review
-//         while(agent.isRunning == true){
-
-//             // PLAN
-//             if(agent.nextPhase == TaskPhases.Plan){
-//                 let plan = await agent.createPlan({updateExistingPlan: agent.updateExistingPlan});
-//                 console.log(JSON.stringify(plan));
-//                 if(plan.isErr()){ 
-//                     agent.status.setFailed(); // sets isRunning to false
-//                     writeFile(agent, { 
-//                         relativeFolderPath: agent.contextData.globalData.workingDirectory, 
-//                         fileContent: JSON.stringify(agent, null, 2),
-//                         fileNameIncExt: `TaskAgent_${agent.id}_Failed.json`
-//                     });
-//                     return Err({
-//                         agentObject: agent,
-//                         errorText: `Error (TaskEngine -> plan) : ${plan.value}`
-//                     });
-//                 }
-//             }
-
-//             // ACTION
-//             if(agent.nextPhase == TaskPhases.Action){
-//                 let action = await agent.performNextAction();
-//                 console.log(JSON.stringify(action));
-//                 if(action.isErr()){ 
-//                     agent.status.setFailed(); // sets isRunning to false
-//                     writeFile(agent, { 
-//                         relativeFolderPath: agent.contextData.globalData.workingDirectory, 
-//                         fileContent: JSON.stringify(agent, null, 2),
-//                         fileNameIncExt: `TaskAgent_${agent.id}_Failed.json`
-//                     });
-//                     return Err({
-//                         agentObject: agent,
-//                         errorText: `Error (TaskEngine -> action) : ${action.value}`
-//                     });
-//                 }
-//             }
-
-//             // REVIEW & RESPOND
-//             if(agent.nextPhase == TaskPhases.Review){
-//                 let review = await agent.reviewAndReturn();
-//                 console.log(JSON.stringify(review));
-//                 if(review.isErr()){ 
-//                     agent.status.setFailed(); // sets isRunning to false
-//                     writeFile(agent, { 
-//                         relativeFolderPath: agent.contextData.globalData.workingDirectory, 
-//                         fileContent: JSON.stringify(agent, null, 2),
-//                         fileNameIncExt: `TaskAgent_${agent.id}_Failed.json`
-//                     });
-//                     return Err({
-//                         agentObject: agent,
-//                         errorText: `Error (TaskEngine -> review) : ${review.value}`
-//                     });
-//                 }
-//             }
-//             agent.incrementLoopCount();    
-//         }// end main loop
-
-//         // Write Job To File
-//         writeFile(agent, { 
-//             relativeFolderPath: agent.contextData.globalData.workingDirectory, 
-//             fileContent: JSON.stringify(agent, null, 2),
-//             fileNameIncExt: `TaskAgent_${agent.id}_Complete.json`
-//         }); 
-
-//         return Ok(agent)
-//     } catch (error) {
-//         console.log(`MAJOR ERROR :: Writing agent to file for debugging. Error - ${error}` );
-//         agent.errors.push(`MAJOR ERROR :: ${error}`);
-//         writeFile(agent, { 
-//             relativeFolderPath: agent.contextData.globalData.workingDirectory, 
-//             fileContent: JSON.stringify(agent, null, 2),
-//             fileNameIncExt: `TaskAgent_${agent.id}_Failed.json`
-//         });
-//     }
-// }

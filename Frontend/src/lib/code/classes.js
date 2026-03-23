@@ -1,98 +1,16 @@
-import { Services } from "../index.js";
+import { generateShortID } from "./utils.js";
 
+// These classes must be the same as the ones in the Backend SharedServices Classes for aiMessages.js - 
+// they are duplicated here to avoid bundling the entire backend classes into the frontend build. 
 export const Roles = {
     User: "User",    // Messages from the user
     Agent: "Agent",  // Messages from Agent / AI 
     Tool: "Tool"     // Messages or data from tools
 }
 
-/**
- * Main Holder of Messages from user, agent and tools. 
- */
-export class MessageLog {
-    #messageCount;
-        constructor() {
-        this.#messageCount = 0;
-        this.allMessages = [];
-    }
-
-    /**
-     * Adds a message to the Message Log
-     * @param {TextMessage | ImageMessage | AudioMessage | DataMessage} messageInstance
-     */
-    addMessage(messageInstance) {
-        if (!(messageInstance instanceof BaseMessage)) {
-            return Services.Utils.Err('Messages must be an instance of BaseMessage or a class that extends it.');
-        }
-        this.allMessages.push(messageInstance);
-    }
-
-    /**
-     * Get All messages as string - ALL TYPES FULL DATA!
-     * @returns {string} - returns all messages separated by \n\n
-     */
-    getAllMessagesString(){
-        return this.allMessages
-        .map(msg => JSON.stringify(msg))
-        .join('\n\n');
-    }
-
-    /**
-     * Returns shortened version of all text messages between User and Agent. { role, message }
-     * @returns {string} - returns all 'Text' messages separated by \n\n 
-     */
-    getSimpleUserAgentComms() {
-    return this.allMessages
-        .filter(msg => msg?.type === 'text' && (msg?.role === Roles.Agent || msg?.role === Roles.User ))
-        .map(msg => `${msg.role}: ${msg.textData}`) // Convert object to a string line
-        .join('\n\n');
-    }
-
-    /**
-     * Get all Tool messagegs from Message Log and return as object.
-     * @returns {object} - Object containing all Tool messages. Key is the message ID.
-     */
-    getToolMessagesAsObject(){
-      let rtnObject = {};
-      let allToolMsgs = this.allMessages.filter(msg => msg?.role === Roles.Tool );
-      const msgLen = allToolMsgs.length ?? 0;
-      for(let i=0; i<msgLen; i++){
-        rtnObject[allToolMsgs[i].id] = allToolMsgs[i];
-      }
-      return rtnObject;
-    }
-
-    /**
-     * Get a message by it's unique id
-     * @returns {TextMessage | ImageMessage | AudioMessage | DataMessage}
-     */
-    getMessagesById(messageID){
-      let allToolMsgs = this.allMessages.filter(msg => msg?.id === messageID );
-      let len = allToolMsgs.length ?? 0;
-      return len === 0 ? null : allToolMsgs[0];
-    }
-
-    /**
-     * Get all user and system messages as an array of objects
-     * @returns {array[object]} - returns an array of {source: 'user' | 'agent', data: any} objects
-     */
-    getAllMessagesArray(){
-      return this.allMessages;
-    }
-
-    /**@returns {number} - total number of messages */
-    getMessageCount(){
-      return this.#messageCount;
-    }
-
-    clearAllMessages() {
-        this.messages = [];
-    }
-}
-
 export class BaseMessage {
   constructor(role, metadata = {}) {
-    this.id = Services.Utils.generateShortID("MSG");
+    this.id = generateShortID("MSG");
     this.role = role; // as defined in Roles object
     this.timestamp = new Date();
     this.metadata = metadata; // for counting ai calls etc

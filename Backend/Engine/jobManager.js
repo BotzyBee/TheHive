@@ -199,16 +199,14 @@ class AI_JOB_MANAGER{
         if(data.isErr()){
           return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
         }
-        let msg = new FrontendMessageFormat({ aiJobId: jobID, status: data.value.status, isRunning: data.value.isRunning });
-        if(data.value.isRunning == true){
-            return Services.Utils.Ok(msg);
-        }
-        if(data.value.isRunning == false){
-            let opLen = data.value.taskOutput.length || 0;
-            if( opLen != 0){
-                msg.addMessages(data.value.taskOutput);
-            }
-        }
+        let msg = new FrontendMessageFormat({ 
+            aiJobId: jobID, 
+            status: data.value.status, 
+            isRunning: data.value.isRunning,
+            messages: data.value.taskOutput, 
+            metadata: data.value.stats
+            });
+
         return Services.Utils.Ok(msg);
     }
 

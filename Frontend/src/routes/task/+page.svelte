@@ -1,145 +1,55 @@
 <script>
-    import { chatStore } from '$lib/code/agentChat/chatStore_example.js';
+    import { chatStore } from '$lib/code/agentChat/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
-    import { quintOut } from 'svelte/easing';
     import { slide } from 'svelte/transition';
-    import BotzyLogo from '$lib/logoSml.png';
-    import LayoutCombine from '$lib/componants/layoutCombine.svelte';
-    import { callTaskApi, checkForUpdate, postAmendApi, stopTask } from '$lib/code/aiJobs/call.js';
-    import { marked } from 'marked';
-    import DOMPurify from 'dompurify';
 
     let isSidebarCollapsed = true;
+    let prompt = '';
+    let inputTextArea;
+    let chatContainer; // This will now refer to the <main> element
+    let lastMessageCount = 0;
+
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
 
-    let prompt = '';
-    let isLoading = false;
-    let isInitPrompt = true;
-    let errorMessage = '';
-    let inputTextArea;
-    let latestJobRef = null;
-    let jobDone = null;
-    let intervalRef = null;
-    let stats = { toolCount: 0, aiCount: 0, loopNumber: 0 };
-    let messageHistory = []; // Array to store all messages
+    // Intelligent Scroll Logic
+    $: if ($chatStore.messageHistory && chatContainer) {
+        const currentCount = $chatStore.messageHistory.length;
+        const isNewMessage = currentCount > lastMessageCount;
+        
+        // Calculate if user is near the bottom (within 100px)
+        const threshold = 100;
+        const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
 
-    // Variable to hold the ID of the last AI message, so we can update it
-    let latestAiMessageId = null;
-
-    // We'll use this to scroll the chat to the bottom
-    let chatContainer;
-
-    // Automatically scroll to the bottom of the chat when a new message is added
-    function scrollToBottom() {
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (isNewMessage || isNearBottom) {
+            setTimeout(() => {
+                chatContainer.scrollTo({
+                    top: chatContainer.scrollHeight,
+                    behavior: isNewMessage ? 'smooth' : 'auto'
+                });
+            }, 50);
         }
+        lastMessageCount = currentCount;
     }
 
-    // Call this whenever messageHistory changes
-    $: {
-        scrollToBottom();
-    }
-
-    // Adjust the height of the textarea
     function adjustHeight(node) {
         node.style.height = 'auto';
         node.style.height = Math.min(node.scrollHeight, 200) + 'px';
     }
 
-    function parseAndSanitizeMarkdown(markdownText) {
-        const rawHtml = marked.parse(markdownText);
-        const sanitizedHtml = DOMPurify.sanitize(rawHtml);
-        return sanitizedHtml;
-    }
-
-
-    // Handle Submit new prompt
     async function handleSubmit(event) {
         event.preventDefault();
         const userPrompt = prompt.trim();
-        if (!userPrompt || isLoading || jobDone === false) return;
+        if (!userPrompt || $chatStore.isLoading || $chatStore.jobDone === false) return;
 
-        isLoading = true;
-        jobDone = false;
-        errorMessage = '';
-
-        // Add user's message to the history
-        messageHistory = [...messageHistory, {
-            id: Date.now(),
-            sender: 'user',
-            text: userPrompt
-        }];
-
-        // Add a placeholder message for the AI
-        const aiPlaceholderId = Date.now() + 1;
-        messageHistory = [...messageHistory, {
-            id: aiPlaceholderId,
-            sender: 'ai',
-            text: 'Thinking...' // Initial message
-        }];
-        latestAiMessageId = aiPlaceholderId; // Keep track of this message's ID
-
+        // The store handles API logic, polling, and markdown parsing
+        await chatStore.submitPrompt({ promptText: userPrompt });
+        
         prompt = '';
-        if (inputTextArea) { inputTextArea.style.height = 'auto'; }
-
-        try {
-            // Init Prompt
-            if(isInitPrompt == true){
-                let res = await callTaskApi(userPrompt);
-                latestJobRef = res;
-                isInitPrompt = false;
-            } else {
-                // Follow up prompts
-                await postAmendApi(userPrompt, latestJobRef); 
-            }
-
-
-            // Update the placeholder AI message with the job submission status
-            const initialAiMessage = messageHistory.find(msg => msg.id === latestAiMessageId);
-            if (initialAiMessage) {
-                initialAiMessage.text = parseAndSanitizeMarkdown(`Job ${latestJobRef} has been submitted...`);
-                messageHistory = [...messageHistory]; // Trigger reactivity
-            }
-
-            // Set interval to check for an update
-            intervalRef = setInterval(async () => {
-                const updateResult = await checkForUpdate(latestJobRef);
-                const currentAiMessage = messageHistory.find(msg => msg.id === latestAiMessageId);
-
-                if (updateResult.response.status === 'Complete' || updateResult.response.status === 'Failed') {
-                    clearInterval(intervalRef);
-                    jobDone = true;
-                    if(currentAiMessage){
-                        if(updateResult.response.status === 'Complete' && updateResult.response.data.output != null){
-                            const resultText = updateResult.response.data.output;
-                            stats = updateResult.response.data.stats;
-                            currentAiMessage.text = parseAndSanitizeMarkdown(resultText);
-                        } else {
-                            currentAiMessage.text = parseAndSanitizeMarkdown(`Job ${latestJobRef} Failed ☹️`);
-                        }
-                        messageHistory = [...messageHistory]; // Trigger reactivity
-                    }
-                } else {
-                    if (currentAiMessage) {
-                        currentAiMessage.text = parseAndSanitizeMarkdown(`Job ${latestJobRef} : **${updateResult.response.data}**`);
-                        messageHistory = [...messageHistory]; // Trigger reactivity
-                    }
-                }
-            }, 2000);
-        } catch (error) {
-            errorMessage = 'Failed to get response. Please try again.';
-            console.error('API Error:', error);
-            // If the initial request fails, remove the placeholder
-            messageHistory = messageHistory.filter(msg => msg.id !== latestAiMessageId);
-        } finally {
-            isLoading = false;
-        }
+        if (inputTextArea) inputTextArea.style.height = 'auto';
     }
 
-    // handle keydown events in the textarea
     function handleKeydown(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
@@ -147,107 +57,105 @@
         }
     }
 
-    // new chat reload
-    function startNewChat() {
-        if (intervalRef) {
-            clearInterval(intervalRef);
-        }
-        messageHistory = [];
-        prompt = '';
-        isLoading = false;
-        errorMessage = '';
-        latestJobRef = null;
-        jobDone = null;
-        latestAiMessageId = null;
-        isInitPrompt = true;
-        if (inputTextArea) { inputTextArea.style.height = 'auto'; }
-    }
-
-    // stop task
-    async function stop(){
-        await stopTask(latestJobRef);
-    }
+    // Helper to determine CSS class based on Role
+    const getRoleClass = (role) => role?.toLowerCase() === 'user' ? 'user-message' : 'ai-response';
 </script>
 
 <div class="app-container">
-    <!-- SIDEBAR -->
     <Sidebar 
         bind:isSidebarCollapsed={isSidebarCollapsed} 
         on:toggle={toggleSidebar} 
     />
-    <!-- New Chat button -->
+
     <button
         class="new-chat-btn"
         class:show={isSidebarCollapsed}
-        on:click={startNewChat}
+        on:click={chatStore.reset}
         aria-label="Start New Chat"
     >
-        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M440-400h80v-120h120v-80H520v-120h-80v120H320v80h120v120ZM80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d="M440-400h80v-120h120v-80H520v-120h-80v120H320v80h120v120ZM80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z"/></svg>
     </button>
-    <!-- MAIN CONTENT -->
-    <main class="main-content">
-        <!-- This div will contain chat messages or other main content -->
-        <div class="content-display" bind:this={chatContainer}>
-            {#if messageHistory.length === 0}
+
+    <main class="main-content" bind:this={chatContainer}>
+        
+        <div class="content-display">
+            {#if $chatStore.messageHistory.length === 0}
                 <div class="start-message">
-                    <p>Welcome to the Hive.. give me a task or ask a question</p>
+                    <p>Welcome to the Hive Task Agent.. give me a task or ask a question</p>
                 </div>
             {/if}
-
-            {#each messageHistory as message (message.id)}
-                <div class="{message.sender === 'user' ? 'user-message' : 'ai-response'}">
-                    <p>{@html message.text}</p>
-                    <!-- Cancel Button -->
-                    {#if message.sender === 'ai' && message.id === latestAiMessageId && jobDone === false}
-                        <button
-                                on:click={stop}
-                                aria-label="Cancel Task"
-                                style="cursor: pointer;"
-                            >
-                            <p class="stats-text">Cancel Task</p>
-                        </button>
+            
+            <!-- Output Message History -->
+            {#each $chatStore.messageHistory as message}
+                <!--Text Message-->
+                <div class={getRoleClass(message.role)}>        
+                    {#if message.type === 'text'}
+                        <p>{@html message.textData}</p>
                     {/if}
-                    {#if message.sender === 'ai' && message.id === latestAiMessageId && jobDone === true}
-                        <div class="stats-container">
-                            <hr class="stats-divider"/>
-                            <p class="stats-text">AiCalls: {stats.aiCount}, ToolCalls: {stats.toolCount}, Loops: {stats.loopNumber}</p>
+
+                    {#if message.type === 'image'}
+                        <div class="image-container">
+                            <img 
+                                src={message.base64 ? `data:${message.mimeType};base64,${message.base64}` : message.url} 
+                                alt={message.altText || 'AI Image'} 
+                                class="chat-image" 
+                            />
                         </div>
                     {/if}
                 </div>
             {/each}
 
-            {#if errorMessage}
+            {#if $chatStore.latestJobRef && $chatStore.jobDone === false}
+                <div class="ai-response status-update" transition:slide>
+                    <p><i>{$chatStore.lastStatus || 'Processing...'}</i></p>
+                    <button on:click={chatStore.cancelTask} class="cancel-link">
+                        Cancel Task
+                    </button>
+                </div>
+            {/if}
+
+            {#if $chatStore.jobDone === true}
+                <div class="stats-container" transition:slide>
+                    <hr class="stats-divider"/>
+                    <p class="stats-text">
+                        AiCalls: {$chatStore.stats.aiCount}, 
+                        ToolCalls: {$chatStore.stats.toolCount}, 
+                        Loops: {$chatStore.stats.loopNumber}
+                    </p>
+                </div>
+            {/if}
+
+            {#if $chatStore.errorMessage}
                 <div class="error-message">
-                    <p>{errorMessage}</p>
+                    <p>{$chatStore.errorMessage}</p>
                 </div>
             {/if}
         </div>
 
-        <!-- Input Form - positioned at the bottom of main-content using flexbox -->
-        <form on:submit={handleSubmit} class="input-form">
-            <textarea
-                bind:value={prompt}
-                bind:this={inputTextArea}
-                on:input={() => adjustHeight(inputTextArea)}
-                on:keydown={handleKeydown}
-                placeholder="Message Botzy AI..."
-                rows="1"
-                class="input-textarea"
-                aria-label="AI prompt input"
-                tabindex="0"
-            ></textarea>
-            <button type="submit" class="send-button" disabled={isLoading || !prompt.trim() || jobDone === false}>
-                {#if isLoading || jobDone === false}
-                    <!-- Spinner for loading state -->
-                    <svg class="spinner" viewBox="0 0 50 50">
-                        <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-                    </svg>
-                {:else}
-                    <!-- Send icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M2.01 21.01L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                {/if}
-            </button>
-        </form>
+        <div class="input-form-container">
+            <form on:submit={handleSubmit} class="input-form">
+                <textarea
+                    bind:value={prompt}
+                    bind:this={inputTextArea}
+                    on:input={() => adjustHeight(inputTextArea)}
+                    on:keydown={handleKeydown}
+                    placeholder="Message Task Agent..."
+                    rows="1"
+                    class="input-textarea"
+                    disabled={$chatStore.isLoading && $chatStore.jobDone === false}
+                ></textarea>
+                
+                <button type="submit" class="send-button" disabled={$chatStore.isLoading || !prompt.trim() || $chatStore.jobDone === false}>
+                    {#if $chatStore.isLoading && $chatStore.jobDone === false}
+                        <svg class="spinner" viewBox="0 0 50 50">
+                            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                        </svg>
+                    {:else}
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M2.01 21.01L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    {/if}
+                </button>
+            </form>
+        </div>
     </main>
 </div>
 
@@ -269,11 +177,34 @@
         --user-message-border: #0098ac; /* Light aquamarine for user messages */
     }
 
+    .chat-image {
+        max-width: 100%;
+        max-height: 400px;
+        border-radius: 8px;
+        display: block;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .cancel-link {
+        background: none;
+        border: none;
+        color: #ff4444;
+        text-decoration: underline;
+        cursor: pointer;
+        font-size: 0.85rem;
+        padding: 0;
+    }
+
+    .status-update {
+        opacity: 0.8;
+        font-size: 0.9rem;
+    }
+
     .app-container {
         display: flex;
-        min-height: 100vh;
         height: 100vh;
-        box-sizing: border-box;
+        overflow: hidden; 
     }
 
     .sidebar {
@@ -289,6 +220,31 @@
         z-index: 10;
         position: relative;
         transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+    }
+
+    .input-form-container {
+        position: sticky;
+        bottom: 0;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        background: linear-gradient(transparent, rgba(25, 90, 165, 0.719) 95%); 
+        padding: 20px;
+        box-sizing: border-box;
+        pointer-events: none; 
+    }
+
+    .input-form {
+        pointer-events: auto; /* Re-enable clicks for the actual input */
+        width: 100%;
+        max-width: var(--input-form-max-width);
+        background-color: #ffffff;
+        border-radius: 24px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        box-shadow: var(--shadow-medium);
+        border: 1px solid var(--border-color);
     }
 
     .sidebar-logo {
@@ -385,30 +341,28 @@
         flex-grow: 1;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px;
-        box-sizing: border-box;
+        overflow-y: auto; /* Scrollbar appears here (far right) */
+        overflow-x: hidden;
+        position: relative;
+        scroll-behavior: smooth;
     }
 
     .content-display {
         flex-grow: 1;
         width: 100%;
         max-width: var(--input-form-max-width);
-        /* padding-bottom: 10px; */
+        margin: 0 auto; /* Keep content centered */
         display: flex;
         flex-direction: column;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        gap: 15px; /* Add spacing between messages */
-        padding-right: 1.25rem; /* Space for scrollbar */
+        gap: 15px;
+        padding: 40px 20px 100px 20px; /* Large bottom padding so text isn't hidden by input */
     }
 
     .start-message {
         align-self: center;
         text-align: center;
-        color: #545454;
-        margin-top: 50px;
+        color: #3d3d3d;
+        margin-top: 150px;
     }
 
     .user-message, .ai-response, .error-message {
@@ -523,7 +477,7 @@
         fill: currentColor;
     }
 
-    /* Input Form Styles - The core of the modern AI look */
+    /* Input Form Styles */
     .input-form {
         position: sticky;
         bottom: 0;

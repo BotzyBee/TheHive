@@ -33,7 +33,7 @@ export async function createQuickAskJob(frontendMessage){
     });
     let msg = new TextMessage({
         role: Services.Classes.Roles.Agent,
-        textData: `Quick-Ask Job has been created and is awaiting allocation. Ref: ${job.id}`
+        textData: `Quick-Ask Job has been created and is awaiting allocation. \n Ref: ${job.id}`
     });
     rtnMessage.addMessages([msg]);
     return Services.Utils.Ok(rtnMessage);
@@ -56,6 +56,9 @@ export async function handleQAMessage(frontendMessage){
     }
     return newJob; // has Result already
     } else {
+
+    // Clear output to stop polling from picking up old output.
+    //job.value.taskOutput = [];
     // Existing Task
     // To Do
     console.log("Existing Job");

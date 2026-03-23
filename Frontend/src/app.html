@@ -14,16 +14,19 @@
 </html>
 
 <style>
-	
 	html, body { font-family: 'Inter', sans-serif; }
 .mainBody {
 	width: 100%;
 	height: 100%;
-	background-image:
-	            radial-gradient(circle at top left, rgba(22, 158, 151, 0.5) 0%, transparent 50%),
-                radial-gradient(circle at top right, rgba(22, 149, 158, 0.5) 0%, transparent 50%),
-                radial-gradient(circle at bottom center, rgba(25, 90, 165, 0.719) 20%, transparent 100%);
- 
+	/* Define background colors */
+    --color-top-left: rgba(22, 158, 151, 0.5);
+    --color-top-right: rgba(22, 149, 158, 0.5);
+    --color-bottom: rgba(25, 90, 165, 0.719);
+
+    background-image:
+        radial-gradient(circle at top left, var(--color-top-left) 0%, transparent 50%),
+        radial-gradient(circle at top right, var(--color-top-right) 0%, transparent 50%),
+        radial-gradient(circle at bottom center, var(--color-bottom) 20%, transparent 100%);
 	background-attachment: fixed;
 	background-position: center;
 	background-repeat: no-repeat;

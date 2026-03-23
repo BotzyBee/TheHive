@@ -1,7 +1,7 @@
 import { FrontendMessageFormat } from "../../SharedServices/Classes/index.js";
 import { Services } from "../../SharedServices/index.js";
 import { JOBS } from "../jobManager.js";
-import { AiJob, TextMessage } from "../../SharedServices/Classes/index.js";
+import { TextMessage } from "../../SharedServices/Classes/index.js";
 import { processApiMessagesToClasses } from './index.js';
 
 /**
@@ -38,7 +38,7 @@ export async function createTaskAgentJob(frontendMessage){
     });
     let msg = new TextMessage({
         role: Services.Classes.Roles.Agent,
-        textData: `Task-Agent Job has been created and is awaiting allocation. Ref: ${job.id}`
+        textData: `Task-Agent Job has been created and is awaiting allocation. \n Ref: ${job.id}`
     });
     rtnMessage.addMessages([msg]);
     return Services.Utils.Ok(rtnMessage);
@@ -66,7 +66,11 @@ export async function handleTAMessage(frontendMessage){
         return newJob; // has Result already
     } else {
     // Existing Task
-        
+        let rtnMsg = new FrontendMessageFormat({ 
+            aiJobId: id, 
+            aiSettings: frontendMessage.aiSettings,
+            status: Services.Classes.Status.NotStarted,
+        });
         // Get JOB Object
         let job = await JOBS.jobListManager({getJob: id});
         if(job.isErr()){
@@ -80,7 +84,14 @@ export async function handleTAMessage(frontendMessage){
         if(frontendMessage.status == Services.Classes.Status.Stopped){
             job.value.isRunning = false;
             job.value.status.setStoppedByUser();
-            return Services.Utils.Ok("Job has been stopped.");
+            rtnText = `Job ${id} has been stopped`;
+            rtnMsg.addMessages(
+                new TextMessage({
+                    role: Services.Classes.Roles.Agent,
+                    textData: `Job ${id} has been stopped`
+                })
+            )
+            return Services.Utils.Ok(rtnMsg);
         }
 
         // Catch still running
@@ -95,8 +106,17 @@ export async function handleTAMessage(frontendMessage){
         // Setup to review new messages
         job.value.status.setNewInfoAdded();
         job.value.nextPhase = Services.Agents.TaskAgent.TaskPhases.Review;
+        // Clear output to stop polling from picking up old output.
+        job.value.taskOutput = [];
+        job.value.toolOutputData = [];
         // Add to un-allocated
         JOBS.NON_ALLOCATED.push(job.value.id);
-        return Services.Utils.Ok("New Information Added.")
+        rtnMsg.addMessages(
+            new TextMessage({
+                role: Services.Classes.Roles.Agent,
+                textData: `New information has been added to Job ${id} and is awaiting allocation.`
+            })
+        )
+        return Services.Utils.Ok(rtnMsg);
     }
 }

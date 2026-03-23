@@ -59,7 +59,7 @@ export async function getToolDetails(toolName){
         // Plugin tool
         let decodedFP = decodeURIComponent(fp);
         fp = decodedFP;
-        let readFile = await import(decodedFP);
+        let readFile = await import(/* @vite-ignore */ decodedFP);
         if(readFile){
             toolObj = readFile.details;
         } else {
