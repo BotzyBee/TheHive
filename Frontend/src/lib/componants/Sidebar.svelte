@@ -22,7 +22,7 @@
     <div class="sidebar-header">
         <div class="sidebar-branding">
             <img src={BotzyLogo} alt="Botzy Logo" class="sidebar-logo"/>
-            <h2 class="sidebar-title">Botzy AI</h2>
+            <h2 class="sidebar-title">Botzy Bee</h2>
         </div>
         <button
             class="collapse-button"
@@ -166,9 +166,9 @@
     .open-sidebar-btn {
         position: fixed;
         left: 0;
-        top: 20px;
+        top: 120px;
         z-index: 5;
-        background-color: var(--primary-blue);
+        background-color: var(--text-color-dark);
         color: white;
         border: none;
         width: var(--open-btn-size);

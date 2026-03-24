@@ -45,7 +45,7 @@ export async function run(
     params = {}
 ){  
     // Destructure input
-    const { taskDescription, referenceText, targetURL } = params;
+    let { taskDescription, referenceText, targetURL } = params;
     // Catch bad params
     if( taskDescription == null ){
         return Shared.Utils.logAndErr(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);

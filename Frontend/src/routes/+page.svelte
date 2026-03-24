@@ -28,7 +28,7 @@
 					bg-gradient-to-r from-green-200 to-blue-300 p-5
 					drop-shadow-md
 					">
-						The Hive : AI Assistant
+						The Hive : AI Agents for Everyone
 					</p>
 					<p style="padding-top: 20px;">	
 					<a href="/task"><span class="p-5">TASKS</span></a>

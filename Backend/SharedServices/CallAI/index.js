@@ -56,7 +56,6 @@ export class AiCall {
       contentMessage,
       options
     );
-    ;
   }
 
   /** Generate Text using web search grounding
