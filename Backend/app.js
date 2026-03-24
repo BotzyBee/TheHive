@@ -8,7 +8,7 @@ import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
 import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
-import { getToolDetails } from './SharedServices/Database/index.js';
+import { getConfigForFrontend } from './Engine/routes/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
@@ -40,9 +40,9 @@ const initServices = async () => {
       process.exit(1);
     }
     Services.Utils.log(`${tools.value.tools} Tools loaded. \n`+
-      `${tools.value.added} are new. \n`+
-      `${tools.value.updated} were updated \n`+
-      `${tools.value.removed} were removed.`)
+      `${tools.value.added} new. \n`+
+      `${tools.value.updated} updated \n`+
+      `${tools.value.removed} removed.`)
     
       //Knowledgebase re-indexing timer (every 60 seconds)
     Services.CoreTools.Timers.addNewTimer(
@@ -96,6 +96,7 @@ app.post("/quickAsk", async (req, res) => {
 // Task Agent Endpoint
 app.post("/taskAgent", async (req, res) => {
   const frontendMessage = req.body?.fmf || null;
+  console.log("Received taskAgent request with fmf:", JSON.stringify(frontendMessage, null, 2));
   if(frontendMessage == null ){ 
     return res.status(400).json({
         error: `Error : fmf is either missing or not a FrontendMessageFormat`
@@ -119,14 +120,44 @@ app.get("/getUpdate", async (req, res) => {
   res.status(200).json(msg.value);
 });
 
-// Test Endpoint: for testing 
-app.get('/test', async (req, res) => {
-  let tsk = req?.query?.tool;
-  let x = await getToolDetails(tsk);
-  //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
-  //console.log(x);
-  res.status(200).json({result: x });
+// ALL - Get Update or Result
+app.get("/stopJob", async (req, res) => {
+  const jobID = req.query?.jobID || null;
+  if(jobID == null ){ 
+    return res.status(400).json({
+        error: `Error : JobID parameter is missing or null!`
+    });
+  }
+  let msg = await JOBS.jobListManager({stopJob: jobID});
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  // format as Frontend Message Format. 
+  let rtnMsg = new Services.Classes.FrontendMessageFormat({
+    aiJobId: jobID,
+    status: Services.Classes.Status.Stopped,
+    isRunning: false,
+    messages: [ new Services.Classes.TextMessage(
+      { role: Services.Classes.Roles.Agent, 
+        textData: `Job ${jobID} has been stopped.` })
+      ],
+    metadata: {}
+  });
+  res.status(200).json(rtnMsg);
 });
+
+app.get("/getConfig", async (req, res) => {
+  let msg = getConfigForFrontend();
+  res.status(200).json(msg);
+});
+
+
+// Test Endpoint 
+// app.get('/test', async (req, res) => {
+//   let tsk = req?.query?.tool;
+//   let x = await getToolDetails(tsk);
+//   //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
+//   //console.log(x);
+//   res.status(200).json({result: x });
+// });
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START
