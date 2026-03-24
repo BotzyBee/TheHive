@@ -1,9 +1,9 @@
 // $lib/code/aiJobs/chatStore.js
 import { writable, get } from 'svelte/store';
 import { parseAndSanitizeMarkdown } from '../utils.js';
-import { callTaskApi, getUpdateApi, stopJobApi } from './call.js';
+import { callTaskApi, getUpdateApi, stopJobApi, callQuickAskApi } from './call.js';
 import { TextMessage, FrontendMessageFormat, Roles } from '../classes.js';
-import { processApiMessagesToClasses, parseStatus } from '../utils.js';
+import { processApiMessagesToClasses, parseStatus, getConfig } from '../utils.js';
 import { fail } from '@sveltejs/kit';
 
 function createChatStore() {
@@ -15,11 +15,23 @@ function createChatStore() {
         errorMessage: '',
         latestJobRef: null,
         lastStatus: null,
-        aiSettings: {}
+        aiSettings: {
+            agent: "Task Agent"
+        },
+        config: {}
     });
 
     let intervalRef = null;
+    // Fetch initial config on store creation
 
+    async function fetchConfig() {
+        let cfgcall = await getConfig();
+        update(s => ({
+            ...s,
+            config: cfgcall
+        }));
+        return cfgcall;
+    }
     /**
      * Submits a user prompt for processing
      * @param {object} options
@@ -48,7 +60,17 @@ function createChatStore() {
         try {
             // API Call
             let userMsg =  new TextMessage({ role: Roles.User, textData: userPrompt })
-            let frontendMessage = await callTaskApi([userMsg], state.latestJobRef, state.aiSettings);
+            let frontendMessage;
+            switch(state.aiSettings.agent){
+                case "Task Agent":
+                    frontendMessage = await callTaskApi([userMsg], state.latestJobRef, state.aiSettings);
+                    break;
+                case "Quick-Ask Agent":
+                    frontendMessage = await callQuickAskApi([userMsg], state.latestJobRef, state.aiSettings);
+                    break;
+                default:
+                    frontendMessage = await callTaskApi([userMsg], state.latestJobRef, state.aiSettings);
+            }
             let jobID = frontendMessage.aiJobId || null;
             // call not ok
             if(!jobID){
@@ -101,12 +123,10 @@ function createChatStore() {
             try {
                 const updateResult = await getUpdateApi(jobRef);
                 const { isRunning, status, messages, metadata } = updateResult;
-                console.log(updateResult);
                 // If job is no longer running, stop polling and process final messages
                 if(isRunning === false && messages && messages.length > 0){
                     stopPolling();
                     let processedMessages = processApiMessagesToClasses(messages);
-                    console.log("Processed Messages: ", processedMessages);
                     // Sanitize and parse markdown in text messages.
                     let sanitisedMessages = [];
                     for(let i=0; i<processedMessages.length; i++){
@@ -114,9 +134,17 @@ function createChatStore() {
                         if(msg.type === 'text'){
                             msg.textData = parseAndSanitizeMarkdown(msg.textData);
                         }
+                        if(msg.type === 'image'){
+                            // If the message contains base64 data and a mime type, 
+                            // convert it to a data URL for display (if not already in that format)
+                            if(msg.base64 && msg.mime){
+                                if(!msg.mime.startsWith('data:')){  
+                                msg.base64 = `data:${msg.mime};base64,${msg.base64}`;
+                                }
+                            }
+                        }
                         sanitisedMessages.push(msg);
                     }
-                    console.log("Sanitised Messages: ", sanitisedMessages);
 
                     update(s => ({
                         ...s,
@@ -147,7 +175,7 @@ function createChatStore() {
                     errorMessage: 'Polling failed - ' + (err.message || 'Unknown error'),
                 }));
             }
-        }, 2000);
+        }, 1500);
     }
 
     function stopPolling() {
@@ -205,7 +233,15 @@ function createChatStore() {
         subscribe,
         submitPrompt, 
         reset,
-        cancelTask
+        cancelTask,
+        fetchConfig,
+        updateAISettings: (newSettings) => update(s => ({
+            ...s,
+            aiSettings: {
+                ...s.aiSettings,
+                ...newSettings
+            }
+        }))
     };
 }
 

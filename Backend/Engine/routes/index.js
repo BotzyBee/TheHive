@@ -21,3 +21,17 @@ export function processApiMessagesToClasses(messageArray) {
   });
   return Services.Utils.Ok(outputArray);
 }
+
+export function getConfigForFrontend(){
+  let rtnObject = {
+    AiProviders: Services.Constants.AiProviders,
+    AiModels: Services.Constants.MODEL_REGISTRY,
+    ModelTypes: Services.Constants.ModelTypes,
+    AiQuality: Services.Constants.AiQuality,
+    Agents: {
+      taskAgent: "Task Agent",
+      quckAsk: "Quick-Ask Agent"
+    }
+  }
+  return rtnObject;
+}

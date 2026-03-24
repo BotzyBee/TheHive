@@ -2,21 +2,34 @@
     import { chatStore } from '$lib/code/agentChat/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
     import { slide } from 'svelte/transition';
-
+    import SettingsModal from '$lib/componants/SettingsModal.svelte';
+    
+    let isSettingsOpen = false;
     let isSidebarCollapsed = true;
     let prompt = '';
     let inputTextArea;
     let chatContainer; // This will now refer to the <main> element
     let lastMessageCount = 0;
-
+    let agentName = "Ai Assistant";
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
+
+    function toggleSettings() {
+        isSettingsOpen = !isSettingsOpen;
+    }
+
+
 
     // Intelligent Scroll Logic
     $: if ($chatStore.messageHistory && chatContainer) {
         const currentCount = $chatStore.messageHistory.length;
         const isNewMessage = currentCount > lastMessageCount;
+
+        // Update agent name if it exists in settings
+        if($chatStore.aiSettings.agent){
+            agentName = $chatStore.aiSettings.agent;
+        }
         
         // Calculate if user is near the bottom (within 100px)
         const threshold = 100;
@@ -42,7 +55,6 @@
         event.preventDefault();
         const userPrompt = prompt.trim();
         if (!userPrompt || $chatStore.isLoading || $chatStore.jobDone === false) return;
-
         // The store handles API logic, polling, and markdown parsing
         await chatStore.submitPrompt({ promptText: userPrompt });
         
@@ -76,12 +88,29 @@
         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d="M440-400h80v-120h120v-80H520v-120h-80v120H320v80h120v120ZM80-80v-720q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H240L80-80Zm126-240h594v-480H160v525l46-45Zm-46 0v-480 480Z"/></svg>
     </button>
 
+    <button
+        class="settings-btn"
+        class:show={isSidebarCollapsed}
+        on:click={toggleSettings}
+        aria-label="AI Settings"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF">
+        <path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-1 13.5l103 78-110 190-119-50q-11 8-23 15t-24 12L590-80H370Zm112-260q58 0 99-41t41-99q0-58-41-99t-99-41q-58 0-99 41t-41 99q0 58 41 99t99 41Z"/> -->
+        </svg>
+    </button>
+
+    <SettingsModal 
+        isOpen={isSettingsOpen} 
+        on:close={() => isSettingsOpen = false} 
+    />
+
     <main class="main-content" bind:this={chatContainer}>
         
         <div class="content-display">
             {#if $chatStore.messageHistory.length === 0}
                 <div class="start-message">
-                    <p>Welcome to the Hive Task Agent.. give me a task or ask a question</p>
+                    <p>Welcome to Botzy Bee.. give me a task or ask a question</p>
+                    <p style="padding-top: 5px; color: #FFF; font-size: 14px;">Using Agent : {agentName}</p>
                 </div>
             {/if}
             
@@ -96,7 +125,7 @@
                     {#if message.type === 'image'}
                         <div class="image-container">
                             <img 
-                                src={message.base64 ? `data:${message.mimeType};base64,${message.base64}` : message.url} 
+                                src={message.base64 ? message.base64 : message.url} 
                                 alt={message.altText || 'AI Image'} 
                                 class="chat-image" 
                             />
@@ -247,68 +276,6 @@
         border: 1px solid var(--border-color);
     }
 
-    .sidebar-logo {
-        width: 32px;
-        height: 32px;
-    }
-
-    .sidebar.collapsed {
-        width: 0;
-        padding: 0;
-    }
-
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        gap: 8px;
-        margin-bottom: 20px;
-        box-sizing: border-box;
-    }
-
-    .sidebar-branding {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 1;
-        min-width: 0;
-    }
-
-    .sidebar-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--text-color-dark);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .sidebar ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        width: 100%;
-    }
-
-    .sidebar ul li {
-        margin-bottom: 8px;
-    }
-
-    .sidebar ul li a {
-        display: block;
-        padding: 10px 15px;
-        border-radius: 8px;
-        color: var(--text-color-dark);
-        text-decoration: none;
-        transition: background-color 0.2s ease, color 0.2s ease;
-    }
-
-    .sidebar ul li a:hover {
-        background-color: #f0f0f0;
-        color: var(--primary-blue);
-    }
-
     .collapse-button {
         background: none;
         border: none;
@@ -418,42 +385,12 @@
         text-align: left;
     }
 
-    /* Styles for the "Open Sidebar" button (appears when sidebar is collapsed) */
-    .open-sidebar-btn {
-        position: fixed;
-        left: 0;
-        top: 20px;
-        z-index: 5;
-        background-color: var(--primary-blue);
-        color: white;
-        border: none;
-        width: var(--open-btn-size);
-        height: var(--open-btn-size);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-        box-shadow: 2px 0 5px rgba(0,0,0,0.2);
-        transition: transform 0.3s ease-in-out;
-        transform: translateX(-100%);
-    }
-
-    .open-sidebar-btn.show {
-        transform: translateX(0);
-    }
-
-    .open-sidebar-btn svg {
-        fill: currentColor;
-    }
-
     .new-chat-btn {
         position: fixed;
         left: 0;
-        top: 70px;
+        top: 175px;
         z-index: 5;
-        background-color: var(--primary-blue);
+        background-color: var(--user-message-border);
         color: white;
         border: none;
         width: var(--open-btn-size);
@@ -474,6 +411,35 @@
     }
 
     .new-chat-btn svg {
+        fill: currentColor;
+    }
+
+    .settings-btn {
+        position: fixed;
+        left: 0;
+        top: 230px;
+        z-index: 5;
+        background-color: var(--user-message-border);
+        color: white;
+        border: none;
+        width: var(--open-btn-size);
+        height: var(--open-btn-size);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease-in-out;
+        transform: translateX(-100%);
+    }
+
+    .settings-btn.show {
+        transform: translateX(0);
+    }
+
+    .settings-btn svg {
         fill: currentColor;
     }
 
@@ -609,12 +575,6 @@
 
         .sidebar.collapsed {
             transform: translateX(-100%);
-        }
-
-        .open-sidebar-btn {
-            transform: translateX(0);
-            left: 0;
-            top: 10px;
         }
 
         .main-content {

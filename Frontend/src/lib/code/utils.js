@@ -2,6 +2,7 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { TextMessage, ImageMessage, AudioMessage, DataMessage } from './classes.js';
+import axios from 'axios';
 
 /**
  * Helper function to parse Markdown and then sanitize the HTML
@@ -51,3 +52,20 @@ export function parseStatus(status){
     return status.taskStatus;
   }
 }
+
+/**
+ * Retrieves the available models, agents, and other configuration settings from the backend API.
+ * @returns {Promise} - A promise resolving to the API response or an error object. Returns a FrontendMessageFormat object on success.
+ */
+export async function getConfig() {
+  const domain = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
+  const url = `${domain}/getConfig`;
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    return error.response
+      ? `Server Error: ${error.response.status} - ${error.response.data.error}`
+      : `Request Error: ${error.message || 'Unknown error'} - Check if docker server is running.`;
+    }
+  }
