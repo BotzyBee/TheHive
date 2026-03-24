@@ -69,6 +69,11 @@ export const MIME_MAP = new Map([
     writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 
       await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
   ],
+  ["application/javascript", { extension: "js", name: "JavaScript File", encoding: "utf-8", 
+    readFN: async (filePath) => await readFileContent(filePath, false), 
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 
+      await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
+  ],
   ["application/json", 
     { extension: "json", name: "JSON File", encoding: "utf-8", 
       readFN: async (filePath) => await readFileContent(filePath, false), 
@@ -130,6 +135,12 @@ export const MIME_MAP = new Map([
         await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
     ],
   ["text/markdown", 
+    { extension: "md", name: "Markdown File", encoding: "utf-8", 
+      readFN: async (filePath) => await readFileContent(filePath, false), 
+      writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 
+        await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
+    ],
+      ["text/md", 
     { extension: "md", name: "Markdown File", encoding: "utf-8", 
       readFN: async (filePath) => await readFileContent(filePath, false), 
       writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 

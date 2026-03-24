@@ -50,12 +50,12 @@ export async function run(
     let matches = [];
     let i;
     for(i=0; i<dirListLen; i++){
-        if(allFoldersAndFiles.value.directoryList[i].includes(st)){
+        if(allFoldersAndFiles.value.directoryList[i].includes(searchTerm)){
             matches.push(allFoldersAndFiles.value.directoryList[i]);
         }
     }
     for(i=0; i<fileListLen; i++){
-        if(allFoldersAndFiles.value.fileList[i].includes(st)){
+        if(allFoldersAndFiles.value.fileList[i].includes(searchTerm)){
             matches.push(allFoldersAndFiles.value.fileList[i]);
         }
     }

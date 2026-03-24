@@ -3,10 +3,9 @@ import { Roles, Status, TextMessage, AiJob } from "../../Classes/index.js";
 import { Services } from "../../index.js";
 import { Ok, Err } from "../../Utils/helperFunctions.js";
 import { getToolsForTask, getToolDetails } from "../../Database/helpers.js";
-import { processMessageForContext, finialiseOutput } from "../agentUtils.js";
+import { processMessageForContext, finialiseOutput,stripOutAudioAndImageData } from "../agentUtils.js";
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js'
 import { callAgentTool } from "../../CoreTools/helperFunctions.js";
-import { AiProviders } from "../../constants.js";
 
 export const TaskPhases = {
     Plan: "Planning Phase",
@@ -538,7 +537,7 @@ export class TaskAgent extends AiJob {
                     PromptsAndSchemas.returnMessage.usr(
                         this.phaseMessage,
                         this.messageHistory.getSimpleUserAgentComms(),
-                        this.getFullContextString(),
+                        this.getAllContextSummaryString,
                         JSON.stringify(this.plan)
                     ),
                 { ...this.aiSettings } 
@@ -595,29 +594,29 @@ export class TaskAgent extends AiJob {
             return Ok("Return to user tool called. Final output completed.")
         }
 
-        // Catch already reviewed (toolId is in context) 
-        let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
-        if(contextData != null){
-            this.nextPhase = TaskPhases.Action;
-            this.phaseMessage = "";
-            this.#setActionComplete(this.actionReviewID);
-            Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
-        }
+        // WHY IS THIS CAUSING ISSUES?? (Context shouldn't be processed yet)
+        // // Catch already reviewed (toolId is in context) 
+        // let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
+        // if(contextData != null){
+        //     console.log("Tool output has already been reviewed and added to context. Skipping review...");
+        //     this.nextPhase = TaskPhases.Action;
+        //     this.phaseMessage = "";
+        //     this.#setActionComplete(this.actionReviewID);
+        //     Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
+        // }
 
-        // Process the tool output(s)
-        this.status.setCustomStatus("Processing tool output into context");
-        let processedToolOp = await this.#processToolOutput(toolOutput); 
-        if(processedToolOp.isErr()){ 
-            this.errors.push(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
-            return Err(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
-        }; // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
+        let processedToolMessages = await stripOutAudioAndImageData(this, toolOutput);
+        if(processedToolMessages.isErr()){
+            this.errors.push(`Error ( reviewAndReturn -> stripOutAudioAndImageData ) : ${processedToolMessages.value}`);
+            return Err(`Error ( reviewAndReturn -> stripOutAudioAndImageData ) : ${processedToolMessages.value}`);     
+        }
 
         // Check if complete 
         let completeCheck = await this.#generateText(
             PromptsAndSchemas.completeCheck.sys,
             PromptsAndSchemas.completeCheck.usr(
                 actionObj.action,
-                JSON.stringify(processedToolOp.value.summaryObj),
+                JSON.stringify(processedToolMessages.value), // tool output with audio and image data stripped out.
                 this.contextData.getGlobalContextString() 
             ),
             { ...this.aiSettings, structuredOutput: PromptsAndSchemas.completeCheck.schema } 
@@ -637,7 +636,7 @@ export class TaskAgent extends AiJob {
             const ac = actionObj.attempt + 1; 
             this.#incrimentActionCount(this.actionReviewID);
             // Tool has exceeded the maximum number of attempts
-            if(ac > this.toolRetryCount){
+            if(ac >= this.toolRetryCount){
                 this.nextPhase = TaskPhases.Plan;
                 this.phaseMessage = `Tool: ${actionObj.tool}  ID: ${this.actionReviewID} - Has failed multiple times when attempting to complete the action.`+
                 `\n Action: ${actionObj.action}.`+
@@ -653,7 +652,16 @@ export class TaskAgent extends AiJob {
             return Ok("Tool failed to complete the task - trying again!");
         }
         // Action is complete 
-        if(completeCheck.value.status == "COMPLETE"){           
+        if(completeCheck.value.status == "COMPLETE"){   
+            // Process the tool output(s)
+            console.log("Action is complete! Processing tool output and updating context...");
+            this.status.setCustomStatus("Processing tool output into context");
+            let processedToolOp = await this.#processToolOutput(toolOutput); 
+            if(processedToolOp.isErr()){ 
+                this.errors.push(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
+                return Err(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
+            }; // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
+            
             this.phaseMessage = "";
             this.nextPhase = TaskPhases.Action;
             this.toolOutputData = [];

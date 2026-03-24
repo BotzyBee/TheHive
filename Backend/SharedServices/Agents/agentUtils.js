@@ -336,43 +336,70 @@ export async function finialiseOutput(agentObject, saveFolder){
     return Ok(aud);
   }
 
-  /**
+ /**
    * Helper function for finialiseOutput
-   * @param {string} contextKey - Optional - the key for a specific tool output. 
+   * @param {string} contextKey - Optional - the key for a specific tool output.
    * @returns {Result[ DataMessage | string]} - Result( Data Message | string )
    */
-  async function processData(agentObject, contextKey){
-    if(contextKey == null){
-       return Err(`Error: (processData) - contextKey is missing`);
-    }
-    let check = agentObject.messageHistory.getMessagesById(contextKey);
-    if(check == null){
-      return Err(`Error: (processData) - Could not located any data for ${contextKey}`);
-    }
-    // Clone & strip out unnessessary data. 
-    let dta = structuredClone(check); // clone of the message
-    dta.role = Roles.Agent;
-    // Handle Data
-    if(typeof dta.data == "object"){
-      dta.data = JSON.stringify(dta.data, null, 2);
-    } 
-    if(dta.data instanceof Uint8Array || dta.data instanceof ArrayBuffer){
-      // Binary Data 
-      dta.data = `[ Data object contained binary data - This feature is yet to be implimented ]`
-    }
-    let summaryMessage = new DataMessage(
-      {
-        role: Roles.Agent,
-        mimeType: dta.mime,
-        data: `[ Data object removed due to size - Full data can be found in message ${contextKey} ]`
-      }
-    )
-    dta.toolName = "";
-    dta.instructions = "";
-    // Push summary message to chat, return full message.
-    agentObject.messageHistory.addMessage(summaryMessage);
-    return Ok(dta);
+ async function processData(agentObject, contextKey ){ 
+  if (contextKey == null) {
+    return Err(`Error: (processData) - contextKey is missing`);
   }
+
+  let check = agentObject.messageHistory.getMessagesById(contextKey);
+  if (check == null) {
+    return Err(`Error: (processData) - Could not locate any data for ${contextKey}`);
+  }
+
+  // Clone the message
+  let dta = structuredClone(check); 
+  dta.role = Roles.Agent;
+
+  // Refined Data Handling
+  if (dta.data instanceof Uint8Array || dta.data instanceof ArrayBuffer) {
+    dta.data = `[ Data object contained binary data - This feature is yet to be implemented ]`;
+  } else if (typeof dta.data === "object" && dta.data !== null) {
+    // Only stringify if it's an actual object/array, not a string or null
+    dta.data = JSON.stringify(dta.data, null, 2);
+  } 
+  // If dta.data is a string (Markdown etc), it stays as a string.
+
+  // Create the summary for the history
+  let summaryMessage = new DataMessage({
+    role: Roles.Agent,
+    // Ensure we use the correct property name from the source
+    mimeType: dta.mime || 'text/markdown', 
+    data: `[ Data content removed due to size - Full data can be found in message ${contextKey} ]`,
+  });
+
+  // Clean up metadata for the return object
+  dta.toolName = dta.toolName || "";
+  dta.instructions = dta.instructions || "";
+
+  // Push summary to history
+  agentObject.messageHistory.addMessage(summaryMessage);
+  return Ok(dta);
+}
+
+  /**
+   * Helper function for finialiseOutput to strip out image and audio data from tool outputs and replace with a summary message.
+   * @param {object} agentObject - the agent object (Not needed at this time).
+   * @param {array} messageArray - an array of messages of Base Message type (TextMessage, ImageMessage, AudioMessage, DataMessage)
+   * @returns {Result[array]} - Result( array of processed messages )
+   */
+  export async function stripOutAudioAndImageData(agentObject, messageArray){
+    //catch non array or empty array
+    if(!Array.isArray(messageArray) || messageArray.length == 0){
+      return Services.Utils.Err(`Error: (stripOutAudioAndImageData) - messageArray is not an array or is empty!`);
+    }
+    let opMessages = structuredClone(messageArray); 
+    for(let i=0; i<opMessages.length; i++){
+      if(opMessages[i].type === "Image" || opMessages[i].type === "Audio"){
+        opMessages[i].base64 = `[ Base 64 data removed due to size - Full data can be found in message ${messageArray[i].id} ]`;
+      }
+  }
+  return Services.Utils.Ok(opMessages);
+}
 
 const PromptsAndSchemas = {
     summarySysPrompt: `You are a specialized data processing engine. 
@@ -470,11 +497,11 @@ If the task doesn't ask for data or information then summarise the tasks that we
 
 You have two options for completing the task:  
 Text Output: Use the data provided to craft your own detailed text response. This is best for short answers and relatively simple tasks.  
-Quote Text. Use the ‘quote tool’ to directly copy the output from one of the tool listed in the context and provide this as a text answer to the user. You must use << >> tags to reference the data location in your answer. 
+Quote Text. Use the ‘quote tool’ to directly copy the output from one of the tool listed in the context and provide this as a text answer to the user. You must use {{}} tags to reference the data location in your answer. 
    
-Example of how to use << >> quotes:  
+Example of how to use {{ }} quotes:  
 Context Data = { context: { potato: "Example Quote Data", cheese: ["More info..", "Another bit of info.."] } } 
-Your answer = '<< context.potato >>'  will output ‘Example Quote Data’. 
+Your answer = '{{ context.potato }}'  will output ‘Example Quote Data’. 
 
 You can only quote the text DO NOT add string functions like .split() etc. You can combine multiple tags if you want to output multiple chunks of data.`,
     

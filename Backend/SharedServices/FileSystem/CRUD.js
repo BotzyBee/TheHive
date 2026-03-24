@@ -71,7 +71,7 @@ export async function readFileContent(filePath, asBuffer = false, options) {
   if (!stats.isFile()) {
     return su.Err(`Error: Path is not a file: ${filePath}`);
   }
-  const encoding = options.encoding || 'utf8';
+  const encoding = options?.encoding || 'utf8';
   try {
     if (asBuffer) {
       // Read as a binary Buffer
@@ -191,22 +191,28 @@ export function getFileExtension(filename) {
  */
 export function getFileExtensionAndSize(filePath) {
   try {
-    // Get file statistics, which includes the file size
+    // 1. Check if it exists at all before stating
+    if (!fs.existsSync(filePath)) {
+        return su.Err(`File does not exist at path: ${filePath}`);
+    }
+
     const stats = fs.statSync(filePath);
-    // Get the file size in bytes
+    
+    if (!stats.isFile()) {
+        return su.Err(`Target is a directory, not a file: ${filePath}`);
+    }
+
     const sizeBytes = stats.size;
-    // path.extname returns '.ext', so we remove the leading dot
-    const extension = path.extname(filePath).toLowerCase().substring(1);
-    // Format the file size for better readability
-    const sizeFormatted = su.formatBytes(sizeBytes);
-    // Return result
+    const ext = path.extname(filePath);
+    const extension = ext ? ext.toLowerCase().substring(1) : ''; // Empty string for no extension
+    
     return su.Ok({
       extension: extension,
       sizeBytes: sizeBytes,
-      sizeFormatted: sizeFormatted,
+      sizeFormatted: su.formatBytes(sizeBytes),
     });
   } catch (error) {
-    return su.Err(`Error (getFileExtensionAndSize) : ${error}`);
+    return su.Err(`OS Error accessing file: ${error.message}`);
   }
 }
 

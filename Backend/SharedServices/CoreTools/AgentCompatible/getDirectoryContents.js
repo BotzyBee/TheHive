@@ -7,7 +7,10 @@ export const details = {
     version:    "2026.0.1",
     creator:    "Botzy Bee",
     overview:   "Scans the target directory returning a string all folders and file paths within it - including sub-directories. \n"+
-                "This data is returned as two arrays of string (file & folder paths) values. ", 
+                "This data is returned as two arrays of string (file & folder paths) values. \n"+
+                "This tool does not return the data from any files. To do this you will need to use the 'readFile' tool. \n"+
+                "You should use this tool if you are needing to read or modify a file however you first need to find the file path. \n"+
+                "You can also use this tool to get an overview of the contents of a directory.", 
     guide:      null,  
     inputSchema:{
     "type": "object",

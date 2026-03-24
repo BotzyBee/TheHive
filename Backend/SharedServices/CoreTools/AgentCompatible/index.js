@@ -12,6 +12,7 @@ export * as createCodeTool from './createCode.js';
 export * as calculatorTool from './calculator.js';
 export * as findAndReplaceTextTool from './findReplaceText.js';
 export * as timeAndDateTool from './timeAndDate.js';
+export * as textCombiner from './textCombiner.js';
 // READ THE NOTE AT THE TOP !!
 
 
