@@ -6,6 +6,7 @@ import { getToolsForTask, getToolDetails } from "../../Database/helpers.js";
 import { processMessageForContext, finialiseOutput } from "../agentUtils.js";
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js'
 import { callAgentTool } from "../../CoreTools/helperFunctions.js";
+import { AiProviders } from "../../constants.js";
 
 export const TaskPhases = {
     Plan: "Planning Phase",
@@ -191,7 +192,7 @@ export class TaskAgent extends AiJob {
         const actionStep = await this.#generateText(
             systemPrompt,
             userPrompt,
-            { structuredOutput: PromptsAndSchemas.planning.schema }
+            { ...this.aiSettings, structuredOutput: PromptsAndSchemas.planning.schema }
         ) // { status: enum[ok, need info, cant plan], plan: [{action: string},...], failText: string }
         if (actionStep.isErr()) return actionStep;
 
@@ -248,7 +249,7 @@ export class TaskAgent extends AiJob {
         const toolStep = await this.#generateText(
             PromptsAndSchemas.planningTools.sys,
             toolUserPrompt,
-            { structuredOutput: PromptsAndSchemas.planningTools.schema }
+            { ...this.aiSettings, structuredOutput: PromptsAndSchemas.planningTools.schema }
         ) 
         if (toolStep.isErr()) return toolStep;
 
@@ -316,7 +317,7 @@ export class TaskAgent extends AiJob {
         if(nextAction == null){
             this.nextPhase = TaskPhases.Review;
             this.phaseMessage = `The plan has no further actions outstanding.`;
-            this.status.setComplete();
+            this.status.setCustomStatus('All actions complete - reviewing and finalising output...');
             return Ok("All actions complete");
         }
         this.actionReviewID = nextAction.id; // setup for next review 
@@ -580,7 +581,7 @@ export class TaskAgent extends AiJob {
         }
         // Catch return to user tool (tool to end task) 
         if(toolOutput[0].toolName == 'returnToUser'){
-            this.status.setComplete();
+            this.status.setCustomStatus('Tasks Completed - Finalising Output...');
             this.isRunning = false;
             this.phaseMessage = "";
             this.setEndTime();
@@ -666,7 +667,7 @@ export class TaskAgent extends AiJob {
             // (Only gets here if 'returnToUser' tool isn't added to the plan)
             const newOustandingActionCount = this.#getOustandingActionCount();
             if (newOustandingActionCount === 0) {
-                this.status.setComplete();
+                this.status.setCustomStatus("All actions complete - finalising output...");
                 this.isRunning = false;
                 this.phaseMessage = "";
                 this.setEndTime();
