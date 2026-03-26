@@ -1,6 +1,6 @@
 import { AiJob } from '../../Classes/aiJob.js';
 import { Ok, Err } from '../../Utils/helperFunctions.js';
-import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
+import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
 import { callAgentTool } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles } from '../../Classes/index.js';
@@ -42,11 +42,11 @@ export class QuickAskAgent extends AiJob {
 
     // Get tool list
     this.status.setCustomStatus('Determining best tool to use for the task...');
-    let tools = await getToolsForTask(this.task, 7);
+    let tools = await getToolsOrGuidesForTask(this.task, 7, true);
     if(tools.isErr()){ 
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> getToolsForTask) : ${tools.value}`) 
+      return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`) 
     }
 
     // Make call to determine the tool to use. 
@@ -94,7 +94,8 @@ export class QuickAskAgent extends AiJob {
       parserPrompts.craftParams.usr(
         this.task, 
         this.getAllContextSummaryString(),
-        JSON.stringify(toolDetails.value.details.inputSchema) 
+        JSON.stringify(toolDetails.value.details.inputSchema),
+        toolDetails.value.details.guide || "no guide provided"
       ),
       { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema } 
     ); 

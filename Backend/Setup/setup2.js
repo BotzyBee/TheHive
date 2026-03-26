@@ -1,7 +1,8 @@
 import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
 import { namespaceName, databaseName, dirTableName, 
-    fileTableName, vectorTableName, vectorEmbedSize, mgmtTableName, toolTableName } from "../SharedServices/constants.js";
+    fileTableName, vectorTableName, vectorEmbedSize, 
+    mgmtTableName, toolTableName, guideTableName } from "../SharedServices/constants.js";
 import { addDirectoryToDB } from "../SharedServices/Database/CRUD.js";
 
 // Setup Namespace, Database and tables
@@ -128,6 +129,27 @@ export async function setupFolderBotDB() {
             TYPE F32;
         `);
         console.log(`${toolTableName} table and index created.`);
+
+        // Define the schema for the Guide Vector Table
+        await db.query(`
+            DEFINE TABLE ${guideTableName} SCHEMAFULL;
+            DEFINE FIELD GuideName ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD GuideDescription ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD Version ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD FilePath ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD Vector ON TABLE ${guideTableName} TYPE array<float>  ASSERT $value != NONE;
+           
+        `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
+        
+        // Define Index for File Vector DB
+        await db.query(`
+            DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${guideTableName}
+            FIELDS Vector HNSW
+            DIMENSION ${vectorEmbedSize}
+            DIST COSINE
+            TYPE F32;
+        `);
+        console.log(`${guideTableName} table and index created.`);
         
         // Add 'Normal User' on database. https://surrealdb.com/docs/surrealql/statements/define/user
         await db.query(`

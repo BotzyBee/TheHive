@@ -27,7 +27,7 @@ function fetchCoreAgentTools() {
 
 export async function fetchPluginAgentTools(){
     let tool = Services.FileSystem.scanFolderRecursively;
-    let call = await tool(pluginDir);
+    let call = await tool(`${pluginDir}/Tools`);
     if(call.isErr()){ return Services.Utils.Err(
         `Error (fetchPluginAgentTools -> scanFolderRecursively ) : ${call.value}`
     )}

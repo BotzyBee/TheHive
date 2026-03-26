@@ -10,6 +10,7 @@ import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getConfigForFrontend } from './Engine/routes/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
+import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
@@ -33,6 +34,7 @@ const initServices = async () => {
     // Setup Piscina Pool
     setupPool();
     // Load Tools
+    console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
     Services.Utils.log("Loading Tools...");
     let tools = await initToolIndex();
     if(tools.isErr()){
@@ -43,7 +45,20 @@ const initServices = async () => {
       `${tools.value.added} new. \n`+
       `${tools.value.updated} updated \n`+
       `${tools.value.removed} removed.`)
-    
+
+    // Load Guides
+    console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
+    Services.Utils.log("Loading Guides...");
+    let guides = await initGuideIndex();
+    if(guides.isErr()){
+      Services.Utils.log(`Error (initServices -> initGuideIndex ) : ${guides.value}`);
+      process.exit(1);
+    }
+    Services.Utils.log(`${guides.value.guides} Guides loaded. \n`+
+      `${guides.value.added} new. \n`+
+      `${guides.value.updated} updated \n`+
+      `${guides.value.removed} removed.`)
+
       //Knowledgebase re-indexing timer (every 60 seconds)
     Services.CoreTools.Timers.addNewTimer(
       'KB_Indexing_Timer',
@@ -96,7 +111,6 @@ app.post("/quickAsk", async (req, res) => {
 // Task Agent Endpoint
 app.post("/taskAgent", async (req, res) => {
   const frontendMessage = req.body?.fmf || null;
-  console.log("Received taskAgent request with fmf:", JSON.stringify(frontendMessage, null, 2));
   if(frontendMessage == null ){ 
     return res.status(400).json({
         error: `Error : fmf is either missing or not a FrontendMessageFormat`
@@ -148,6 +162,11 @@ app.get("/getConfig", async (req, res) => {
   let msg = getConfigForFrontend();
   res.status(200).json(msg);
 });
+
+// app.get("/test", async (req, res) => {
+//   let msg = await initGuideIndex();
+//   res.status(200).json(msg.value);
+// });
 
 
 // Test Endpoint 

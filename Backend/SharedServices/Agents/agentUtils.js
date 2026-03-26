@@ -98,7 +98,7 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
     return Services.Utils.Ok(data);
 }
 
-async function createSummary(stringRes, aiOptions = {}){
+export async function createSummary(stringRes, aiOptions = {}){
     // summarise data
     let dataSummary = await new Services.AiCall.AiCall().generateText(
         PromptsAndSchemas.summarySysPrompt,

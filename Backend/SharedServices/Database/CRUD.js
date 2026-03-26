@@ -145,6 +145,43 @@ export async function addVectorToolToDB(
   }
 }
 
+// Add Guide (Vector) to DB
+export async function addVectorGuideToDB(
+  dbAgent,
+  tableName,
+  guideName,
+  guideDescription,
+  version,
+  filePath,
+  vector
+) {
+  let encodedFP = encodeURIComponent(filePath);
+  try {
+    let result = await dbAgent.query(
+      `
+            INSERT INTO ${tableName} {
+                GuideName: $gn,
+                GuideDescription: $gd,
+                Version: $vi,
+                FilePath: $fp,
+                Vector: $vec
+            };
+        `,
+      {
+        gn: guideName,
+        gd: guideDescription,
+        vi: version,
+        fp: encodedFP,
+        vec: vector, // Array of floats
+      }
+    );
+
+    return su.Ok(result);
+  } catch (error) {
+    return su.logAndErr(`Error (addVectorGuideToDB) : ${error}`);
+  }
+}
+
 // [][] -- READ -- [][]
 export async function getRecords(dbAgent, tableName, searchField, searchTerm) {
   if (searchField === 'Url') {

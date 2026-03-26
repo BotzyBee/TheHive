@@ -67,6 +67,7 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
 export async function readFileContent(filePath, asBuffer = false, options) {
+  if(!filePath) return su.Err(`Error (readFileContent) : No file path provided.`)
   const stats = await fsp.lstat(filePath);
   if (!stats.isFile()) {
     return su.Err(`Error: Path is not a file: ${filePath}`);
@@ -97,12 +98,14 @@ export async function readFileContent(filePath, asBuffer = false, options) {
 export async function getUpdateStatsFromUrl(url) {
   url = decodeURIComponent(url); // handle encoded URLS
   try {
-    let data = fs.statSync(url);
-    // round Millis -
-    data.atimeMs = Math.round(data.atimeMs);
-    data.mtimeMs = Math.round(data.mtimeMs);
-    data.ctimeMs = Math.round(data.ctimeMs);
-    data.birthtimeMs = Math.round(data.birthtimeMs);
+    const stats = await fsp.lstat(url);
+    const data = {
+      ...stats,
+      atimeMs: Math.round(stats.atimeMs),//The last time the file was accessed.
+      mtimeMs: Math.round(stats.mtimeMs),//The last time the file's data was modified.
+      ctimeMs: Math.round(stats.ctimeMs),//The last time the file's status was changed (e.g., permissions, ownership).
+      birthtimeMs: Math.round(stats.birthtimeMs),//The timestamp of when the file was created
+    };
     return su.Ok(data);
   } catch (error) {
     return su.Err(error);

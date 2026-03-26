@@ -2,7 +2,7 @@ import { ContextTemplate } from "../../Classes/context.js";
 import { Roles, Status, TextMessage, AiJob } from "../../Classes/index.js";
 import { Services } from "../../index.js";
 import { Ok, Err } from "../../Utils/helperFunctions.js";
-import { getToolsForTask, getToolDetails } from "../../Database/helpers.js";
+import { getToolsOrGuidesForTask, getToolDetails } from "../../Database/helpers.js";
 import { processMessageForContext, finialiseOutput,stripOutAudioAndImageData } from "../agentUtils.js";
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js'
 import { callAgentTool } from "../../CoreTools/helperFunctions.js";
@@ -37,7 +37,7 @@ export class TaskContextTemplate extends ContextTemplate {
         super(); // setup global & tool data objects.
         this.globalData.isProject = false;
         this.globalData.projectIndexUrl = ""; // relative url where files are located eg. UserFiles/Projects/ProjectName
-        this.globalData.workingDirectory = "/UserFiles/aiOutputs"; // relative url 
+        this.globalData.workingDirectory = "/UserFiles/"; // relative url 
     }
     addProjectIndexUrl(relativeIndexUrl){ 
         if(typeof relativeIndexUrl === "string" && relativeIndexUrl != ""){
@@ -154,6 +154,47 @@ export class TaskAgent extends AiJob {
         return Err(errorMsg);        
     }
 
+    async #getSuitableGuides(task, maxGuides = 10){
+        // Get guides by vector lookup
+        let matchingGuides = await getToolsOrGuidesForTask(task, maxGuides, false);
+        if(matchingGuides.isErr()){
+            return Err(`Erorr (getSuitableGuides -> getToolsOrGuidesForTask) : ${matchingGuides.value}`);
+        }
+        // Use AI to select the most suitable
+        let call = await this.#generateText(
+            "Your task is to review the provided guide text and return the file path for any guides that could be useful for the user task.",
+            `Here is the user task : ${task} and here are the guides : ${JSON.stringify(matchingGuides.value)}`,
+            { ...this.aiSettings, 
+                structuredOutput: {
+                "type": "object",
+                "description": "An object containing a filePaths property which is an array of string values.",
+                "properties": {
+                    "filePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                    }
+                },
+                "required": ["filePaths"]
+                }
+            }
+        );
+        if(call.isErr()){
+            return Err(`Error (getSuitableGuides -> generateText ) : ${call.value}`);
+        }
+        // fetch the texts
+        let OPlen = call.value.filePaths.length ?? 0;
+        let OPAR = [];
+        for(let i=0; i<OPlen; i++){
+            const readFile = await Services.FileSystem.readFileContent(call.value.filePaths[i]);
+            if(readFile.isErr()){ return readFile };
+            OPAR.push(readFile.value);
+        }
+        console.log(`${OPAR.length} Guides have been added to planing process.`);
+        OPAR.join("\n Next Guide : \n\n")
+        return Ok(OPAR);
+    }
     /**
      * Planning Stage
      * @param {object} options
@@ -162,12 +203,17 @@ export class TaskAgent extends AiJob {
      */
     async #planningEngine(options = {}) {
         console.log("Starting Planning.");
-        const { isUpdate = false, } = options;
+        const { isUpdate = false, useTaskPlanGuides } = options;
         const statusLabel = isUpdate ? "Updating Task Plan..." : "Creating Task Plan...";
         this.status.setCustomStatus(statusLabel);
 
-        // Prepare Context
-        const guideText = "" // params.useTaskPlanGuides ? await getToolGuides() : ""; TO DO !!
+        // Get Planning / Task Guides. 
+        let guideText = ""
+        if(useTaskPlanGuides === true){
+            let fetchGuides = await this.#getSuitableGuides(this.task);
+            if( fetchGuides.isErr()) return fetchGuides;
+            guideText = fetchGuides.value;
+        }
         const completedActions = isUpdate ? this.#getCompletedActionsSummary() : "No prior actions completed.";
         const oldPlan = isUpdate ? [...this.plan] : [];
 
@@ -199,6 +245,7 @@ export class TaskAgent extends AiJob {
         if(actionResponse == undefined){
             return Err(`Error: ( #planningEngine ) : response is missing status key or value.`)
         }
+
         if (actionResponse.status === 'need info') {
             this.isRunning = false;
             this.status.setAwaitingUserInput();
@@ -219,9 +266,9 @@ export class TaskAgent extends AiJob {
 
         // Get tools
         let Step1PlanMerged = actionStep.value.plan.map(item => item.action).join('\n') 
-        let tools = await getToolsForTask(`${this.task} \n\n ${Step1PlanMerged}`, 12);
+        let tools = await getToolsOrGuidesForTask(`${this.task} \n\n ${Step1PlanMerged}`, 15);
         if(tools.isErr()){ 
-            return Err(`Error (planningEngine -> getToolsForTask) : ${tools.value}`) 
+            return Err(`Error (planningEngine -> getToolsOrGuidesForTask) : ${tools.value}`) 
         } // [{ ToolName: string, ToolDescription: string, Version: string, FilePath: string,  Vector: [] }, ..]
         
         // Add Task Agent Built-in tools 
@@ -242,7 +289,8 @@ export class TaskAgent extends AiJob {
             this.task, 
             JSON.stringify(actionResponse.plan), 
             JSON.stringify(toolsOverview),
-            isUpdate ? JSON.stringify(oldPlan.filter(p => p.complete)) : ""
+            isUpdate ? JSON.stringify(oldPlan.filter(p => p.complete)) : "",
+            this.getAllContextSummaryString()
         );
 
         const toolStep = await this.#generateText(
@@ -254,9 +302,11 @@ export class TaskAgent extends AiJob {
 
         // Finalize and Merge Plan
         const newActions = toolStep.value.plan.map(p => new TaskAction(p.action, p.tool));
+
         // If updating, keep completed actions and append/replace the rest
         const completedOldActions = oldPlan.filter(p => p.complete);
         this.plan = isUpdate ? [...completedOldActions, ...newActions] : newActions;
+
         // Set control flow properties
         this.planUpdateNeeded = false;
         if (this.plansNeedApproved) {
@@ -364,7 +414,12 @@ export class TaskAgent extends AiJob {
         // Craft input params AI Calls
         let craftedParams = await this.#generateText(
             parserPrompts.craftParams.sys,
-            parserPrompts.craftParams.usr(nextAction.action, this.getAllContextSummaryString(), JSON.stringify(toolObj.value.details.inputSchema)),
+            parserPrompts.craftParams.usr(
+                nextAction.action, 
+                this.getAllContextSummaryString(), 
+                JSON.stringify(toolObj.value.details.inputSchema),
+                toolObj.value.details.guide || "no guide provided"
+            ),
             { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema }           
         )// @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] }
         if(craftedParams.isErr()){ 
@@ -576,6 +631,7 @@ export class TaskAgent extends AiJob {
         if(toolOutput[0].toolName == 'rePlanTool'){
             this.nextPhase = TaskPhases.Plan;
             this.planUpdateNeeded = true;
+            this.#setActionComplete(this.actionReviewID); // mark complete so it's included in 'old plan' and merged with new plan.
             return Ok("Skipping review to allow Re-Planning");
         }
         // Catch return to user tool (tool to end task) 
@@ -594,16 +650,15 @@ export class TaskAgent extends AiJob {
             return Ok("Return to user tool called. Final output completed.")
         }
 
-        // WHY IS THIS CAUSING ISSUES?? (Context shouldn't be processed yet)
-        // // Catch already reviewed (toolId is in context) 
-        // let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
-        // if(contextData != null){
-        //     console.log("Tool output has already been reviewed and added to context. Skipping review...");
-        //     this.nextPhase = TaskPhases.Action;
-        //     this.phaseMessage = "";
-        //     this.#setActionComplete(this.actionReviewID);
-        //     Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
-        // }
+        // Catch already reviewed (toolId is in context) 
+        let contextData = this.#getSummaryContextByActionID(this.actionReviewID);// should be null if tool hasn't been reviewed & approved.
+        if(contextData != null && Object.keys(contextData).length > 0){
+            console.log("Tool output has already been reviewed and added to context. Skipping review...");
+            this.nextPhase = TaskPhases.Action;
+            this.phaseMessage = "";
+            this.#setActionComplete(this.actionReviewID);
+            Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
+        }
 
         let processedToolMessages = await stripOutAudioAndImageData(this, toolOutput);
         if(processedToolMessages.isErr()){
@@ -705,7 +760,7 @@ export class TaskAgent extends AiJob {
         while(this.isRunning == true){
             // PLAN
             if(this.nextPhase == TaskPhases.Plan){
-                let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan});
+                let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan, useTaskPlanGuides: true });
                 if(plan.isErr()){ 
                     console.log("ERROR Plan - ", plan.value);
                     this.status.setFailed();
@@ -781,6 +836,9 @@ Example Transformation: Task: "Email the summary of yesterday's meeting to Sarah
 4.	Generate a summary of the identified content.
 5.	Search the global address list or contacts to resolve "Sarah" to a specific email address.
 6.	Compose and send the email containing the summary to the resolved email address.
+
+IMPORTANT! - You MUST review the tool data in the context to check if an action has already been completed. Any completed tool actions are added to the context object.
+You must not repeat actions when the data is already available in the context object. 
 `,
         usr: (task, globalContext, guideText) => {
             return `Here is your task from the user <userTask> ${task} </userTask>
@@ -831,6 +889,8 @@ Guidelines for Selection:
 3.	Error Handling: If an action cannot be completed by any available tool, you must flag this in your response.
 4.	Gap Analysis: If an action has no corresponding tool, do not guess. Return ‘cant plan’ and enter the reason in failText: [reason]. If the task is missing critical data: Return status: 'need info' and failText: [Specific Clarification Questions].
 
+CRITICAL: Use a 'rePlanTool' immediately after any tool call that identifies a list of objects (files, data points, etc.). Our plans are static and cannot loop or scale automatically; replanning is necessary to handle the specific number of entities discovered at runtime.
+Do not repeat any actions that are in the context. It is important not to duplicate work unless a change of plan necessitates it. 
 `,
         usr: (task, actions, tools, priorActions, contextData) => {
             return `Here is your task from the user <userTask> ${task} </userTask>

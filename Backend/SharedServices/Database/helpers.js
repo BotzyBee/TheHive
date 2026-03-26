@@ -1,4 +1,4 @@
-import { vectorEmbedSize, toolTableName, builtInFilePath } from '../constants.js';
+import { vectorEmbedSize, toolTableName, guideTableName, builtInFilePath } from '../constants.js';
 import { searchVectorRecords } from './CRUD.js';
 import { Services } from '../index.js';
 
@@ -6,11 +6,13 @@ import { Services } from '../index.js';
  * Performs a vector search on the DB to get tools that match the task. 
  * @param {string} task - the task needing completed 
  * @param {number} limit - the number of tools to return 
+ * @param {boolean} modeTools - if true will return matching tools, if false will return matching guides.
  * @returns {Result<Array<object>} - Result([
  * { ToolName: string, ToolDescription: string, Version: string, FilePath: string,  Vector: [] } ]);
  */
-export async function getToolsForTask(task, limit){
+export async function getToolsOrGuidesForTask(task, limit, modeTools = true){
     // Get DB Agent
+    let tableName = modeTools ? toolTableName : guideTableName;
     let getDB = await Services.Database.getDbAgent();
     if(getDB.isErr()){
         return Services.Utils.Err(`Error ( matchToolsToTask -> getDbAgent ) : ${getDB.value}`);
@@ -21,7 +23,7 @@ export async function getToolsForTask(task, limit){
     {inputDataVec: [task], dimensionSize: vectorEmbedSize, quality: 1 });
     if( vec.isErr() ){ return Services.Utils.Err(`Error ( matchToolsToTask -> generateEmbeddings ) : ${vec.value}`); }
     // Search the database
-    let search = await searchVectorRecords(db, toolTableName, vec.value[0], limit);
+    let search = await searchVectorRecords(db, tableName, vec.value[0], limit);
     if( search.isErr() ){ return Services.Utils.Err(`Error ( matchToolsToTask -> searchVectorRecords ) : ${search.value}`); }
     // remove embeddings
     let resLen = search.value[0].length ?? 0;

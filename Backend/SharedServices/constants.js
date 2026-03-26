@@ -223,6 +223,7 @@ export const fileTableName = 'Files';
 export const mgmtTableName = 'mgmtData';
 export const vectorTableName = 'FileVectors';
 export const toolTableName = 'ToolVectors';
+export const guideTableName = 'GuideVectors';
 export const vectorEmbedSize = 1024;
 
 // "http://indexdb:8000/rpc"; (live-inter-container) | "http://127.0.0.1:8000/rpc" (testing from CLI)
