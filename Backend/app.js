@@ -77,6 +77,16 @@ const initServices = async () => {
             await JOBS.checkNonAllocated();
         }
     }, 5000);
+
+    // Prune completed jobs every 10 mins
+    Services.CoreTools.Timers.addNewTimer("Prune_Completed_Jobs", async () => {
+      await JOBS.jobListManager({ prune: true });
+    }, 600000);
+
+    // Write logs to file every 2 mins
+    Services.CoreTools.Timers.addNewTimer("Write_Logs_To_File", async () => {
+      await writeLogsToFile();
+    }, 120000);
     servicesStarted = true;
   }
 };
