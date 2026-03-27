@@ -56,11 +56,56 @@ export async function handleQAMessage(frontendMessage){
     }
     return newJob; // has Result already
     } else {
-
-    // Clear output to stop polling from picking up old output.
-    //job.value.taskOutput = [];
     // Existing Task
-    // To Do
-    console.log("Existing Job");
+        let rtnMsg = new FrontendMessageFormat({ 
+            aiJobId: id, 
+            aiSettings: frontendMessage.aiSettings,
+            status: Services.Classes.Status.NotStarted,
+        });
+        // Get JOB Object
+        let job = await JOBS.jobListManager({getJob: id});
+        if(job.isErr()){
+            return Services.Utils.Err(`Error : (handleQAMessage) - ${job.value}`);
+        } 
+        let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
+        if( processedMsg.isErr() ){ 
+            return Services.Utils.Err(`Error (handleQAMessage 2) : could not process the messages into classes. ${processedMsg.value}`);
+        }
+        // Handle Stop
+        if(frontendMessage.status == Services.Classes.Status.Stopped){
+            job.value.isRunning = false;
+            job.value.status.setStoppedByUser();
+            rtnText = `Job ${id} has been stopped`;
+            rtnMsg.addMessages(
+                new TextMessage({
+                    role: Services.Classes.Roles.Agent,
+                    textData: `Job ${id} has been stopped`
+                })
+            )
+            return Services.Utils.Ok(rtnMsg);
+        }
+
+        // Catch still running
+        if(job.value.isRunning == true){
+            return Services.Utils.Err(`Job ${id} is still running. Cannot add new instructions unless stopped or complete.`)
+        }
+
+        // add new messages to messageHistory
+        processedMsg.value.forEach(
+            msg => job.value.messageHistory.addMessage(msg)
+        );
+        // Setup to review new messages
+        job.value.status.setNewInfoAdded();
+        // Clear output to stop polling from picking up old output.
+        job.value.taskOutput = [];
+        // Add to un-allocated
+        JOBS.NON_ALLOCATED.push(job.value.id);
+        rtnMsg.addMessages(
+            new TextMessage({
+                role: Services.Classes.Roles.Agent,
+                textData: `New information has been added to Job ${id} and is awaiting allocation.`
+            })
+        )
+        return Services.Utils.Ok(rtnMsg);
     }
 }
