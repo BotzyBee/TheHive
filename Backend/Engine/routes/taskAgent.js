@@ -109,6 +109,7 @@ export async function handleTAMessage(frontendMessage){
         // Clear output to stop polling from picking up old output.
         job.value.taskOutput = [];
         job.value.toolOutputData = [];
+        job.value.stats.loopNumber = 0; // reset loop number to allow for new loop of agent actions.
         // Add to un-allocated
         JOBS.NON_ALLOCATED.push(job.value.id);
         rtnMsg.addMessages(
