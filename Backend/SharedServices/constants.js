@@ -109,7 +109,7 @@ export const MODEL_REGISTRY = [
     quality: AiQuality.Advanced,
   },
   {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.1-pro-preview',
     provider: AiProviders.gemini,
     capabilities: [
       ModelTypes.text,
@@ -117,6 +117,7 @@ export const MODEL_REGISTRY = [
       ModelTypes.websearch,
       ModelTypes.maps,
       ModelTypes.reasoning,
+      ModelTypes.code
     ],
     maxContext: 1048576,
     quality: AiQuality.Pro,

@@ -202,9 +202,10 @@ export class TaskAgent extends AiJob {
      * @param {boolean} [options.useTaskPlanGuides ] - if true planning engine will search for relevant guides. 
      */
     async #planningEngine(options = {}) {
-        console.log("Starting Planning.");
+        
         const { isUpdate = false, useTaskPlanGuides } = options;
         const statusLabel = isUpdate ? "Updating Task Plan..." : "Creating Task Plan...";
+        console.log(statusLabel);
         this.status.setCustomStatus(statusLabel);
 
         // Get Planning / Task Guides. 
@@ -411,37 +412,47 @@ export class TaskAgent extends AiJob {
             return Err(`Error (Task Agent -> getToolDetails) : ${toolObj.value}`)
         };
 
-        // Craft input params AI Calls
-        let craftedParams = await this.#generateText(
-            parserPrompts.craftParams.sys,
-            parserPrompts.craftParams.usr(
-                nextAction.action, 
-                this.getAllContextSummaryString(), 
-                JSON.stringify(toolObj.value.details.inputSchema),
-                toolObj.value.details.guide || "no guide provided"
-            ),
-            { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema }           
-        )// @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] }
-        if(craftedParams.isErr()){ 
-            this.errors.push(`Error (performAction -> craft input params) : ${craftedParams.value}`)
-            return Err(`Error (performAction -> craft input params) : ${craftedParams.value}`)
-        }
+        let toolErrorText = "";
+        let toolCall;
+        for(let i=0; i< this.toolRetryCount; i++){
+            // Craft input params AI Calls
+            let craftedParams = await this.#generateText(
+                parserPrompts.craftParams.sys,
+                parserPrompts.craftParams.usr(
+                    nextAction.action, 
+                    this.getAllContextSummaryString(), 
+                    JSON.stringify(toolObj.value.details.inputSchema),
+                    toolObj.value.details.guide || "no guide provided",
+                    toolErrorText
+                ),
+                { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema }           
+            )// @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] }
+            if(craftedParams.isErr()){ 
+                this.errors.push(`Error (performAction -> craft input params) : ${craftedParams.value}`)
+                return Err(`Error (performAction -> craft input params) : ${craftedParams.value}`)
+            }
 
-        // Build params into object (injecting data if needed)
-        let fullContext = this.getAllContextRaw();
-        let resolvedParams = parseNunjucksTemplate(craftedParams.value.params, fullContext );
-        if(resolvedParams.isErr()){ 
-        return Err(`Error (performAction -> parseNunjucksTemplate ) : ${JSON.stringify(resolvedParams)}`)
-        }
+            // Build params into object (injecting data if needed)
+            let fullContext = this.getAllContextRaw();
+            let resolvedParams = parseNunjucksTemplate(craftedParams.value.params, fullContext );
+            if(resolvedParams.isErr()){ 
+            return Err(`Error (performAction -> parseNunjucksTemplate ) : ${JSON.stringify(resolvedParams)}`)
+            }
 
-        // Call Tool
-        this.status.setCustomStatus(`Using Tool: ${toolObj.value.details.toolName}`)
-        console.log(`Calling tool ${toolObj.value.details.toolName}`);
-        let toolCall = await callAgentTool(
-            toolObj.value.details.toolName,
-            toolObj.value.filePath,
-            resolvedParams.value
-        ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
+            // Call Tool
+            this.status.setCustomStatus(`Using Tool: ${toolObj.value.details.toolName}`)
+            console.log(`Calling tool ${toolObj.value.details.toolName}`);
+            toolCall = await callAgentTool(
+                toolObj.value.details.toolName,
+                toolObj.value.filePath,
+                resolvedParams.value
+            ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
+            if(toolCall.isErr()){
+                toolErrorText = toolCall.value;
+            }
+            if(toolCall.isOk()) break; // exit retry loop if successful
+        }
+        // If we have an error after retrying, return the error.
         if(toolCall.isErr()){
         return Err(`Error (performAction -> toolCall ) : ${toolCall.value}`);    
         }
@@ -672,7 +683,8 @@ export class TaskAgent extends AiJob {
             PromptsAndSchemas.completeCheck.usr(
                 actionObj.action,
                 JSON.stringify(processedToolMessages.value), // tool output with audio and image data stripped out.
-                this.contextData.getGlobalContextString() 
+                this.contextData.getGlobalContextString(),
+                JSON.stringify(this.plan)
             ),
             { ...this.aiSettings, structuredOutput: PromptsAndSchemas.completeCheck.schema } 
         ); // Output { status: COMPLETE || INCOMPLETE, feedback: string (optional) }
@@ -687,9 +699,17 @@ export class TaskAgent extends AiJob {
         }
         console.log("REVIEW :: "+JSON.stringify(completeCheck, null, 2));
         // Action did not complete 
+        let fb = completeCheck.value?.feedback ?? "No feedback given!";
         if(completeCheck.value.status == "INCOMPLETE"){ 
             const ac = actionObj.attempt + 1; 
             this.#incrimentActionCount(this.actionReviewID);
+            // plan needs updated
+            if(completeCheck.value.replan === true || completeCheck.value.replan === "true"){
+                this.nextPhase = TaskPhases.Plan;
+                this.planUpdateNeeded = true;
+                this.phaseMessage = `The Review phase has been completed and signaled that the plan needs updated. Feedback: ${fb}`;
+                return Ok("Action failed and a replan was suggested.")
+            }
             // Tool has exceeded the maximum number of attempts
             if(ac >= this.toolRetryCount){
                 this.nextPhase = TaskPhases.Plan;
@@ -700,7 +720,6 @@ export class TaskAgent extends AiJob {
                 return Ok("Action failed after multiple attempts - triggering re-planning.")
             }
             // Tool has not exceeded maximum number of attempts. Trying again with feedback.  
-            let fb = completeCheck.value?.feedback ?? "No feedback given!";
             this.#setActionText(this.actionReviewID, `${actionObj.action}. Feedback from last attempt: ${fb}`);
             this.nextPhase = TaskPhases.Action;
             this.phaseMessage = "";
@@ -718,13 +737,20 @@ export class TaskAgent extends AiJob {
             }; // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
             
             this.phaseMessage = "";
-            this.nextPhase = TaskPhases.Action;
             this.toolOutputData = [];
             this.#incrimentActionCount(this.actionReviewID);
             this.#setActionComplete(this.actionReviewID);
             // Push data to context & message history
             processedToolOp.value.rawMessages.forEach( msg => this.messageHistory.addMessage(msg));
             this.contextData.toolData = {...this.contextData.toolData, ...processedToolOp.value.summaryObj };
+
+            // Complete but replan suggested
+            if(completeCheck.value.replan === true || completeCheck.value.replan === "true"){
+                this.nextPhase = TaskPhases.Plan;
+                this.planUpdateNeeded = true;
+                this.phaseMessage = `The Review phase has been completed and signaled that the plan needs updated. Feedback: ${fb}`;
+                return Ok("Action completed and a replan was suggested.")
+            }
 
             // - catch all actions complete 
             // (Only gets here if 'returnToUser' tool isn't added to the plan)
@@ -743,6 +769,7 @@ export class TaskAgent extends AiJob {
                 return Ok("All Actions Complete - Review Complete - Task Complete :-)")
             }
             // action complete return -> back to action phase
+            this.nextPhase = TaskPhases.Action;
             return Ok("Review complete - proceed with next action.")
         }
     }
@@ -1050,7 +1077,7 @@ Maintain Scope: Ensure the instruction is a direct reflection of the user's inte
         Here is the task plan. Remember to include this in full if you want the user to review it. <plan> ${plan} </plan>` },
     },
     completeCheck: {
-        sys: `Role: You are a pragmatic Quality Assurance (QA) Critic Agent. Your purpose is to verify that the tool output effectively addresses the user's core intent.
+        sys: `Role: You are a pragmatic Quality Assurance (QA) Critic Agent. Your purpose is to verify that the tool output effectively addresses the user's core intent and if the plan still make sense. 
 Goal: Do not nitpick. Your objective is to ensure the output is useful and accurate, not necessarily perfect.
 
 Evaluation Framework:
@@ -1062,10 +1089,17 @@ If you mark a tool call as INCOMPLETE, provide a brief Correction Directive:
 Critical Gap: Briefly identify the "make-or-break" missing piece of data or the specific error.
 Required Fix: Provide a clear, one-sentence instruction for what needs to change to make the result acceptable.
 
-Avoid commenting on style, tone, or non-essential formatting unless it prevents the user from achieving their goal.`,
-        usr: (actionText, toolOutputData, globalContext) => { return `Here is the user task which the tool should complete <task> ${actionText} </task>
+Avoid commenting on style, tone, or non-essential formatting unless it prevents the user from achieving their goal.
+
+Replan: (default = false) You must review the plan and consider if it needs updating due to the tool output - this check must always be completed regardless of the tool being COMPLETE or INCOMPLETE. Setting replan to true will trigger a re-planning cycle.  
+Re-planning could be needed for a number of reasons, for example the wrong tool was used or the tool doesn't / cant output what was expected. 
+It could be that the tool has completed however the plan needs to be updated to account for the returned data. 
+Any tool used will be marked complete / not complete at a later stage. Do not trigger a replan to update this field.
+Only set replan to true when it's clear the current plan will not work.`,
+        usr: (actionText, toolOutputData, globalContext, plan) => { return `Here is the user task which the tool should complete <task> ${actionText} </task>
         Here is the output from the tool call <toolData> ${toolOutputData} </toolData>
-        Here is some global context which might help (may be empty) <globalContext> ${globalContext} </globalContext>` },
+        Here is some global context which might help (may be empty) <globalContext> ${globalContext} </globalContext>
+        Here is the current plan <plan> ${plan} </plan>` },
         schema: {
         "type": "object",
         "description": "Output schema to track completion status and provide optional feedback.",
@@ -1081,10 +1115,16 @@ Avoid commenting on style, tone, or non-essential formatting unless it prevents 
             "feedback": {
             "type": "string",
             "description": "Optional comments, suggestions, or reasons regarding the task status."
-            }
+            },
+            "replan": {
+            "type": "boolean",
+            "description": "Set to true if the plan needs to be updated following the tool call.",
+            "default": false
+            },    
         },
         "required": [
-            "status"
+            "status",
+            "replan"
         ]
         }
     },

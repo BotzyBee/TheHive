@@ -33,7 +33,7 @@ export async function callAnthropic(
   try {
     const params = {
       model: model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemMessage,
       messages: [{ role: 'user', content: contentMessage }],
     };
@@ -48,14 +48,29 @@ export async function callAnthropic(
       };
     }
     const res = await client.messages.create(params);
+
+    // Check if the model cut off early
+    if (res.stop_reason === 'max_tokens') {
+      return su.logAndErr('Error: Claude hit the max_token limit. The JSON is incomplete.');
+    }
+
     // Find the first text block in the content array
     const textBlock = res.content.find((block) => block.type === 'text');
     if (!textBlock) {
       return su.logAndErr('No text content returned from Claude.');
     }
-    const finalResult = structuredOutput
-      ? JSON.parse(textBlock.text)
-      : textBlock.text;
+
+    let finalResult;
+    if (structuredOutput) {
+        try {
+          finalResult = JSON.parse(textBlock.text);
+        } catch (e) {
+          console.error("Failed to parse JSON. String preview:", textBlock.text.slice(-100)); // See the end of the string
+          return su.logAndErr(`JSON Syntax Error at position ${e.message}`);
+        }
+      } else {
+        finalResult = textBlock.text;
+    }
 
     return su.Ok(finalResult);
   } catch (error) {

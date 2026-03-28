@@ -10,7 +10,12 @@ import { FrontendMessageFormat } from '../classes.js';
  */
 export async function callTaskApi(messages = [], jobId = null, settings = {}) {
 const domain = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
-const url = `${domain}/taskAgent`;
+let url = `${domain}/taskAgent`;
+if(settings?.agent == "Quick Agent"){
+  url = `${domain}/quickAsk`;
+} else {
+  url = `${domain}/taskAgent`;
+} 
 
   // Constructing the payload based on your FrontendMessageFormat class
   const payload = new FrontendMessageFormat({
@@ -21,7 +26,6 @@ const url = `${domain}/taskAgent`;
   try {
     // Make the call
     const response = await axios.post(url, { fmf: { ...payload } });
-    console.log("API Response:", response.data);
     return response.data;
   } catch (error) {
     console.error("API Error:", error.response?.data || error.message);

@@ -5,7 +5,7 @@ export const details = {
     toolName:   "createCodeTool",
     version:    "2026.0.1",
     creator:    "Botzy Bee",
-    overview:   "This tool uses AI to create, check or modify code."+
+    overview:   "This tool uses AI to create, check or modify code. It can also answer queries about coding or code."+
     " The Tool can output in a range of common code languages - for example HTML, Javascript, python, rust, CSS.  \n"+
     " Great for frontend or backend development. This tool DOES NOT execute code.",
     guide:      null,  

@@ -24,6 +24,7 @@ export class MessageLog {
         if (!(messageInstance instanceof BaseMessage)) {
             return Services.Utils.Err('Messages must be an instance of BaseMessage or a class that extends it.');
         }
+        this.#messageCount++;
         this.allMessages.push(messageInstance);
     }
 
@@ -86,7 +87,8 @@ export class MessageLog {
     }
 
     clearAllMessages() {
-        this.messages = [];
+        this.allMessages = [];
+        this.#messageCount = 0;
     }
 }
 

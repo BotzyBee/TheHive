@@ -184,6 +184,7 @@ function createChatStore() {
     }
 
     function reset() {
+        const state = get({ subscribe }); // Get current state without subscribing
         stopPolling();
         set({
             messageHistory: [],
@@ -193,7 +194,10 @@ function createChatStore() {
             errorMessage: '',
             latestJobRef: null,
             lastStatus: null,
-            aiSettings: {}
+            aiSettings: {
+                agent: state.aiSettings.agent || "Task Agent"
+            },
+            config: {}
         });
     }
 

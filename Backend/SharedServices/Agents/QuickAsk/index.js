@@ -5,6 +5,7 @@ import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParse
 import { callAgentTool } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles } from '../../Classes/index.js';
 import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
+import { Services } from '../../index.js';
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -21,7 +22,7 @@ export class QuickAskAgent extends AiJob {
 
   async run(){
     // Starting settings
-    if(this.startEpochMs == 0) this.setStartTime();
+    if(this.startEpochMs == 0) this.setStartTime(); 
     this.status.setInProgress();
     this.isRunning = true;
     
@@ -169,6 +170,10 @@ export class QuickAskAgent extends AiJob {
     this.setEndTime();
     this.setComplete();
     this.isRunning = false;
+    // Write output for debugging.
+    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
+    await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
     return Ok(this.taskOutput);
   }
 }

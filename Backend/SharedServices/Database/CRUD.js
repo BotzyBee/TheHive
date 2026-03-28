@@ -421,7 +421,7 @@ export async function getDirsAndFilesRecursive(dbAgent, Url) {
   // merge all
   directoryList = directoryList.concat(newDirList);
   // return results
-  return su.result_ok({ directoryList, fileList });
+  return su.Ok({ directoryList, fileList });
 }
 
 // [][] -- UPDATE -- [][]

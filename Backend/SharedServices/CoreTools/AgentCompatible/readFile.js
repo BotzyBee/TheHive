@@ -40,10 +40,9 @@ export async function run(
     if(filePath == null){
         return Shared.Utils.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
     }
-
-    const root = Shared.Utils.pathHelper.resolve(Shared.Constants.containerVolumeRoot);
-    const targetURL = Shared.Utils.pathHelper.resolve(root, filePath.trim());
-
+    const root = Shared.Constants.containerVolumeRoot; 
+    const targetURL = Shared.Utils.pathHelper.join(root, filePath.trim());
+    
 if (!targetURL.startsWith(root)) {
     return Shared.Utils.Err(`Error: Access denied. Path is outside of allowed directory.`);
 }

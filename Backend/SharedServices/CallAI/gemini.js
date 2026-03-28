@@ -40,7 +40,7 @@ export async function callGemini(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.code:
-      return su.Err('Error (callGemini) : Gemini does not have coding capability.');
+      return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.image:
       return await generateImage(contentMessage, model, options);

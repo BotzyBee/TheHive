@@ -182,6 +182,7 @@ Do NOT try to answer the query and do NOT add your own thoughts or comments to t
 In the value field you can include data directly or include a reference to the context data via a property access path.
 Any property access paths must be wrapped in {{ }} and have the type field set to 'ref'.
 Note use an array if you want to combine multiple property access paths - example: [{{ path.1 }}, {{ path.here }}, {{ another.path }}]
+When accessing an element in an array use bracket notation (data[0] NOT data.0 ). 
 
 Examples of how to use property access paths (if needed):
 context: { ACT_XXXX: { tool: "the tool used", action: "what the tool did.", data: { a: "some output data", b: false }} }
@@ -189,12 +190,14 @@ param output = [
     { key : 'key_from_schema' , type: 'ref', value: '{{ context.ACT_XXXX.data.b }}' },
     { key : 'key_from_schema2' , type: 'ref', value: '{{ context.ACT_XXXX.data.a }} can be combined in the output.' }
 ]`,
-    usr: (task, contextObject, toolSchema) => {
+    usr: (task, contextObject, toolSchema, toolGuide, errors) => {
         return `<task> ${task} </task>
 If there is any context to help you it will be here: <context> ${contextObject} </context>
 Here is the tool input parameters schema <tool>${toolSchema}</tool>
+Here is a guide on how to use the tool (may be empty if no guide provided): <guide> ${toolGuide} </guide>
 Remember you can use property access paths or direct responses when crafting the input params.
 Check you are providing params for all inputs specified in the schema - do not miss any that are required.
+If there are any errors from previous steps, they will be provided here: <errors> ${errors} </errors>
 Your output must be an array of { key: string, type: string, value: any } objects`;
     },
     schema: {
