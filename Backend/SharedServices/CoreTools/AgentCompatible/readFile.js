@@ -6,14 +6,16 @@ export const details = {
     version:    "2026.0.1",
     creator:    "Botzy Bee",
     overview:   "Reads a file on the host filesystem and returns the file contents. The tool can return base64 or utf-8 formats. \n"+
-                "The tool does not perform any other task. It cannot modify the contents - it is read-only.", 
+                "The tool does not perform any other task. It cannot modify the contents - it is read-only. \n"+
+                "You must know the file path in advance. If this is unknown, you can use the 'listFilesAndDirectories' tool to explore the filesystem and find the file path."+
+                " You must include the file name and extension in the file path.", 
     guide:      null,  
     inputSchema: {
         "description": "Input parameters schema for the readFile tool.",
         "type": "object",
         "properties": {
             "filePath": {
-                "description": "The URL path where the file is located.",
+                "description": "The URL path where the file is located. This must include the file name and extension. ",
                 "type": "string"
             }
         },
@@ -38,8 +40,13 @@ export async function run(
     if(filePath == null){
         return Shared.Utils.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
     }
-    const root = Shared.Constants.containerVolumeRoot;
-    const targetURL = Shared.Utils.pathHelper.join(root, filePath);
+    const root = Shared.Constants.containerVolumeRoot; 
+    const targetURL = Shared.Utils.pathHelper.join(root, filePath.trim());
+    
+if (!targetURL.startsWith(root)) {
+    return Shared.Utils.Err(`Error: Access denied. Path is outside of allowed directory.`);
+}
+
     // Get File data
     let fileInfo = Shared.FileSystem.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
     if(fileInfo.isErr()){
@@ -48,7 +55,7 @@ export async function run(
     // lookup correct read tool
     let fileSupported = false;
     let fileMethods = undefined;
-    for (const value of Services.FileSystem.MIME_MAP.values()) {
+    for (const value of Shared.FileSystem.MIME_MAP.values()) {
         if (value.extension === fileInfo.value.extension) {
             fileMethods = value;
             fileSupported = true;

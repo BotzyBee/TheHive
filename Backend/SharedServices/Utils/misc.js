@@ -7,10 +7,10 @@ let allLogs = []; // Holds all logs until written to file.
 const MAX_LOGS = 500;
 export function log(...input) {
   console.log(...input);
-  allLogs.push({
+  allLogs.push(JSON.stringify({
     timestamp: new Date().toISOString(),
     message: input,
-  });
+  }, null, 2));
   if (allLogs.length > MAX_LOGS) {
     allLogs.shift();
   }

@@ -2,7 +2,7 @@ import { AiJob } from "../SharedServices/Classes/index.js";
 import { Services } from "../SharedServices/index.js";
 import { useMultipleThreads } from "../SharedServices/constants.js";
 import { pool, processObjectToClass } from "./workers.js";
-import { FrontendMessageFormat } from "./classes.js";
+import { FrontendMessageFormat } from "../SharedServices/Classes/aiMessages.js";
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -133,10 +133,11 @@ class AI_JOB_MANAGER{
      * @param {string} [params.stopJob] - stops the specified job by id 
      * @param {string} [params.getJob] - returns the aiJob object matching the specified id
      * @param {AiJob} [params.replaceJob] - adds/ replaces any matching aiJobs 
+     * @param {boolean} [params.prune] - removes any completed jobs that are over 1hr old. 
      * @returns {Result}
      */
     jobListManager( params = {}) {
-        const { insertJob, deleteJob, stopJob, getJob, replaceJob } = params;
+        const { insertJob, deleteJob, stopJob, getJob, replaceJob, prune } = params;
         this.AI_JOBS
         // INSERT
         if (insertJob) {
@@ -183,6 +184,19 @@ class AI_JOB_MANAGER{
             }
             return Services.Utils.Ok(`ID ${replaceJob.id} has been replaced/added`);
         }
+
+        // PRUNE - removes any completed jobs that are over 1hr old. Called on each getUpdateOrResult call to keep list clean.
+        if(prune){
+            const oneHourAgo = Date.now() - (60 * 60 * 1000);
+            this.AI_JOBS = this.AI_JOBS.filter(
+                job => {
+                if(job.status == Services.Classes.Status.Complete && job.endEpochMs < oneHourAgo){
+                    Services.Utils.log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
+                    return false; // Remove from list
+                }
+                return true; // Keep in list
+            });
+        }
         return Services.Utils.Err("Error (jobListManager): No valid operation provided.");
     }
 
@@ -199,21 +213,16 @@ class AI_JOB_MANAGER{
         if(data.isErr()){
           return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
         }
-        let msg = new FrontendMessageFormat({ aiJobId: jobID, status: data.value.status });
-        if(data.value.isRunning == true){
-            return Services.Utils.Ok(msg);
-        }
-        if(data.value.isRunning == false){
-            let opLen = data.value.taskOutput.length || 0;
-            if( opLen != 0){
-                msg.addMessages(data.value.taskOutput);
-            }
-        }
+        let msg = new FrontendMessageFormat({ 
+            aiJobId: jobID, 
+            status: data.value.status, 
+            isRunning: data.value.isRunning,
+            messages: data.value.taskOutput, 
+            metadata: data.value.stats
+            });
+
         return Services.Utils.Ok(msg);
     }
-
-    // HANDLE MESSAGE TO AGENT
-    // Inject Message, push id to unalloc -> picked up by allocator? 
 
     isAllocatorActive(){
         return this.#allocatingJobs;

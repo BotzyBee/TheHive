@@ -1,10 +1,11 @@
-import { AiJob } from '../../Classes/aiJob.js';
 import { Ok, Err } from '../../Utils/helperFunctions.js';
-import { getToolsForTask, getToolDetails } from '../../Database/helpers.js';
+import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
 import { callAgentTool } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles } from '../../Classes/index.js';
 import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
+import { Services } from '../../index.js';
+import { AiJob } from '../../Classes/aiJob.js';
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -21,7 +22,7 @@ export class QuickAskAgent extends AiJob {
 
   async run(){
     // Starting settings
-    if(this.startEpochMs == 0) this.setStartTime();
+    if(this.startEpochMs == 0) this.setStartTime(); 
     this.status.setInProgress();
     this.isRunning = true;
     
@@ -32,16 +33,21 @@ export class QuickAskAgent extends AiJob {
         PromptsAndSchemas.newTask.usr(this.messageHistory.getSimpleUserAgentComms()),
         {...this.aiSettings }
       ); // @returns - Result(string)
-      if(taskCall.isErr()){ return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
+      if(taskCall.isErr()){
+        this.setFailed();
+        this.isRunning = false; 
+        return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
       this.task = taskCall.value;
+       this.addAiCount(1);
     }
 
     // Get tool list
-    let tools = await getToolsForTask(this.task, 7);
+    this.status.setCustomStatus('Determining best tool to use for the task...');
+    let tools = await getToolsOrGuidesForTask(this.task, 7, true);
     if(tools.isErr()){ 
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> getToolsForTask) : ${tools.value}`) 
+      return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`) 
     }
 
     // Make call to determine the tool to use. 
@@ -51,7 +57,8 @@ export class QuickAskAgent extends AiJob {
       { ...this.aiSettings, structuredOutput: PromptsAndSchemas.routingCall.schema } 
     ); 
     // @returns {Result(object)} - Result ({ nextAction: "no-suitable-tool" | "clarify-task" | "use-tool", toolName: "", message: "" })
-    
+    this.addAiCount(1);
+
     if(routingCall.isErr()) {
       this.setFailed();
       this.isRunning = false;
@@ -76,19 +83,25 @@ export class QuickAskAgent extends AiJob {
     // Get tool details
     let toolDetails = await getToolDetails(routingCall.value.toolName);
     if(toolDetails.isErr()){
+      this.setFailed();
+      this.isRunning = false;
       return Err(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`)
     };
      
     // Craft input params;
+    this.status.setCustomStatus('Crafting input parameters...');
     let paramsCall = await this.aiCall.generateText(
       parserPrompts.craftParams.sys,
       parserPrompts.craftParams.usr(
         this.task, 
         this.getAllContextSummaryString(),
-        JSON.stringify(toolDetails.value.details.inputSchema) 
+        JSON.stringify(toolDetails.value.details.inputSchema),
+        toolDetails.value.details.guide || "no guide provided"
       ),
       { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema } 
     ); 
+    this.addAiCount(1);
+
     // @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] } 
     if(paramsCall.isErr()) {
       this.setFailed();
@@ -107,6 +120,7 @@ export class QuickAskAgent extends AiJob {
 
     // Call Tool
     console.log(`Calling ${toolDetails.value.details.toolName} ...`);
+    this.status.setCustomStatus(`Calling ${toolDetails.value.details.toolName} ...`);
     let toolCall = await callAgentTool(
       toolDetails.value.details.toolName,
       toolDetails.value.filePath,
@@ -117,15 +131,19 @@ export class QuickAskAgent extends AiJob {
       this.isRunning = false;
       return Err(`Error (Quick Task Agent -> startTask -> toolCall ) : ${toolCall.value}`);    
     }
+    this.addToolCount(1);
 
     // Process messages from tool call
+    this.status.setCustomStatus(`Processing output to context...`);
     let newMessageLen = toolCall.value?.length ?? 0;
     for(let i=0; i<newMessageLen; i++){
       // Shorten & add to context
       if(toolCall.value[i].role === Roles.Tool){
         console.log("Processing Tool Message... ");
-        let processed = await processMessageForContext(toolCall.value[i], 500, this.aiSettings );
+        let processed = await processMessageForContext(toolCall.value[i], 500, this.aiSettings, this );
         if(processed.isErr()){
+          this.setFailed();
+          this.isRunning = false;
           return Err(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);   
         }
         // Add data to tool context;
@@ -140,6 +158,7 @@ export class QuickAskAgent extends AiJob {
     }
     
     // Finalise output
+    this.status.setCustomStatus('Task Completed - Finalising Output...');
     let formattedOP = await finialiseOutput(this, 'UserFiles/QuickAskOutputs');
     if( formattedOP.isErr()){
       this.setFailed();
@@ -151,6 +170,10 @@ export class QuickAskAgent extends AiJob {
     this.setEndTime();
     this.setComplete();
     this.isRunning = false;
+    // Write output for debugging.
+    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
+    await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
     return Ok(this.taskOutput);
   }
 }

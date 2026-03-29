@@ -25,3 +25,18 @@ export function generateShortID(prefix) {
     return v.toString(16);
   });
 }
+
+/**
+ * Generate a simple random reference string of specified length.
+ * @param {number} length - length of the random hex string
+ * @returns {string} - example output Action-xxxx
+ */
+export function generateSimpleRef(length = 4) {
+  // Create a string of asterisks based on the desired length
+  const mask = '*'.repeat(length);
+  const randomPart = mask.replace(/[*]/g, () => {
+    const r = (Math.random() * 16) | 0;
+    return r.toString(16);
+  });
+  return randomPart;
+}

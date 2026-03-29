@@ -24,6 +24,7 @@ export class MessageLog {
         if (!(messageInstance instanceof BaseMessage)) {
             return Services.Utils.Err('Messages must be an instance of BaseMessage or a class that extends it.');
         }
+        this.#messageCount++;
         this.allMessages.push(messageInstance);
     }
 
@@ -86,7 +87,8 @@ export class MessageLog {
     }
 
     clearAllMessages() {
-        this.messages = [];
+        this.allMessages = [];
+        this.#messageCount = 0;
     }
 }
 
@@ -189,4 +191,41 @@ export class DataMessage extends BaseMessage {
     this.toolName = toolName;
     this.instructions = instructions;
   }
+}
+
+
+// For passing messages between Backend <> Frontend
+/**
+ * constructor { aiJobId, aiSettings }
+ * Data - this.messages, this.aiJobId, this.aiSettings
+ */
+export class FrontendMessageFormat{
+ constructor({ aiJobId, aiSettings, status, isRunning, metadata, messages } = {}) {
+    this.aiJobId = aiJobId || null;
+    this.isRunning = isRunning ?? null;
+    this.metadata = metadata || {};
+    this.status = status || null;
+    this.aiSettings = aiSettings || {};
+    this.messages = messages || [];
+  }
+
+  clearMessages(){
+    this.messages = [];
+    return this;
+  }
+
+  /**
+   * Adds one or more messages to the Frontend Message Class.
+   * @param {array<BaseMessage>} messageArray - Array of BaseMessage class or any class that extends it.
+   */
+  addMessages(messageArray){
+    if(Array.isArray(messageArray)){
+      messageArray.forEach((msg) => {
+        if(msg instanceof BaseMessage){
+          this.messages.push(msg);
+        }
+      })
+    }
+  }
+
 }

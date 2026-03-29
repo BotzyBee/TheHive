@@ -2,6 +2,7 @@ import { Services } from "../index.js";
 import { saveFile } from "../FileSystem/index.js";
 import { MIME_MAP } from "../FileSystem/supportedFiles.js";
 import path from 'path';
+import { typeOf } from "mathjs";
 
 /**
  * 
@@ -19,7 +20,7 @@ export async function callAgentTool(toolName, filePath, params){
         return Services.CoreTools.AgentCompatible[toolName].run(Services, params); // tools must return Ok/ Err.
     } else {
         // plug-in tool
-        let readFile = await import(filePath);
+        let readFile = await import(/* @vite-ignore */ filePath);
         if(readFile){
             return readFile.run(Services, params);
         } else {
@@ -36,6 +37,9 @@ export async function callAgentTool(toolName, filePath, params){
  * @returns {Promise<Result>}
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
+  if(!message || !folderPath){
+    return Services.Utils.Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
+  }
   try {
     let contentToSave;
     // Resolve Extension and Config
@@ -82,7 +86,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
         contentToSave = message.toJSON();
         return await saveFile(targetDirectoryInContainer, contentToSave, `${message.id}.json`);
     }
-
+    await saveFile(targetDirectoryInContainer, `Contenxt to save ${message}`, finalFileName, options);
     if (!contentToSave) {
         return Services.Utils.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
     }

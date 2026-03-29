@@ -3,7 +3,7 @@
 */
 export const details = {
     toolName:   "aiWebSearch",
-    version:    "2026.0.1",
+    version:    "2026.0.3",
     creator:    "Botzy Bee",
     overview:   "Use AI to search the internet for information - either a specific website or a general web-search. "+
     "This tool simply returns the search results. It does not format or extract data from these results. "
@@ -45,7 +45,7 @@ export async function run(
     params = {}
 ){  
     // Destructure input
-    const { taskDescription, referenceText, targetURL } = params;
+    let { taskDescription, referenceText, targetURL } = params;
     // Catch bad params
     if( taskDescription == null ){
         return Shared.Utils.logAndErr(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);
@@ -76,15 +76,57 @@ export async function run(
     let res = await Promise.all(allCalls);
     if (res[0].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
     if (res[1].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
-    let combined = { result: `Gemini_Result : ${res[0].value} `+
-        `Perplexity Result : ${res[1].value.searchResult}`, sources: res[1].value.citations };
+    
+    const GemiProcessed = transformReferences(Shared, res[0].value.text, res[0].value.references);
+    const PxltyProcessed = transformReferences(Shared, res[1].value.searchResult, res[1].value.citations);
+    const mergedRefs = [...GemiProcessed.references, ...PxltyProcessed.references];
+    
+    let combined = { result: `Gemini_Result - ${GemiProcessed.text} `+
+        `Perplexity Result - ${PxltyProcessed.text}`, sources: mergedRefs };
 
-    let message = new Shared.Classes.TextMessage({
+    let message = new Shared.Classes.DataMessage({
         role: Shared.Classes.Roles.Tool, 
-        mimeType: "text/plain", 
-        textData: combined,
+        data: combined,
         toolName: "aiWebSearch",
         instructions: taskDescription
     });
     return Shared.Utils.Ok([message]);
+}
+
+/**
+ * Transforms index-based references [n] into unique string references.
+ * @param {object} Shared - Shared utilities and constants.
+ * @param {string} inputText - The text containing [0], [1], etc.
+ * @param {string[]} linksArray - Array of URL strings.
+ * @returns {object} { text: string, references: object[] }
+ */
+function transformReferences(Shared, inputText, linksArray) {
+  // Map the original URLs to their new unique reference IDs
+  // We do this first so we have a lookup table for the text replacement
+  const updatedReferences = linksArray.map((url) => {
+    return {
+      ref: Shared.Utils.generateSimpleRef(4),
+      url: url
+    };
+  });
+
+  // Use regex to find all [number] patterns in the text
+  // \d+ matches one or more digits inside literal square brackets
+  const updatedText = inputText.replace(/\[(\d+)\]/g, (match, index) => {
+    const num = parseInt(index, 10);
+
+    // Check if the index exists in our new reference array
+    if (updatedReferences[num]) {
+      return `[${updatedReferences[num].ref}]`;
+    }
+
+    // If the number in the bracket doesn't have a corresponding link, 
+    // we return the original match to avoid breaking the text.
+    return match;
+  });
+
+  return {
+    text: updatedText,
+    references: updatedReferences
+  };
 }

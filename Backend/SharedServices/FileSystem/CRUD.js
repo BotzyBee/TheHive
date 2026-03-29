@@ -67,11 +67,12 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
 export async function readFileContent(filePath, asBuffer = false, options) {
+  if(!filePath) return su.Err(`Error (readFileContent) : No file path provided.`)
   const stats = await fsp.lstat(filePath);
   if (!stats.isFile()) {
     return su.Err(`Error: Path is not a file: ${filePath}`);
   }
-  const encoding = options.encoding || 'utf8';
+  const encoding = options?.encoding || 'utf8';
   try {
     if (asBuffer) {
       // Read as a binary Buffer
@@ -97,12 +98,14 @@ export async function readFileContent(filePath, asBuffer = false, options) {
 export async function getUpdateStatsFromUrl(url) {
   url = decodeURIComponent(url); // handle encoded URLS
   try {
-    let data = fs.statSync(url);
-    // round Millis -
-    data.atimeMs = Math.round(data.atimeMs);
-    data.mtimeMs = Math.round(data.mtimeMs);
-    data.ctimeMs = Math.round(data.ctimeMs);
-    data.birthtimeMs = Math.round(data.birthtimeMs);
+    const stats = await fsp.lstat(url);
+    const data = {
+      ...stats,
+      atimeMs: Math.round(stats.atimeMs),//The last time the file was accessed.
+      mtimeMs: Math.round(stats.mtimeMs),//The last time the file's data was modified.
+      ctimeMs: Math.round(stats.ctimeMs),//The last time the file's status was changed (e.g., permissions, ownership).
+      birthtimeMs: Math.round(stats.birthtimeMs),//The timestamp of when the file was created
+    };
     return su.Ok(data);
   } catch (error) {
     return su.Err(error);
@@ -191,22 +194,28 @@ export function getFileExtension(filename) {
  */
 export function getFileExtensionAndSize(filePath) {
   try {
-    // Get file statistics, which includes the file size
+    // 1. Check if it exists at all before stating
+    if (!fs.existsSync(filePath)) {
+        return su.Err(`File does not exist at path: ${filePath}`);
+    }
+
     const stats = fs.statSync(filePath);
-    // Get the file size in bytes
+    
+    if (!stats.isFile()) {
+        return su.Err(`Target is a directory, not a file: ${filePath}`);
+    }
+
     const sizeBytes = stats.size;
-    // path.extname returns '.ext', so we remove the leading dot
-    const extension = path.extname(filePath).toLowerCase().substring(1);
-    // Format the file size for better readability
-    const sizeFormatted = su.formatBytes(sizeBytes);
-    // Return result
+    const ext = path.extname(filePath);
+    const extension = ext ? ext.toLowerCase().substring(1) : ''; // Empty string for no extension
+    
     return su.Ok({
       extension: extension,
       sizeBytes: sizeBytes,
-      sizeFormatted: sizeFormatted,
+      sizeFormatted: su.formatBytes(sizeBytes),
     });
   } catch (error) {
-    return su.Err(`Error (getFileExtensionAndSize) : ${error}`);
+    return su.Err(`OS Error accessing file: ${error.message}`);
   }
 }
 

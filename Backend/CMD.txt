@@ -34,3 +34,10 @@ sudo docker-compose up
 // Prune 
 docker builder prune -a
 docker volume prune -a
+
+// FRONTEND
+npm run dev  (starts the svelte dev server)
+npm run build (builds the svelte app)
+npm run tauri  (gives a list of tauri commands)
+npm run tauri dev (starts the tauri dev server)
+npm run tauri build (builds the tauri app)

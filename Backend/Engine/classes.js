@@ -191,38 +191,5 @@ export class indexJob {
   }
 }
 
-// For passing messages between Backend <> Frontend
-/**
- * constructor { aiJobId, aiSettings }
- * Data - this.messages, this.aiJobId, this.aiSettings
- */
-export class FrontendMessageFormat{
- constructor({ aiJobId, aiSettings, status } = {}) {
-    this.aiJobId = aiJobId || null;
-    this.status = status || null;
-    this.aiSettings = aiSettings || {};
-    this.messages = [];
-  }
-
-  clearMessages(){
-    this.messages = [];
-    return this;
-  }
-
-  /**
-   * Adds one or more messages to the Frontend Message Class.
-   * @param {array<BaseMessage>} messageArray - Array of BaseMessage class or any class that extends it.
-   */
-  addMessages(messageArray){
-    if(Array.isArray(messageArray)){
-      messageArray.forEach((msg) => {
-        if(msg instanceof Services.Classes.BaseMessage){
-          this.messages.push(msg);
-        }
-      })
-    }
-  }
-
-}
 
 

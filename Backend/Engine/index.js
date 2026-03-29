@@ -4,12 +4,14 @@ import * as KbIndex from './buildKbIndex.js';
 import * as ToolIndex from './toolIndex.js';
 import * as Workers from './workers.js';
 import * as Routes from './routes/index.js';
+import * as GuideIndex from './guideIndex.js';
 
 export const EngineTools = {
     EngineClasses,
     JobManager,
     KbIndex,
     ToolIndex,
+    GuideIndex,
     Workers,
     Routes
 };

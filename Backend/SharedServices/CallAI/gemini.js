@@ -40,7 +40,7 @@ export async function callGemini(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.code:
-      return su.Err('Error (callGemini) : Gemini does not have coding capability.');
+      return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.image:
       return await generateImage(contentMessage, model, options);
@@ -74,6 +74,54 @@ export async function callGemini(
   }
 }
 
+function processGrounding(apiResponse) {
+  const candidate = apiResponse.candidates[0];
+  let fullText = candidate.content.parts[0].text;
+  const supports = candidate.groundingMetadata.groundingSupports;
+  const chunks = candidate.groundingMetadata.groundingChunks;
+
+  const usedReferences = [];
+  const indexMap = new Map(); // Maps original API index -> new sequential index
+
+  // Determine the order of appearance and create new indices
+  // We sort ascending to see what appears first in the text
+  const appearanceOrder = [...supports].sort((a, b) => a.segment.startIndex - b.segment.startIndex);
+
+  appearanceOrder.forEach((support) => {
+    const originalIndex = support.groundingChunkIndices[0];
+    
+    if (!indexMap.has(originalIndex)) {
+      // If we haven't seen this source yet, assign it the next available number
+      const newIndex = usedReferences.length;
+      indexMap.set(originalIndex, newIndex);
+      
+      // Output the reference info for this chunk
+      const chunk = chunks[originalIndex].web;
+      usedReferences.push(chunk.uri);
+    }
+  });
+
+  // 2. Insert the new numbers into the text
+  // We sort descending to insert from back-to-front (prevents index shifting)
+  const insertionOrder = [...supports].sort((a, b) => b.segment.startIndex - a.segment.startIndex);
+
+  insertionOrder.forEach((support) => {
+    const { endIndex } = support.segment;
+    const originalIndex = support.groundingChunkIndices[0];
+    const newIndex = indexMap.get(originalIndex);
+    
+    const refLabel = `[${newIndex}]`;
+    fullText = fullText.slice(0, endIndex) + refLabel + fullText.slice(endIndex);
+  });
+
+  return {
+    text: fullText,
+    references: usedReferences
+  };
+}
+
+
+
 // Generate Text 
 /**
  * Uses Gemini to generate text
@@ -85,7 +133,7 @@ export async function callGemini(
  * @param {object}  [options.structuredOutput] - a JSON schema for structured outputs, optional.
  * @returns {Result} - Result( [ TextMessage, ...] )
  */
-async function generateText(
+export async function generateText(
   systemMessage,
   contentMessage,
   model,
@@ -114,11 +162,11 @@ async function generateText(
           systemInstruction: systemMessage,
         },
       });
-      
+
       // Second call: Format grounded info into JSON schema
       const secondResponse = await ai.models.generateContent({
         model: model,
-        contents: [firstResponse.text],
+        contents: [firstResponse],
         config: {
           responseMimeType: 'application/json',
           responseSchema: schemaWithStrictness,
@@ -156,7 +204,13 @@ async function generateText(
       ? JSON.parse(response.text)
       : response.text;
 
-    return su.Ok(finalResult);
+    let groundedResponse = finalResult;
+    if(useWeb){
+      let grd = processGrounding(response);
+      groundedResponse = grd; // {text: "The response with [0][1] etc for grounded refs", references: [urls,..] }
+    }
+
+    return su.Ok(groundedResponse);
   } catch (error) {
     return su.logAndErr(`Error (callGemini -> generateText): ${error}`);
   }

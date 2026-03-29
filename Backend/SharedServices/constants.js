@@ -11,11 +11,11 @@ import { callPerplexity } from './CallAI/perplexity.js';
 
 // 1. CALL AI CONSTANTS
 export const AiProviders = Object.freeze({
-  openAI: 'openAI',
-  gemini: 'gemini',
-  anthropic: 'anthropic',
-  perplexity: 'perplexity',
-  inception: 'inception'
+  openAI: 'OpenAI',
+  gemini: 'Gemini',
+  anthropic: 'Anthropic',
+  perplexity: 'Perplexity',
+  inception: 'Inception'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <- Default AI provider
 export const AiQuality = Object.freeze({
@@ -55,6 +55,28 @@ export const MODEL_REGISTRY = [
     maxContext: 400000,
     quality: AiQuality.Base,
   },
+    {
+    model: 'gpt-5.4',
+    provider: AiProviders.openAI,
+    capabilities: [
+      ModelTypes.text,
+      ModelTypes.structuredOutputs,
+      ModelTypes.websearch,
+    ],
+    maxContext: 1050000,
+    quality: AiQuality.Pro,
+  },
+      {
+    model: 'gpt-5.4-mini',
+    provider: AiProviders.openAI,
+    capabilities: [
+      ModelTypes.text,
+      ModelTypes.structuredOutputs,
+      ModelTypes.websearch,
+    ],
+    maxContext: 400000,
+    quality: AiQuality.Advanced,
+  },
   {
     model: 'text-embedding-3-small',
     provider: AiProviders.openAI,
@@ -87,7 +109,7 @@ export const MODEL_REGISTRY = [
     quality: AiQuality.Advanced,
   },
   {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3.1-pro-preview',
     provider: AiProviders.gemini,
     capabilities: [
       ModelTypes.text,
@@ -95,6 +117,7 @@ export const MODEL_REGISTRY = [
       ModelTypes.websearch,
       ModelTypes.maps,
       ModelTypes.reasoning,
+      ModelTypes.code
     ],
     maxContext: 1048576,
     quality: AiQuality.Pro,
@@ -163,7 +186,8 @@ export const MODEL_REGISTRY = [
     model: 'gpt-5.1-codex-mini',
     provider: AiProviders.openAI,
     capabilities: [
-      ModelTypes.code
+      ModelTypes.code,
+      ModelTypes.structuredOutputs,
     ],
     maxContext: 400000,
     quality: AiQuality.Base,
@@ -172,7 +196,8 @@ export const MODEL_REGISTRY = [
     model: 'gpt-5.3-codex',
     provider: AiProviders.openAI,
     capabilities: [
-      ModelTypes.code
+      ModelTypes.code,
+      ModelTypes.structuredOutputs,
     ],
     maxContext: 400000,
     quality: AiQuality.Pro,
@@ -199,6 +224,7 @@ export const fileTableName = 'Files';
 export const mgmtTableName = 'mgmtData';
 export const vectorTableName = 'FileVectors';
 export const toolTableName = 'ToolVectors';
+export const guideTableName = 'GuideVectors';
 export const vectorEmbedSize = 1024;
 
 // "http://indexdb:8000/rpc"; (live-inter-container) | "http://127.0.0.1:8000/rpc" (testing from CLI)

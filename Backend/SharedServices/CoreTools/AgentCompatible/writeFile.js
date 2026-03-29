@@ -61,25 +61,32 @@ export async function run(
 
     // Resolve Extension and Config
     let fileInfo = Shared.FileSystem.MIME_MAP.get(mimeType);
-    if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8' };
+    if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8', writeFN: null };
     const finalFileName = fileName 
       ? `${fileName}.${fileInfo.extension}` 
       : `Undefined.${fileInfo.extension}`;
-    let options = { encoding: fileInfo.encoding };
 
     // this is set in docker-compose.yml and maps to the UserFiles folder on the host machine
     const containerVolumeRoot = Shared.Constants.containerVolumeRoot; 
     //Construct the full path and save the content
     const targetDirectoryInContainer = Shared.Utils.pathHelper.join(containerVolumeRoot, relativeFolderPath);
-    let call = await Shared.FileSystem.saveFile(targetDirectoryInContainer, fileContent, finalFileName, options);
-    if (call.isErr()){ return Shared.Utils.Err(`Error (writeFile -> saveFile) : ${call.value}`)}
+    if(fileInfo.writeFN != null){
+        let call = await fileInfo.writeFN({
+            relativeFolderPath: targetDirectoryInContainer, 
+            fileContent, 
+            fileNameIncExt: finalFileName
+        });
+        if (call?.outcome == "Error"){ return Shared.Utils.Err(`Error (writeFile -> saveFile) : ${call.value}`)}
 
-    let message = new Shared.Classes.TextMessage({
-        role: Shared.Classes.Roles.Tool, 
-        mimeType: "text/plain", 
-        textData: `File created in ${relativeFolderPath} with filename ${finalFileName} - using the data provided. Mark task as complete!`,
-        toolName: "writeFile",
-        instructions: `Write content to file`
-    });
-    return Shared.Utils.Ok([message]);
+        let message = new Shared.Classes.TextMessage({
+            role: Shared.Classes.Roles.Tool, 
+            mimeType: "text/plain", 
+            textData: `File created in ${relativeFolderPath} with filename ${finalFileName} - using the data provided. Mark task as complete!`,
+            toolName: "writeFile",
+            instructions: `Write content to file`
+        });
+        return Shared.Utils.Ok([message]);
+    } else {
+        return Shared.Utils.Err(`Error (writeFile) : No function for saving ${mimeType} files. Sorry!`)
+    }
 }

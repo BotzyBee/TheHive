@@ -8,8 +8,9 @@ import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
 import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
-import { getToolDetails } from './SharedServices/Database/index.js';
+import { getConfigForFrontend } from './Engine/routes/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
+import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
@@ -33,6 +34,7 @@ const initServices = async () => {
     // Setup Piscina Pool
     setupPool();
     // Load Tools
+    console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
     Services.Utils.log("Loading Tools...");
     let tools = await initToolIndex();
     if(tools.isErr()){
@@ -40,10 +42,23 @@ const initServices = async () => {
       process.exit(1);
     }
     Services.Utils.log(`${tools.value.tools} Tools loaded. \n`+
-      `${tools.value.added} are new. \n`+
-      `${tools.value.updated} were updated \n`+
-      `${tools.value.removed} were removed.`)
-    
+      `${tools.value.added} new. \n`+
+      `${tools.value.updated} updated \n`+
+      `${tools.value.removed} removed.`)
+
+    // Load Guides
+    console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
+    Services.Utils.log("Loading Guides...");
+    let guides = await initGuideIndex();
+    if(guides.isErr()){
+      Services.Utils.log(`Error (initServices -> initGuideIndex ) : ${guides.value}`);
+      process.exit(1);
+    }
+    Services.Utils.log(`${guides.value.guides} Guides loaded. \n`+
+      `${guides.value.added} new. \n`+
+      `${guides.value.updated} updated \n`+
+      `${guides.value.removed} removed.`)
+
       //Knowledgebase re-indexing timer (every 60 seconds)
     Services.CoreTools.Timers.addNewTimer(
       'KB_Indexing_Timer',
@@ -62,6 +77,16 @@ const initServices = async () => {
             await JOBS.checkNonAllocated();
         }
     }, 5000);
+
+    // Prune completed jobs every 10 mins
+    Services.CoreTools.Timers.addNewTimer("Prune_Completed_Jobs", async () => {
+      await JOBS.jobListManager({ prune: true });
+    }, 600000);
+
+    // Write logs to file every 2 mins
+    Services.CoreTools.Timers.addNewTimer("Write_Logs_To_File", async () => {
+      await writeLogsToFile();
+    }, 120000);
     servicesStarted = true;
   }
 };
@@ -119,14 +144,49 @@ app.get("/getUpdate", async (req, res) => {
   res.status(200).json(msg.value);
 });
 
-// Test Endpoint: for testing 
-app.get('/test', async (req, res) => {
-  let tsk = req?.query?.tool;
-  let x = await getToolDetails(tsk);
-  //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
-  //console.log(x);
-  res.status(200).json({result: x });
+// ALL - Get Update or Result
+app.get("/stopJob", async (req, res) => {
+  const jobID = req.query?.jobID || null;
+  if(jobID == null ){ 
+    return res.status(400).json({
+        error: `Error : JobID parameter is missing or null!`
+    });
+  }
+  let msg = await JOBS.jobListManager({stopJob: jobID});
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  // format as Frontend Message Format. 
+  let rtnMsg = new Services.Classes.FrontendMessageFormat({
+    aiJobId: jobID,
+    status: Services.Classes.Status.Stopped,
+    isRunning: false,
+    messages: [ new Services.Classes.TextMessage(
+      { role: Services.Classes.Roles.Agent, 
+        textData: `Job ${jobID} has been stopped.` })
+      ],
+    metadata: {}
+  });
+  res.status(200).json(rtnMsg);
 });
+
+app.get("/getConfig", async (req, res) => {
+  let msg = getConfigForFrontend();
+  res.status(200).json(msg);
+});
+
+// app.get("/test", async (req, res) => {
+//   let msg = await initGuideIndex();
+//   res.status(200).json(msg.value);
+// });
+
+
+// Test Endpoint 
+// app.get('/test', async (req, res) => {
+//   let tsk = req?.query?.tool;
+//   let x = await getToolDetails(tsk);
+//   //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
+//   //console.log(x);
+//   res.status(200).json({result: x });
+// });
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

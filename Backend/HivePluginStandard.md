@@ -1,28 +1,101 @@
-## TheHive - Plugin Tool Standard
-ALL Agent Compatable tools MUST adhere to the following to ensure compatability
+# 🐝 TheHive – Plugin Tool Standard (v2026)
 
-1. Tools must expose the following methods
+All **agent-compatible tools** must adhere to the following specification to ensure interoperability and reliability across the system. 
 
-```
-export details = {
-    toolName:   "theNameOfYourTool", // must be unique!
-    version:    "",
-    creator:    "",
-    overview:   "A clear overview of what the tool does and doesn't do" 
-    +"This is used by AI agents to determin if your tool should be used to complete a task." 
-    +"It should be clear and consise.", 
-    guide:      null | "Optional - more detailed instructions for the agent to follow.",
-    schema: {} // JSON schema detailing the input parameters for the tool  
+---
+
+## 1. Required Tool Interface: The `details` Export
+
+Each tool **must** export a `details` object. This object acts as the "manifest" that the AI uses to understand when and how to call your tool.
+
+### Property Breakdown
+* **`toolName` (String):** Must be a unique, camelCase identifier (e.g., `calculateInvoiceTotal`).
+* **`version` (String):** Semantic versioning (e.g., `1.0.0`).
+* **`creator` (String):** Your identifier or name.
+* **`overview` (String):** A clear, concise description. **Crucial:** Define what the tool *does* and its *limitations* (what it cannot do) to prevent AI hallucinations.
+* **`guide` (String | null):** Optional. Specific instructions or "Chain of Thought" hints for the AI to follow when using the results.
+* **`inputSchema` (Stringified JSON):** * **Requirement:** This must be a **String**, not a raw JavaScript object. 
+    * **Format:** Use `JSON.stringify({...})`. 
+    * **Purpose:** This allows the system to validate inputs strictly against standard JSON Schema definitions before the tool even runs.
+
+---
+
+## 2. The `run` Function Logic
+
+The core logic must be an exported `async` function.
+
+### Arguments
+* **`Shared`:** An object providing system-wide services:
+    * `Shared.Classes.DataMessage`: Constructor for the tool's response.
+    * `Shared.Classes.Roles`: Enum for message types (e.g., `Tool`).
+    * `Shared.Utils.Ok()`: Success wrapper.
+    * `Shared.Utils.Err()`: Failure wrapper.
+* **`params`:** An object containing the arguments extracted from the AI's prompt based on your `inputSchema`.
+
+### Return Value
+The function must return a `Shared.Utils` wrapper:
+* **Success:** `return Shared.Utils.Ok([DataMessage])` (The result must be an array of messages).
+* **Failure:** `return Shared.Utils.Err("Descriptive error message")`.
+
+---
+
+## 3. Standard Boilerplate Template
+
+Use the following template to start building a new tool.
+
+```javascript
+/**
+ * 🐝 TheHive Plugin Tool Standard - Boilerplate
+ */
+
+export const details = {
+    toolName: "myCustomTool",
+    version: "1.0.0",
+    creator: "YourName",
+    overview: "Describe exactly what this tool does. Mention limitations here.",
+    guide: null, 
+    // IMPORTANT: inputSchema must be a stringified JSON object
+    inputSchema: JSON.stringify({
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search term or query string"
+            }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+    })
+};
+
+/**
+ * @param {object} Shared - Core Hive services
+ * @param {object} params - Inputs defined in inputSchema
+ */
+export async function run(Shared, params = {}) {
+    const { query } = params;
+
+    try {
+        // 1. Tool Logic Here
+        const resultData = {
+            success: true,
+            processed: query.toUpperCase(),
+            timestamp: new Date().toISOString()
+        };
+
+        // 2. Construct the DataMessage
+        const message = new Shared.Classes.DataMessage({
+            role: Shared.Classes.Roles.Tool,
+            data: resultData,
+            toolName: details.toolName,
+            instructions: "Summarize the processed data for the user."
+        });
+
+        // 3. Return as a successful result array
+        return Shared.Utils.Ok([message]);
+
+    } catch (error) {
+        // Return structured error
+        return Shared.Utils.Err(`Error in ${details.toolName}: ${error.message}`);
+    }
 }
-
-export async function run( 
-    Shared, 
-    params = {}
-){ }
-```
-
-When called, Shared Services will be injected into Shared allowing you to utilise the core classes and functions. Any params expected should match the schema. 
-
-2. All tools must return a Result Type. Any return data MUST be array containing one or more Message Types [TextMessage | ImageMessage | AudioMessage | DataMessage] - as defined in SharedServices/Classes/aiMessages.js or a string in the case of an error. Any message coming from a tool MUST have role = Roles.Tool (Roles object is also defined in aiMessages.js)
-
-Result type can be found in SharedServices/Classes/result.js . A helper functions have been created in Utils/helperFunctions.js - these allow quick use of Result type. For example return Shared.Utils.Ok(YourData) or return Shared.Utils.Err(YourError); 

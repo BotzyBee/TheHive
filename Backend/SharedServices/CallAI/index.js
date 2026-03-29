@@ -7,7 +7,6 @@ import {
   PROVIDER_DISPATCH,
   DEFAULT_PROVIDER,
 } from '../constants.js';
-
 /*
 Function flow for AiCall
 AiCall Method -> EstimateTokens -> dispatch -> resolveModel -> ProviderFunctions -> AI PROVIDER
@@ -56,7 +55,6 @@ export class AiCall {
       contentMessage,
       options
     );
-    ;
   }
 
   /** Generate Text using web search grounding

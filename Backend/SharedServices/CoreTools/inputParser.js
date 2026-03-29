@@ -16,26 +16,37 @@ nunEnv.addFilter('tojson', function(obj, spaces) {
 });
 
 /**
- * Used for crafting input parameters for AI calls. 
- * @param {array(objects)} templateArray - Example input [ { key: 'str', type: 'string', value: '<<valStr>>' }, ... ]
- * @param {object} dataObject -  The data that will be injected to the object - Eg { valStr: "ABC" }
- * @returns { Result(object) } - An object with the keys of the template and data from the data object.
+ * Updated to handle "Bad control character" errors by automatically 
+ * escaping partial string injections.
  */
 export function parseNunjucksTemplate(templateArray, dataObject) {
     try {
         const rawObj = buildObject(templateArray);
-        // Check if buildObject returned an Error Result instead of a raw object
+        
         if (rawObj && typeof rawObj.isErr === 'function' && rawObj.isErr()) {
             return rawObj; 
         }
+
         let templateString = JSON.stringify(rawObj);
 
-        // REFINED REGEX: 
-        // 1. Target specifically quoted placeholders for JSON casting
-        // 2. Target bare placeholders for standard string injection
-        templateString = templateString
-            .replace(/"<<(.+?)>>"/g, '{{ $1 | tojson }}') 
-            .replace(/<<(.+?)>>/g, '{{ $1 }}');
+        // Handle FULL replacements: "{{ item }}" -> {{ item | tojson }}
+        // This handles objects, arrays, and strings that occupy the entire field.
+        templateString = templateString.replace(/"\{\{\s*(.+?)\s*\}\}"/g, (match, path) => {
+            return path.includes('| tojson') ? `{{ ${path} }}` : `{{ ${path} | tojson }}`;
+        });
+
+        // Handle PARTIAL injections: "Text {{ item }} Text"
+        // We apply a manual escape chain for JSON safety (newlines, tabs, quotes).
+        // We use | safe at the end to prevent Nunjucks from doing HTML escaping (like &amp;).
+        const jsonEscapeChain = ` | replace('\\\\', '\\\\\\\\') | replace('"', '\\\\"') | replace('\\n', '\\\\n') | replace('\\r', '\\\\r') | replace('\\t', '\\\\t') | safe`;
+
+        templateString = templateString.replace(/\{\{\s*(.+?)\s*\}\}/g, (match, path) => {
+            // Skip if it already has tojson or our escape chain
+            if (path.includes('| tojson') || path.includes('| replace')) {
+                return `{{ ${path} }}`;
+            }
+            return `{{ ${path}${jsonEscapeChain} }}`;
+        });
 
         const rendered = nunEnv.renderString(templateString, dataObject);
         
@@ -49,58 +60,56 @@ export function parseNunjucksTemplate(templateArray, dataObject) {
     }
 }
 
- 
 /**
- * Adds Data to a string from provided data-object.
- * (Used for AI Agent finalisation to avoid limiting output to AI model response size &  research agent editor)
- * @param {string} inputString - Example -"The status is << complexObj.status >>" 
- * @param {object} dataObject - { complexObj: { id: 1, status: "active" } }
- * @returns {Result} - Result(string) merges the data from the data object. Eg.
- * The example above outputs 'The status is "active"'
+ * Helper to swap placeholders in standard strings.
  */
-export function addAnyDirectData(inputString, dataObject) {
-  let templateString = inputString;
-  //Input validation
-    if (typeof templateString !== 'string') {
-      return Err(`Error (addAnyDirectData) : templateString must be a string`);
-    }
-    if (typeof dataObject !== 'object' || dataObject === null || Array.isArray(dataObject)) {
-      return Err(`Error (addAnyDirectData) : dataObject must be an object`)
-    }
-    if (templateString.includes("<<")) {
-      templateString = swapPlaceholders(templateString, false);
-    } else {
-      // No data needing added;
-      return Ok(inputString);
-    }
-    // Parse to nunJucks template
-    try {
-        let renderedText = nunjucks.renderString(templateString, dataObject);
-        return Ok(renderedText);
-    } catch (error) {
-      return Err(`Error (addAnyDirectData) : ${error}`)
-    }
-}
-
-// helper for above functions.
 function swapPlaceholders(inputString = "", convertToJson = true) {
-    // Regex breakdown:
-    // 1. (['"])?           -> Optional opening quote (Group 1)
-    // 2. <<\s*(.+?)\s*>>   -> The placeholder and content (Group 2)
-    // 3. \1?               -> Matches the same quote from Group 1, if it existed
-    const regex = /(['"])?<<\s*(.+?)\s*>>\1/g;
+    const regex = /(['"])?\{\{\s*(.+?)\s*\}\}\1/g;
 
-    return inputString.replace(regex, (match, quote, path) => { // match not used but needed.
+    return inputString.replace(regex, (match, quote, path) => {
         const cleanPath = path.trim();
+        const alreadyHasToJson = cleanPath.includes('| tojson');
 
-        // If it was wrapped in quotes OR if convertToJson is explicitly true
-        // we use the | tojson pipe.
-        if (quote || convertToJson) {
+        // If it was wrapped in quotes, it needs to be JSON safe.
+        if ((quote || convertToJson) && !alreadyHasToJson) {
             return `{{ ${cleanPath} | tojson }}`;
         }
 
         return `{{ ${cleanPath} }}`;
     });
+}
+
+ 
+/**
+ * Adds Data to a string from provided data-object.
+ * @param {string} inputString - "The status is {{ complexObj.status }}" 
+ * @param {object} dataObject - { complexObj: { status: "active" } }
+ * @returns {Result} - 'The status is active'
+ */
+export function addAnyDirectData(inputString, dataObject) {
+    let templateString = inputString;
+
+    if (typeof templateString !== 'string') {
+        return Err(`Error (addAnyDirectData) : templateString must be a string`);
+    }
+    if (typeof dataObject !== 'object' || dataObject === null || Array.isArray(dataObject)) {
+        return Err(`Error (addAnyDirectData) : dataObject must be an object`);
+    }
+
+    // Check for standard Nunjucks braces
+    if (templateString.includes("{{")) {
+        templateString = swapPlaceholders(templateString, false);
+    } else {
+        return Ok(inputString);
+    }
+
+    try {
+        // Note: Using 'nunjucks' or your 'nunEnv' instance consistently
+        let renderedText = nunjucks.renderString(templateString, dataObject);
+        return Ok(renderedText);
+    } catch (error) {
+        return Err(`Error (addAnyDirectData) : ${error.message}`);
+    }
 }
 
 /**
@@ -171,21 +180,24 @@ You will also be given an string with context data which will be useful when cra
 Do NOT try to answer the query and do NOT add your own thoughts or comments to the output.
 
 In the value field you can include data directly or include a reference to the context data via a property access path.
-Any property access paths must be wrapped in << >> and have the type field set to 'ref'.
-Note use an array if you want to combine multiple property access paths - example: [<< path.1 >>, << path.here >>, << another.path >>]
+Any property access paths must be wrapped in {{ }} and have the type field set to 'ref'.
+Note use an array if you want to combine multiple property access paths - example: [{{ path.1 }}, {{ path.here }}, {{ another.path }}]
+When accessing an element in an array use bracket notation (data[0] NOT data.0 ). 
 
 Examples of how to use property access paths (if needed):
 context: { ACT_XXXX: { tool: "the tool used", action: "what the tool did.", data: { a: "some output data", b: false }} }
 param output = [
-    { key : 'key_from_schema' , type: 'ref', value: '<< context.ACT_XXXX.data.b >>' },
-    { key : 'key_from_schema2' , type: 'ref', value: '<< context.ACT_XXXX.data.a >> can be combined in the output.' }
+    { key : 'key_from_schema' , type: 'ref', value: '{{ context.ACT_XXXX.data.b }}' },
+    { key : 'key_from_schema2' , type: 'ref', value: '{{ context.ACT_XXXX.data.a }} can be combined in the output.' }
 ]`,
-    usr: (task, contextObject, toolSchema) => {
+    usr: (task, contextObject, toolSchema, toolGuide, errors) => {
         return `<task> ${task} </task>
 If there is any context to help you it will be here: <context> ${contextObject} </context>
 Here is the tool input parameters schema <tool>${toolSchema}</tool>
+Here is a guide on how to use the tool (may be empty if no guide provided): <guide> ${toolGuide} </guide>
 Remember you can use property access paths or direct responses when crafting the input params.
 Check you are providing params for all inputs specified in the schema - do not miss any that are required.
+If there are any errors from previous steps, they will be provided here: <errors> ${errors} </errors>
 Your output must be an array of { key: string, type: string, value: any } objects`;
     },
     schema: {
