@@ -168,7 +168,7 @@
                     bind:this={inputTextArea}
                     on:input={() => adjustHeight(inputTextArea)}
                     on:keydown={handleKeydown}
-                    placeholder="Message Task Agent..."
+                    placeholder="Message Agent..."
                     rows="1"
                     class="input-textarea"
                     disabled={$chatStore.isLoading && $chatStore.jobDone === false}

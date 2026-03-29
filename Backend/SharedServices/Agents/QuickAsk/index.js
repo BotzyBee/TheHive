@@ -1,4 +1,3 @@
-import { AiJob } from '../../Classes/aiJob.js';
 import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
@@ -6,6 +5,7 @@ import { callAgentTool } from '../../CoreTools/helperFunctions.js';
 import { TextMessage, Roles } from '../../Classes/index.js';
 import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
 import { Services } from '../../index.js';
+import { AiJob } from '../../Classes/aiJob.js';
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the

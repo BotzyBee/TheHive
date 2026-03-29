@@ -169,6 +169,7 @@ export async function finialiseOutput(agentObject, saveFolder){
       agentObject.isRunning = false;
       return Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
     } 
+
     agentObject.addAiCount(1);
     let outputPlan = outputOverview.value.outputPlan || [];
     if(outputPlan.length == 0){
@@ -387,16 +388,16 @@ export async function finialiseOutput(agentObject, saveFolder){
    * @param {array} messageArray - an array of messages of Base Message type (TextMessage, ImageMessage, AudioMessage, DataMessage)
    * @returns {Result[array]} - Result( array of processed messages )
    */
-  export async function stripOutAudioAndImageData(agentObject, messageArray){
-    //catch non array or empty array
-    if(!Array.isArray(messageArray) || messageArray.length == 0){
-      return Services.Utils.Err(`Error: (stripOutAudioAndImageData) - messageArray is not an array or is empty!`);
+export function stripOutAudioAndImageData(messageArray){
+  //catch non array or empty array
+  if(!Array.isArray(messageArray) || messageArray.length == 0){
+    return Services.Utils.Err(`Error: (stripOutAudioAndImageData) - messageArray is not an array or is empty!`);
+  }
+  let opMessages = structuredClone(messageArray); 
+  for(let i=0; i<opMessages.length; i++){
+    if(opMessages[i].type === "image" || opMessages[i].type === "audio"){
+      opMessages[i].base64 = `[ Base 64 data removed due to size - Full data can be found in message ${messageArray[i].id} ]`;
     }
-    let opMessages = structuredClone(messageArray); 
-    for(let i=0; i<opMessages.length; i++){
-      if(opMessages[i].type === "Image" || opMessages[i].type === "Audio"){
-        opMessages[i].base64 = `[ Base 64 data removed due to size - Full data can be found in message ${messageArray[i].id} ]`;
-      }
   }
   return Services.Utils.Ok(opMessages);
 }

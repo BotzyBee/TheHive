@@ -28,12 +28,22 @@ You are currently editing a specific CHUNK of a larger document.
 4. If no edits are required for this specific chunk, return nothing.
 `.trim();
 
+let aiCount = 0;
+
 export const details = {
     toolName: "superEditor",
-    version: "2.2.1",
+    version: "2.2.2",
     creator: "TheHive",
     overview: "An advanced text editor capable of precise inline replacements, targeted insertions, and full document generation. Outputs structural diffs. Limitations: Cannot read external files or perform internet research. Operates strictly on the provided 'document' string.",
-    guide: "Always provide the full 'document' state. If starting a new file, pass an empty string \"\". Formulate 'prompt' as direct, actionable editing instructions.",
+    guide: `Always provide the full 'document' state. If starting a new file, pass an empty string \"\". 
+Output Format: You should craft consise and direct list of edits needed for the agent to follow. This should be short, clear and actionable. Do not include 'fluff' or general statements.
+When crafting a list of edits quote sections of the text so that the edit agent knows where the change needs to happen (if the document isn't blank). 
+
+Example Output: 
+There are two section 5 titles. The second section 5 ('the title text') should be section 6. 
+Remove duplicated paragraph starting with 'This text...' in section 3 which is the same as a paragraph in section 1.1. 
+Change all instances of 'optimize' to 'optimise' for UK English consistency.
+IMPORTANT: If no edits are needed output 'NO-EDITS-NEEDED'.`,
     inputSchema: JSON.stringify({
         "type": "object",
         "properties": {
@@ -59,9 +69,8 @@ export const details = {
  * Core plugin execution interface.
  */
 export async function run(Shared, params = {}) {
-    const { prompt, document, context } = params;
-    const CHUNK_SIZE = 2000; // Character limit per AI call
-
+    const { prompt, document, context, chunkSize = 100000 } = params; // chunk size not included in schema as it's just for testing.
+    const CHUNK_SIZE = chunkSize; // Character limit per AI call
     if (!prompt || typeof document !== 'string') {
         return Shared.Utils.Err("SuperEditor: Missing prompt or document.");
     }
@@ -71,6 +80,7 @@ export async function run(Shared, params = {}) {
         return await handleNewDocument(Shared, prompt, context);
     }
 
+    // Edit document with existing content
     try {
         const aiService = new Shared.AiCall.AiCall();
         const mutator = new DocumentMutator();
@@ -91,9 +101,8 @@ CHUNK ${i + 1} OF ${chunks.length}:
 ${currentChunk}
 ---
             `.trim();
-
             const response = await aiService.generateText(SYSTEM_PROMPT, chunkPrompt, { quality: 2 });
-            
+            aiCount++;
             if (response.isErr() || !containsActionableBlocks(response.value)) {
                 processedChunks.push(currentChunk);
                 continue;
@@ -118,7 +127,8 @@ ${currentChunk}
                     chunksProcessed: chunks.length,
                     timestamp: new Date().toISOString()
                 },
-                toolName: details.toolName
+                toolName: details.toolName,
+                metadata: { aiCount}
             })
         ]);
 
@@ -133,7 +143,7 @@ ${currentChunk}
 async function handleNewDocument(Shared, prompt, context) {
     const aiService = new Shared.AiCall.AiCall();
     const response = await aiService.generateText(SYSTEM_PROMPT, `TASK: ${prompt}\nCONTEXT: ${context}\nDOCUMENT IS EMPTY. USE REPLACE_ALL.`);
-    
+    aiCount++;
     if (response.isErr()) return response;
     
     const mutator = new DocumentMutator();
@@ -143,7 +153,8 @@ async function handleNewDocument(Shared, prompt, context) {
         new Shared.Classes.DataMessage({
             role: Shared.Classes.Roles.Tool,
             data: { success: true, editedDocument: result.value },
-            toolName: details.toolName
+            toolName: details.toolName,
+            metadata: { aiCount}
         })
     ]);
 }

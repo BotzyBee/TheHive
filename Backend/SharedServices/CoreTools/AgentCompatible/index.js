@@ -15,6 +15,7 @@ export * as timeAndDateTool from './timeAndDate.js';
 export * as textCombiner from './textCombiner.js';
 export * as superEditor from './superEditor.js';
 export * as createMermaidDiagram from './createMermaidDiagram.js';
+export * as deepResearchTool from './deepResearchTool.js';
 // READ THE NOTE AT THE TOP !!
 
 

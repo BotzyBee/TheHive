@@ -34,9 +34,7 @@
     </div>
     <ul>
         <li><a href="/">Home</a></li>
-        <li><a href="/task">Task</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="https://primary-production-05a5c.up.railway.app/" target="_blank">N8N</a></li>
+        <li><a href="/task">Agents</a></li>
     </ul>
 </aside>
 {/if}

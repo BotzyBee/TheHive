@@ -1,36 +1,47 @@
 /**
  * 🐝 TheHive Plugin Tool Standard - Deep Research Tool
  *  IMPORTANT: This tool requires aiWebSearch and superEditor Tool to function. Ensure both tools are present in the CoreTools/AgentCompatible directory.
- */
-
-import { re } from 'mathjs';
-import { AiCall } from '../../CallAI/index.js';
-import { Services } from '../../index.js';
-import { saveFile } from '../../FileSystem/index.js';
+ *  To Do: Add custom status updates to tool.  
+*/
 export const details = {
     toolName: "deepResearchTool",
-    version: "0.0.4",
-    creator: "System Architect",
+    version: "0.0.5",
+    creator: "Botzy Bee",
     overview: "Conducts deep, factual, and actionable research on a given topic. It scopes the research, deconstructs terms, " 
     +"gathers official sources, fact-checks claims, and returns structured data. \n" 
     +"Limitations: Time-consuming for very broad topics; relies on available online sources. \n"
     +"Important: Only use this tool when the user explicitly requests in-depth research. For general questions, use the standard web search tool or other lighter tools.",
-    guide: "Provide as much detail as possible in the 'topic' input. The tool will handle the rest, but clearer input can lead to better results.",
-    inputSchema: JSON.stringify({
-        type: "object",
-        properties: {
-            topic: {
-                type: "string",
-                description: "The main topic or question to research."
-            },
-            depth: {
-                type: "number",
-                description: "Research depth level (1-3), determining how many explorative loops to run. Defaults to 1."
-            }
+    guide: "Provide as much detail as possible in the 'topic' input. The tool will handle the rest, but clearer input can lead to better results. The JobID can be found in global context data.",
+    inputSchema: {
+    "type": "object",
+    "properties": {
+        "topic": {
+        "type": "string",
+        "description": "The main topic or question to research."
         },
-        required: ["topic"],
-        additionalProperties: false
-    })
+        "breadth": {
+        "type": "number",
+        "description": "Number of top questions to consider for research. Defaults to 1.",
+        "minimum": 1,
+        "default": 1
+        },
+        "savePath": {
+        "type": "string",
+        "description": "Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/' ",
+        },
+        "jobID": {
+        "type": "string",
+        "description": "The ID of the agent job for passing updates."
+        }
+    },
+    "required": [
+        "topic",
+        "breadth",
+        "savePath",
+        "jobID"
+    ],
+    "additionalProperties": false
+    }
 };
 
 const INGORE_DOMAINS = []; // Example domains to ignore during source gathering
@@ -117,7 +128,7 @@ export class ResearchChunk {
 
     async finaliseResearchChunk(){
         let aiCall = new this.Shared.AiCall.AiCall();
-        let clarifications = this.factsOrAssumptions.map(f => f.getSummary()).join("\n\n");
+        let clarifications = this.factsOrAssumptions.map(f => f.getSummary()).join(`\n \n`);
         // use the initial result and all fact checking results to generate a final output.
         let prompt = `
 Using the initial research response: "${this.firstResponse}" and the following fact-checking details for each claim: ${clarifications}, produce a final researched output. 
@@ -130,6 +141,33 @@ Focus on factual accuracy, actionable information, and clarity. Keep all referen
         stats.aiCount += 1;
         this.output = finalCall.value; 
         return this.Shared.Utils.Ok();
+    }
+
+    mergeAllReferences() {
+        // Combine all sources into a flat array
+        const rawRefs = [
+            ...(this.factsOrAssumptions?.flatMap(f => f.sources || []) || []),
+            ...(this.references || [])
+        ];
+
+        // Group by URL using a Map
+        const grouped = rawRefs.reduce((acc, { ref, url }) => {
+            if (!url) return acc; // Skip if no URL exists
+
+            if (!acc.has(url)) {
+                acc.set(url, new Set([ref])); // Use a Set to avoid duplicate ref tags for the same URL
+            } else {
+                acc.get(url).add(ref);
+            }
+            return acc;
+        }, new Map());
+
+        // Convert Map back to the desired array format
+        // Output is [ { url: 'example.com', ref: ['ref1', 'ref2'] }, ... ]
+        return Array.from(grouped, ([url, refs]) => ({
+            url: url,
+            ref: Array.from(refs) // Convert Set back to Array
+        }));
     }
 }
 
@@ -144,7 +182,7 @@ export async function scopeTopic(Shared, topic, breadth = 5){
     ); // learnings: [ { term: '', definition: ''} ]
     if (termscall.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> initTerms : ${termscall.value}`)}
     // Merge learnings into a single string to pass to the next prompt
-    let defs = termscall.value.learnings.map(l => `${l.term} : ${l.definition}`).join("\n \n");
+    let defs = termscall.value.learnings.map(l => `${l.term} : ${l.definition}`).join(`\n \n`);
     
     // Generate a list of the most relevant explorative questions to guide the research.
    let questionCall = await callAI.generateText(
@@ -195,12 +233,14 @@ let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the en
  * @param {object} Shared - Core Hive services.
  * @param {object} params - Inputs defined in inputSchema.
  * @param {string} params.topic - The main topic or question to research.
- * @param {number} params.depth - Research depth level (1-3), determining how many explorative loops to run. Defaults to 1.
- * @param {number} params.breadth - Number of top questions to consider for research. Defaults to 5.
+ * @param {number} params.breadth - Number of top questions to consider for research. Defaults to 1.
+ * @param {string} params.savePath - Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/'.
+ * @param {string} params.jobID - The ID of the agent job for passing updates.
  * @returns {Promise<object>} Shared.Utils.Ok or Shared.Utils.Err.
  */
-export async function run(Shared = Services, params = {}) {
-    const { topic, depth = 1, breadth = 3 } = params;
+export async function run(Shared, params = {}) {
+    stats.aiCount = 0; // Reset AI call count at the start of each run.
+    const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID } = params;
     
     if (!topic || typeof topic !== 'string') {
         return Shared.Utils.Err("Error (deepResearchTool) requires a valid 'topic' string.");
@@ -220,7 +260,6 @@ export async function run(Shared = Services, params = {}) {
         let question = scoping.value.questions[i];
         let chunk = new ResearchChunk({ Shared: Shared, question: question });
         await chunk.getInitialResearch();
-        console.log("Initial Research Output done");
         await chunk.factCheckClaims();
         await chunk.finaliseResearchChunk();
         RESEARCH_CHUNKS.push(chunk); // Store each research chunk for potential later review or report generation.
@@ -234,7 +273,8 @@ export async function run(Shared = Services, params = {}) {
     // reverse order as first chunk is just definitions and terms.
     let latestPlan = ""; 
     for (let i = chunkLength - 1; i >= 0; i--){
-        console.log(`Generating report plan for chunk ${i + 1}/${chunkLength}`);
+        console.log(`Generating report plan based on research chunk ${((i + 2)-chunkLength)}/${chunkLength}`);
+
         let planCall = await callAI.generateText(
             PromptsAndSchemas.reportPlan.sys,
             PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
@@ -255,10 +295,10 @@ export async function run(Shared = Services, params = {}) {
      
     // [][] ----- WRITING PHASE - CREATE EACH SECTION ------ [][]
 
-    let latestReport = `# ${planArrayCall.value.reportTitle ? planArrayCall.value.reportTitle : ""}`; // Start with the title.
+    let latestReport = ""; // Start with the title/ head.
     let planLen = planArray.length ?? 0;
     // combine research chunks
-    let combinedResearch = RESEARCH_CHUNKS.map(c => c.output).join("\n\n");
+    let combinedResearch = RESEARCH_CHUNKS.map(c => c.output).join(`\n \n`);
     for(let i=0; i<planLen; i++){
          console.log(`Writing report section for section ${i + 1}/${planLen}`);
         let sectionCall = await callAI.generateText(
@@ -267,40 +307,180 @@ export async function run(Shared = Services, params = {}) {
         ); // Returns the text for this section of the report.
         if (sectionCall.isErr()){ return Shared.Utils.Err(`Error in run -> writeSection : ${sectionCall.value}`)}
         stats.aiCount += 1;
-        latestReport += `\n\n${sectionCall.value}`; // Append each section to build the full report.
+        latestReport += `\n \n ${sectionCall.value}`; // Append each section to build the full report.
     }
-    await Shared.FileSystem.saveFile("./", latestReport, `First_Draft${Date.now()}.txt`);
     
     // Final Review and Polishing (1)
-    for(let i=0; i<2; i++){ // Run 2 loops of review and polish to ensure quality and coherence.
-        console.log(`Final review loop ${i + 1}/2`);
+    for(let i=0; i<3; i++){ // Run 3 loops of review and polish to ensure quality and coherence.
+        console.log(`Final review loop ${i + 1}/3`);
         let sectionCall = await callAI.generateText(
             PromptsAndSchemas.finalCheck.sys,
-            PromptsAndSchemas.finalCheck.usr(latestReport)
+            PromptsAndSchemas.finalCheck.usr(latestReport),
+            { structuredOutput: PromptsAndSchemas.finalCheck.schema }
         ); // Returns a prompt for final edits and polishing.
         if (sectionCall.isErr()){ return Shared.Utils.Err(`Error in run -> finalCheck : ${sectionCall.value}`)}
         stats.aiCount += 1;
-        let polishPrompt = sectionCall.value;
-
-        if (polishPrompt === "NO-EDITS-NEEDED") break;
-
-        console.log("Final Review Feedback: ", polishPrompt);
+        let editLen = sectionCall.value.edits.length ?? 0;
+        if (editLen === 0) break;
         console.log(`Performing final edit and polish of the report.`);
 
-        // Final Review and Polishing (2)
-        let editAgent = await Shared.CoreTools.AgentCompatible.superEditor.run(
-            Shared,
-            { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" }
-        ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
-        if (editAgent.isErr()){ return Shared.Utils.Err(`Error in run -> superEditor : ${editAgent.value}`)}
-        latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
-        // TODO handle ai count from superEditor tool .   
-        await Shared.FileSystem.saveFile("./", latestReport, `Final_Report_${Date.now()}.txt`);
-        }
-        
-    return Shared.Utils.Ok({ report: latestReport, stats: stats });
+        // Conduct Edits (2)
+        for(let j=0; j<editLen; j++){
+            let polishPrompt = sectionCall.value.edits[j];     
+            let editAgent = await Shared.CoreTools.AgentCompatible.superEditor.run(
+                Shared,
+                { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" }
+            ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
+            if (editAgent.isErr()){ return Shared.Utils.Err(`Error in run -> superEditor : ${editAgent.value}`)}
+            latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
+            stats.aiCount += 1; // add ai calls from edit agent.
+        }// j
+    }// i 
+    
+    // [][] ----- WRITING PHASE - MANAGE REFERENCES ------ [][]
+    
+    // Merge all references
+    let allRefChunks = [];
+    for(let chunk of RESEARCH_CHUNKS){
+        allRefChunks.push(chunk.mergeAllReferences());
+    }
+    let processedReferences = processReferences(latestReport, allRefChunks ); // returns { updatedText, referenceList }
+    let finalReport = finalFormatting(
+        planArrayCall.value.reportTitle, 
+        processedReferences.updatedText, 
+        processedReferences.referenceList
+    );
+
+    const containerVolumeRoot = Shared.Constants.containerVolumeRoot; 
+    //Construct the full path and save the content
+    const targetDirectoryInContainer = Shared.Utils.pathHelper.join(containerVolumeRoot, savePath);
+    await Shared.FileSystem.saveFile(targetDirectoryInContainer, finalReport, `Final_Report_${jobID || Date.now()}.txt`);
+
+    let message = new Shared.Classes.TextMessage({
+        role: Shared.Classes.Roles.Tool, 
+        mimeType: "text/plain", 
+        textData: finalReport,
+        toolName: "deepResearchTool",
+        instructions: `Deep research has completed on the topic: "${topic}". The final report has been saved to ${savePath} with the filename "Final_Report_${jobID || Date.now()}.txt". The report includes detailed research findings, structured sections, and a reference list.`
+    });
+    return Shared.Utils.Ok([message]);
 }
 
+function processReferences(text, referencesArray) {
+    if (!text || !referencesArray) return { updatedText: text, referenceList: "" };
+
+    const mergedRefs = mergeChunkReferences(referencesArray);
+    const urlToRefNumber = new Map();
+    const oldRefToNewRef = new Map();
+    let refCount = 1;
+
+    // Phase 1: Determine used URLs and assign numbers
+    for (const item of mergedRefs) {
+        if (!item || item.ref === undefined) continue;
+        
+        const refStr = String(item.ref);
+        const url = item.url;
+
+        // Check if the reference exists in text (with or without brackets)
+        if (text.includes(refStr)) {
+            if (!urlToRefNumber.has(url)) {
+                urlToRefNumber.set(url, refCount++);
+            }
+            oldRefToNewRef.set(refStr, urlToRefNumber.get(url));
+        }
+    }
+
+    // Phase 2: Replace occurrences with specific spacing and single brackets
+    let updatedText = text;
+    
+    // Sort keys by length descending to prevent partial matches (e.g., replacing "ref1" inside "ref10")
+    const sortedOldRefs = Array.from(oldRefToNewRef.keys()).sort((a, b) => b.length - a.length);
+
+    for (const oldRef of sortedOldRefs) {
+        const newNum = oldRefToNewRef.get(oldRef);
+        
+        // This regex looks for the oldRef potentially wrapped in brackets [ ]
+        // and captures surrounding whitespace to normalize it.
+        const escapedRef = oldRef.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        
+        // Match: optional space + optional [ + the ref + optional ] + optional space
+        const regex = new RegExp(`\\s*\\[?${escapedRef}\\]?\\s*`, 'g');
+        
+        // Replace with " [N] " to ensure single brackets and consistent spacing
+        updatedText = updatedText.replace(regex, ` [${newNum}] `);
+    }
+
+    // Clean up: Fix any accidental double spaces and trim
+    updatedText = updatedText.replace(/  +/g, ' ').trim();
+
+    // Phase 3: Build the reference list
+    const eol = (typeof process !== 'undefined' && process.platform === 'win32') ? '\r\n' : '\n';
+    const sortedRefs = Array.from(urlToRefNumber.entries()).sort((a, b) => a[1] - b[1]);
+    
+    let referenceList = sortedRefs.length > 0 ? `## References${eol}` : "";
+    for (const [url, refNum] of sortedRefs) {
+        referenceList += `[${refNum}] ${url}${eol}`;
+    }
+
+    return { updatedText, referenceList };
+}
+
+function mergeChunkReferences(arrayOfChunkRefs) {
+    // Flatten the array of arrays into one long list of objects
+    const flatRefs = arrayOfChunkRefs.flat();
+
+    // Group by URL
+    const grouped = flatRefs.reduce((acc, { url, ref }) => {
+        if (!url) return acc;
+
+        if (!acc.has(url)) {
+            acc.set(url, new Set());
+        }
+
+        const urlSet = acc.get(url);
+
+        // Since 'ref' is an array, we spread/iterate to add each item
+        if (Array.isArray(ref)) {
+            ref.forEach(r => urlSet.add(r));
+        } else if (ref) {
+            // Fallback just in case a single string slips in
+            urlSet.add(ref);
+        }
+
+        return acc;
+    }, new Map());
+
+    // Convert back to desired format
+    return Array.from(grouped, ([url, refSet]) => ({
+        url: url,
+        ref: Array.from(refSet)
+    }));
+}
+
+function finalFormatting(title, text, refs){
+     // TimeStamp
+    const now = new Date();
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const year = String(now.getUTCFullYear()).slice(-2);
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0'); 
+    const gmtTimestamp = `${day}/${month}/${year} : ${hours}:${minutes}`;
+
+    const finalReport = 
+`
+>   Report : ${title} 
+>   Timestamp: ${gmtTimestamp} (GMT) 
+>   Note: This report was generated by BotzyBee (AI) and may contain errors or omissions.
+>   Ai Call Count: ${stats.aiCount} 
+\n
+# ${title}
+${text}
+\n
+${refs}
+`
+    return finalReport;
+}
 
 const PromptsAndSchemas = {
     initTerms: {
@@ -506,14 +686,35 @@ Example Output:
 
 Core Objectives:
 - Linguistic Precision: Ensure the entire report adheres strictly to UK English (e.g., optimise, labour, centre).
-- Structural Integrity: Verify that the numbering is sequential and the layout is consistent throughout. Headings should follow a logical hierarchy (e.g., 1, 1.1, 1.2, 2, etc.) and formatting should be uniform (e.g., all headings in bold).
+- Structural Integrity: Verify that the numbering is sequential and the layout is consistent throughout. Headings should follow a logical hierarchy (e.g., 1, 1.1, 1.2, 2, etc.) and formatting should be uniform (Use Markdown).
 - Redundancy Detection: Identify and flag instances of "clumsy" duplication, such as paragraphs repeated from copy-pasting, overlapping arguments, or identical sentences appearing in different sections.
 - Technical Polish: Ensure all punctuation is professional and consistent (e.g., Oxford commas if used throughout, consistent bullet point styles).
   
-Output Format: You should craft consise and direct 'prompt' for a edit agent to follow. This should be short, clear and actionable. Do not include 'fluff' or general statements.  
+Output Format: You should craft consise and direct list of edits needed for the agent to follow and output these as individual array items. Each array item should be short, clear and actionable. Do not include 'fluff' or general statements.
+If possible include the specific text which needs to be edited in the output to make it easier for the agent to identify and make the necessary edits." 
 
-IMPORTANT: If no edits are needed output 'NO-EDITS-NEEDED'.`,
-        usr: (report) => { return `Here is the final draft of the report <report>${report}</report>.`}
+Example Output: 
+["There are two section 5 titles. The second section 5 ('the title text') should be section 6.",
+"There are two section 5 titles. The second section 5 ('the title text') should be section 6.",
+"Change all instances of 'optimize' to 'optimise' for UK English consistency.",
+"Remove duplicated paragraph starting with 'This text...' in section 3 which is the same as a paragraph in section 1.1."
+]
+
+IMPORTANT: If no edits are needed output an empty array [].`,
+        usr: (report) => { return `Here is the final draft of the report <report>${report}</report>. Really focus on the heading structure and numbering!`},
+        schema: {
+        "type": "object",
+        "properties": {
+            "edits": {
+            "type": "array",
+            "description": "A list of edits needed for the report.",
+            "items": {
+                "type": "string"
+                }
+            }
+        },
+        "required": ["edits"]
+    }
     },
     editAgentPrompt: {
         prompt: (reviewFeedback) => { 

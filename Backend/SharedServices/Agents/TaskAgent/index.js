@@ -1,4 +1,4 @@
-import { ContextTemplate } from "../../Classes/context.js";
+import { ContextTemplate } from '../../Classes/aiJob.js';
 import { Roles, Status, TextMessage, AiJob } from "../../Classes/index.js";
 import { Services } from "../../index.js";
 import { Ok, Err } from "../../Utils/helperFunctions.js";
@@ -671,7 +671,7 @@ export class TaskAgent extends AiJob {
             Ok(`Skipping review - ${this.actionReviewID} has already been reviewed and added to context.`)
         }
 
-        let processedToolMessages = await stripOutAudioAndImageData(this, toolOutput);
+        let processedToolMessages = stripOutAudioAndImageData(toolOutput);
         if(processedToolMessages.isErr()){
             this.errors.push(`Error ( reviewAndReturn -> stripOutAudioAndImageData ) : ${processedToolMessages.value}`);
             return Err(`Error ( reviewAndReturn -> stripOutAudioAndImageData ) : ${processedToolMessages.value}`);     

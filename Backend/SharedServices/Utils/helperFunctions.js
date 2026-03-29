@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 import { evaluate } from 'mathjs';
+import { JOBS } from "../../Engine/jobManager.js";
 
 /**
  * Return Ok
@@ -38,3 +39,15 @@ export const pathHelper = path;
 export const fsHelper = fs;
 export const readlineHelper = readline;
 export const evaluateHelper = (input) => { evaluate(input) }
+
+/**
+ * 
+ * @param {strting} jobID- the ID of the job to update 
+ * @param {string} statusText - the custom status text to set for the job. 
+ */
+export function updateCustomTaskStatus(jobID, statusText){
+  let job = JOBS.jobListManager({getJob: jobID});
+  if(job) {
+    job.status.setCustomStatus(statusText);
+  }
+}

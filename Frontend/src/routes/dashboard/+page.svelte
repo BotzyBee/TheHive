@@ -25,58 +25,8 @@
             <div class="dashboard-container">
             <!-- First -->
             <div class="portal" style="padding: 15px;">
-                <h2 style="padding-bottom: 15px; color:darkgray">AI Provider Dashboards</h2>
-                <a href="https://platform.openai.com/usage"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Open AI</p>
-                </a>
-                <a href="https://console.cloud.google.com/billing?inv=1&invt=Ab1EiA"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Gemini</p>
-                </a>
-                <a href="https://console.anthropic.com/usage"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Anthropic</p>
-                </a>
-                <a href="https://portal.withorb.com/view?token=IjRSOXR1VXVaSlIyWU4ySm8i.CDfJceDjvDD-ck0CJ4XV3Ikmz20"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Perplexity</p>
-                </a>
-                <a href="https://platform.inceptionlabs.ai/"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Inception</p>
-                </a>
-                
-
-                <h2 style="padding-bottom: 15px; padding-top:20px; color:darkgray">Other Dashboards</h2>
-                <a href="https://railway.com/dashboard"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Railway</p>
-                </a>
-                <a href="https://dash.cloudflare.com/80bc3ba890ed8bc85f7c62018f93b6d6/botzybee.com"
-                    target="_blank" 
-                    >
-                    <p style="padding-bottom: 5px;">Cloudflare</p>
-                </a>
-                
+                <h2 style="padding-bottom: 15px; color:darkgray">Woah.. we're still building here 🏗️</h2>                
             </div>
-
-            <!-- Second -->
-            <div 
-                class="portal" 
-            ></div>
-
-            <!-- Third -->
-            <div 
-                class="portal"
-                style="margin-bottom: 20px;" 
-            ></div>
         </div>
     </main>
 </div>

@@ -31,7 +31,7 @@
 						The Hive : AI Agents for Everyone
 					</p>
 					<p style="padding-top: 20px;">	
-					<a href="/task"><span class="p-5">TASKS</span></a>
+					<a href="/task"><span class="p-6">AGENTS</span></a>
 					<a href="/dashboard"><span class="p-5">DASHBOARD</span></a>
 					</p>
 				</div>
