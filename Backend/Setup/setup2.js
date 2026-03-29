@@ -1,9 +1,24 @@
 import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
+<<<<<<< Updated upstream
 import { namespaceName, databaseName, dirTableName, 
     fileTableName, vectorTableName, vectorEmbedSize, 
     mgmtTableName, toolTableName, guideTableName } from "../SharedServices/constants.js";
 import { addDirectoryToDB } from "../SharedServices/Database/CRUD.js";
+=======
+import {
+  namespaceName,
+  databaseName,
+  dirTableName,
+  fileTableName,
+  vectorTableName,
+  vectorEmbedSize,
+  mgmtTableName,
+  toolTableName,
+  guideTableName,
+} from '../SharedServices/constants.js';
+import { addDirectoryToDB } from '../SharedServices/Database/CRUD.js';
+>>>>>>> Stashed changes
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
@@ -128,7 +143,11 @@ export async function setupFolderBotDB() {
             DIST COSINE
             TYPE F32;
         `);
+<<<<<<< Updated upstream
         console.log(`${toolTableName} table and index created.`);
+=======
+    console.log(`${toolTableName} table and index created.`);
+>>>>>>> Stashed changes
 
         // Define the schema for the Guide Vector Table
         await db.query(`
@@ -149,10 +168,17 @@ export async function setupFolderBotDB() {
             DIST COSINE
             TYPE F32;
         `);
+<<<<<<< Updated upstream
         console.log(`${guideTableName} table and index created.`);
         
         // Add 'Normal User' on database. https://surrealdb.com/docs/surrealql/statements/define/user
         await db.query(`
+=======
+    console.log(`${guideTableName} table and index created.`);
+
+    // Add 'Normal User' on database. https://surrealdb.com/docs/surrealql/statements/define/user
+    await db.query(`
+>>>>>>> Stashed changes
             DEFINE USER ${dbUserRegular} ON DATABASE PASSWORD '${dbPassRegular}' ROLES OWNER DURATION FOR SESSION 1d, FOR TOKEN 1d;
         `);
         console.log(`User ${dbUserRegular} created with OWNER permissions on database level.`);

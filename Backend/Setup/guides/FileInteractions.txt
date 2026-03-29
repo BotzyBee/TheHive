@@ -1,0 +1,25 @@
+# Agent Planning Guide
+# FileInteractions.txt 
+
+Covers: This guide covers how to best handle tasks that require File Actions to be performed. This could be finding a file, reading a file, writing data to file etc. It could also be getting the contents of a directory or finding a directory. 
+
+# Key Consideration
+When planning to undertake a file system action the main consideration is knowing the file path (url) of the file or directory you need to interact with. If the user has not provided a clear filepath then it's likely that you will need to determine this yourself. You MUST include pre-curser actions to resolve urls / file paths if they are not explicitly known in advance. 
+
+A good starting point if no other information is given is the 'workingDirectory' url provided in the global context object or the projectIndexUrl. If provided - the projectIndexUrl takes precedence over the workingDirectory and MUST be used. 
+
+The root directory is /UserFiles/ if you are really stuck.
+
+# Tools
+Later in the planning process you will be given the opportunity to use one or more tools to help you locate files or folders. You MUST use these tools if you are not 100% sure of a file or folder filepath / url. 
+
+The following file tools are useful in finding files or directories. 
+
+- findFileOrFolder
+- getDirectoryContents
+
+# New Directories
+When saving files you can include a file path to a directory that does not exist. The file saving process will create any new directories needed. This is useful if you are planning on saving or handling multiple files and want to keep them all together for the user. 
+
+# Unknown numbers of files or directories.
+Beware of creating a plan to process, read or interact with the files inside a folder without knowing what the exact file paths are. If you are planning on performing an action on an unknown number of files or directories you MUST add 'rePlanTool' after getting the contents of the directory to allow re-planning once the exact files are known. Example tasks could include 'For each file in X directory do this'. 
