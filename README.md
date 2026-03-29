@@ -4,7 +4,7 @@
 ![Botzy Bee Logo](logoSml.png)
 
 >
-> **NOTE : 'The Hive' is still work-in-progress and is not production-ready. GNU v3 Licence.**
+> **NOTE : 'The Hive' is work-in-progress and is not production-ready. GNU v3 Licence.**
 >
 
 The Hive is an Agentic AI workspace that allows users to use several different AI models to power custom agents. The Hive focuses on handling context locally on your computer and only passing data to AI models when needed. It's built to be multi-modal - it can read and write files, call tools, search online, as well as create images and work with audio. 
@@ -15,7 +15,7 @@ The Hive is built as a space for testing the capabilities of different LLM model
 
 
 ### Frontend 🖥️
-The Hive frontend is built using SvelteKit and Tauri - This allows the frontend to run both in your web browser and also as a stand-along application. 
+The Hive frontend is built using SvelteKit and Tauri - This allows the frontend to run both in your web browser and also as a stand-alone application. 
 
 ### Backend ⚙️
 The Hive backend is dockerised for easy deployment and management. It consists of two main docker containers which run on a shared docker network. 
