@@ -3,12 +3,13 @@
 ### By Botzy Bee
 ![Botzy Bee Logo](logoSml.png)
 
+>
+> **NOTE : This code is still work-in-progress and is not production-ready!**
+>
 
-**NOTE : This code is still work-in-progress and is not production-ready!**
+The Hive is an Agentic AI workspace that allows users to use several different AI models to power custom agents. The Hive focuses on handling context locally on your computer and only passing data to AI models when needed. It's built to be multi-modal - it can read and write files, call tools, search online, as well as create images and work with audio. 
 
-The Hive is an Agentic AI workspace that allows users to use multiple different AI models to power custom agents. The Hive focuses on handling context locally on your computer and only passing data to AI models when needed. It's built to be multi-modal - can read and write files, call tools, search online, create images and work with audio. 
-
-The Hive was originally built as a space for testing the capabilities of different LLM models, but it aims to become a personal AI-Assistant that can perform useful real-world tasks. 
+The Hive is built as a space for testing the capabilities of different LLM models, but also aims to become a useful personal AI-Assistant that can perform real-world tasks. 
 
 ![The Hive User Interface](TheHive_BotzyBee.jpg)
 
@@ -38,10 +39,11 @@ Each agent has access to the following tools:
  - textCombiner : Allows the agent to combine blocks of text without passing them through the LLM (saves context / tokens)
  - superEditor : Performs edits on files using diffs (can edit large files - saves context / tokens)
  - createMermaidDiagram : Create mermaid code for creating diagrams such as flow charts. 
- - deepResearchTool : Performs deep research on the user topic. Includes fact checking. 
+ - deepResearchTool : Performs deep research on the user topic. Includes fact-checking. 
+ - (More coming soon...)
 
 ### LLM Providers 
-The Hive is currently setup to use any of the following LLM providers
+The Hive is currently setup to use any of the following LLM providers (mix n match!)
 - Gemini (Text, Image, Audio, Code, WebSearch)
 - OpenAI (Text, Code)
 - Perplexity (Text, WebSearch)
