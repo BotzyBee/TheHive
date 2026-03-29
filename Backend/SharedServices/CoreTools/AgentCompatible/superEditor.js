@@ -60,7 +60,7 @@ export const details = {
  */
 export async function run(Shared, params = {}) {
     const { prompt, document, context } = params;
-    const CHUNK_SIZE = 2500; // Character limit per AI call
+    const CHUNK_SIZE = 2000; // Character limit per AI call
 
     if (!prompt || typeof document !== 'string') {
         return Shared.Utils.Err("SuperEditor: Missing prompt or document.");
@@ -92,7 +92,7 @@ ${currentChunk}
 ---
             `.trim();
 
-            const response = await aiService.generateText(SYSTEM_PROMPT, chunkPrompt, { quality: 3 });
+            const response = await aiService.generateText(SYSTEM_PROMPT, chunkPrompt, { quality: 2 });
             
             if (response.isErr() || !containsActionableBlocks(response.value)) {
                 processedChunks.push(currentChunk);
