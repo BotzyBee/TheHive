@@ -4,7 +4,7 @@
 ![Botzy Bee Logo](logoSml.png)
 
 >
-> **NOTE : This code is still work-in-progress and is not production-ready!**
+> **NOTE : 'The Hive' is still work-in-progress and is not production-ready. GNU v3 Licence.**
 >
 
 The Hive is an Agentic AI workspace that allows users to use several different AI models to power custom agents. The Hive focuses on handling context locally on your computer and only passing data to AI models when needed. It's built to be multi-modal - it can read and write files, call tools, search online, as well as create images and work with audio. 
@@ -14,15 +14,15 @@ The Hive is built as a space for testing the capabilities of different LLM model
 ![The Hive User Interface](TheHive_BotzyBee.jpg)
 
 
-### Frontend
+### Frontend 🖥️
 The Hive frontend is built using SvelteKit and Tauri - This allows the frontend to run both in your web browser and also as a stand-along application. 
 
-### Backend 
+### Backend ⚙️
 The Hive backend is dockerised for easy deployment and management. It consists of two main docker containers which run on a shared docker network. 
 - Express API Server - This is the main powerhouse behind The Hive. It hosts the agents, tools and functions needed to complete the users tasks. 
 - Surreal DB Instance - This is used for maintaining an index of the agent's 'UserFiles' folder and also details of the available tools and guides. 
 
-### Tools
+### Tools 🔨
 Each agent has access to the following tools:
  - aiTextAction : General purpose AI text tool. For example for generation, reviewing, summerising etc. 
  - readFile : For reading files on the user's computer (The user sets the AI's 'home' folder.)
@@ -42,7 +42,7 @@ Each agent has access to the following tools:
  - deepResearchTool : Performs deep research on the user topic. Includes fact-checking. 
  - (More coming soon...)
 
-### LLM Providers 
+### LLM Providers 🤖
 The Hive is currently setup to use any of the following LLM providers (mix n match!)
 - Gemini (Text, Image, Audio, Code, WebSearch)
 - OpenAI (Text, Code)
