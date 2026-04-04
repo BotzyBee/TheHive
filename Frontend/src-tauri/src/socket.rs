@@ -38,9 +38,15 @@ struct AgentAction {
 
 #[derive(Deserialize, Debug)]
 struct AgentActionPayload {
-    actions: Vec<AgentAction>,
+    //actions: Vec<AgentAction>,
+    action: String,
+    data: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct TestPayload {
+    message: String,
+}
 
 // Automation State - Using Tokio Mutex to allow holding across .await
 pub struct AutomationState(pub Mutex<Enigo>);
@@ -67,6 +73,11 @@ async fn send_to_express(
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+async fn print_agent_response(payload: String){
+    println!("Received response from Agent: {}", payload);
 }
 
 
@@ -98,9 +109,14 @@ pub fn start_socket() {
                             if let Some(first_val) = values.get(0) {
                                 if let Ok(data) = serde_json::from_value::<StartAgentPayload>(first_val.clone()) {
                                     if let Some(h) = APP_HANDLE.get() {
-                                        // Open window
-                                        let message = format!("Navigating to {}", data.url.clone());
-                                        window_actions::emit_to_specific_webview(h.clone(), "add-status", &message, "agent-webview1").unwrap();
+                                        
+                                        let message = format!("Going to {}", data.url.clone());
+
+                                        // check window exists, if not create it, if it does navigate and show it
+                                        if !window_actions::check_window_exists(h.clone(), "agent-window") {
+                                           let _ = window_actions::build_multi_view_window(h.clone()).await; 
+                                        } 
+
                                         window_actions::navigate_webview(
                                             h.clone(), 
                                             tauri::WebviewUrl::External(data.url.parse().expect("Invalid URL")), 
@@ -114,14 +130,18 @@ pub fn start_socket() {
                 })
                 
                 // Follow on actions
-                .on("web-agent-actions", |payload: Payload, client| {
+                .on("test2", |payload: Payload, client| {
                     async move {
                         if let Payload::Text(values) = payload {
                             if let Some(first_val) = values.get(0) {
-                                if let Ok(data) = serde_json::from_value::<AgentActionPayload>(first_val.clone()) {
-                                  // stuff here!
+                                if let Ok(data) = serde_json::from_value::<TestPayload>(first_val.clone()) {
+                                 if let Some(h) = APP_HANDLE.get() {
+                                    println!("Received 'test2' event with payload: {:?}", data);
+                                    window_actions::emit_to_specific_webview(h.clone(), "add-status", &data.message, "agent-webview2").unwrap();
+                                    window_actions::emit_to_specific_webview(h.clone(), "request-dom-capture", "", "agent-webview1").unwrap();
                                 }
                             }
+                        }
                         }
                     }.boxed()
                 }) // Placeholder for the actual handler
@@ -142,13 +162,12 @@ pub fn start_socket() {
                 }
             });
 
-            // create_dual_webview_window(app.handle())?;
-            window_actions::build_multi_view_window(app)?;
             Ok(())
         })
         .manage(SocketState(socket_state_inner)) // Manage the socket state
         .invoke_handler(tauri::generate_handler![
             send_to_express,
+            print_agent_response
             //get_external_source
         ])
         .run(tauri::generate_context!())

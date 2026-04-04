@@ -221,6 +221,21 @@ io.on('connection', (socket) => {
     socket.emit('start-web-agent', { url: 'https://www.google.com' });
   });
 
+  socket.on('testing2', (data) => {
+    Services.Utils.log(`User ${socket.id} is now watching job test`);
+    socket.emit('test2', { message: data });
+  });
+
+  socket.on('testing3', (data) => {
+    Services.Utils.log(`User ${socket.id} is now watching job test`);
+    socket.emit('test3', { message: data });
+  });
+
+  socket.on('testing4', () => {
+    Services.Utils.log(`User ${socket.id} is now watching job test`);
+    socket.emit('test4', { message: data });
+  });
+
   socket.on('disconnect', () => {
     Services.Utils.log('User left');
   });

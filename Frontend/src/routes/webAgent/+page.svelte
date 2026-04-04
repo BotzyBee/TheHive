@@ -27,6 +27,7 @@
     
     onMount(async () => {
         unlisten = await listen('add-status', (event) => {
+            console.log('Received status update:', event.payload);
             addStatus(event.payload);
         });
     });

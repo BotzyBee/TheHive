@@ -1,21 +1,47 @@
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl, AppHandle, Manager, Emitter};
 
-pub fn build_multi_view_window(app: &tauri::App) -> tauri::Result<()> {
+pub async fn build_multi_view_window(app: tauri::AppHandle) -> tauri::Result<()> {
     let width = 1200.;
     let height = 700.;
 
-    let window = tauri::window::WindowBuilder::new(app, "agent-container")
+    // let preload_js = r#"
+    //     (function() {
+    //         window.__TAURI__.event.listen('request-dom-capture', (event) => {
+    //             const html = document.documentElement.outerHTML;
+    //             console.log("Emitting DOM capture response with HTML length:", html.length);
+    //             window.__TAURI__.event.emit('dom-response', {
+    //                 label: window.__TAURI_INTERNALS__.metadata.label,
+    //                 html: html
+    //             });
+    //         });
+    //     })();
+    // "#;
+
+let preload_js = r#"
+    console.log("Preload script executed, setting up event listener for 'request-dom-capture'...");
+    window.__TAURI__.webview.getCurrentWebview().listen('request-dom-capture', (event) => {
+        const html = document.documentElement.outerHTML;
+        console.log("Emitting DOM capture response with HTML length:", html.length);
+        const invoke = window.__TAURI__.core.invoke;
+        
+        // Added the missing comma after the command name
+        invoke('print_agent_response', { payload: 'Hello from Javascript!' });
+    }); 
+"#;
+
+    let window = tauri::window::WindowBuilder::new(&app, "agent-window")
     .title("Hive Agent")
     .inner_size(width, height)
     .build()?;
 
     // Main Webview
-    let _webview1 = window.add_child(
-    tauri::webview::WebviewBuilder::new(
+    let webview_builder = tauri::webview::WebviewBuilder::new(
         "agent-webview1", 
-        WebviewUrl::App("/webAgent".into()),
-    )
-    .auto_resize(),
+        WebviewUrl::App("/webAgent".into()),)
+        .initialization_script(preload_js)
+        .auto_resize();
+    let _webview1 = window.add_child(
+    webview_builder,
     LogicalPosition::new(0., 0.),
     LogicalSize::new(width * 0.8, height),
     )?;
@@ -33,7 +59,6 @@ pub fn build_multi_view_window(app: &tauri::App) -> tauri::Result<()> {
 
     Ok(())
 }
-
 
 pub async fn navigate_webview(handle: AppHandle, url: WebviewUrl, webview_label: &str) -> Result<(), String> {
     let window = handle.get_webview(webview_label)
@@ -56,9 +81,33 @@ pub async fn navigate_webview(handle: AppHandle, url: WebviewUrl, webview_label:
     Ok(())
 }
 
-
+// Used to emit a message to a specific webview
 pub fn emit_to_specific_webview(app: AppHandle, event: &str, payload: &str, webview_label: &str) -> Result<(), String> {
     app.emit_to(webview_label, event, payload).map_err(|e| e.to_string())
+}
+
+// Show and centre a specific window
+pub fn show_and_center_window(app: AppHandle, window_label: &str) -> Result<(), String> {
+    let window = app.get_window(window_label);
+    match window {
+        Some(w) => {
+            let is_visble = w.is_visible().unwrap_or(false);
+            if is_visble {
+                return Ok(());
+            }
+            let _ = w.show();
+            let _ = w.center();
+        }
+        None => {
+            return Err(format!("Window label '{}' not found", window_label));
+        }
+    }
+    Ok(())       
+}
+
+// Checks if a window with the given label exists
+pub fn check_window_exists(app: AppHandle, window_label: &str) -> bool {
+    app.get_window(window_label).is_some()
 }
 
 

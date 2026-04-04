@@ -10,6 +10,8 @@
   // These are your "state" variables bound to the inputs
   let inputEvent = ""; 
   let inputPayload = "";
+    let inputEvent2 = ""; 
+  let inputPayload2 = "";
 
   onMount(async () => {
     unlisten = await listen('test-message', (event) => {
@@ -38,6 +40,8 @@
       // Clear the inputs
       inputEvent = "";
       inputPayload = "";
+      inputEvent2 = "";
+      inputPayload2 = "";
     } catch (err) {
       console.error("Failed to send:", err);
     }
@@ -51,6 +55,14 @@
     <button on:click={() => sendMessageToServer(inputEvent, inputPayload)}>
       Send to Express
     </button>
+
+    <div style="padding-top: 30px;">
+    <input bind:value={inputEvent2} placeholder="EVENT.." />
+    <input bind:value={inputPayload2} placeholder="Payload..." />
+    <button on:click={() => sendMessageToServer("relay", JSON.stringify({event: inputEvent2, payload: inputPayload2}))}>
+      Relay Call
+    </button>
+    </div>
 
   <ul>
     {#each messages as msg}
