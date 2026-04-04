@@ -12,11 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "thehive",
+        "title": "The Hive - Botzy Bee",
         "width": 800,
         "height": 600
       }
     ],
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     }

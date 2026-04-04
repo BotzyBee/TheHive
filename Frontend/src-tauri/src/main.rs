@@ -1,6 +1,6 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use thehive_lib::socket::{start_socket};
 
-fn main() {
-    thehive_lib::run()
+
+fn main(){
+    start_socket()
 }

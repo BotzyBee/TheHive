@@ -1,3 +1,5 @@
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import {
@@ -90,11 +92,22 @@ const initServices = async () => {
     servicesStarted = true;
   }
 };
-// Express init
+// init express 
 export const app = express();
 const port = 3000;
-app.use(cors()); // Enable CORS for all origins <=== should be changed if not running locally !!)
-app.use(express.json()); // Enable JSON body parsing
+app.use(cors());
+app.use(express.json());
+
+// 1. Create the explicit HTTP server (wrapping the Express app)
+const httpServer = createServer(app);
+
+// 2. Initialize Socket.io
+export const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Matches your current Express CORS logic
+    methods: ["GET", "POST"]
+  }
+});
 
 // [][] -------------------------------------- [][]
 //                 API ENDPOINTS
@@ -173,11 +186,45 @@ app.get("/getConfig", async (req, res) => {
   res.status(200).json(msg);
 });
 
-// app.get("/test", async (req, res) => {
-//   let msg = await initGuideIndex();
-//   res.status(200).json(msg.value);
-// });
+app.get("/test", async (req, res) => {
+  let msg = await initGuideIndex();
+  // Only users who called socket.join('test') will hear this.
+  io.to('test').emit('testing', "POTATO ! 🥔");
+  res.status(200).json(msg.value);
+});
 
+
+// [][] -------------------------------------- [][]
+//                 WEBSOCKET EVENTS
+// [][] -------------------------------------- [][]
+
+//Handle Socket.io connections
+io.on('connection', (socket) => {
+  Services.Utils.log(`User joined: ${socket.id}`);
+  
+  // NOTES 
+  // -> start-web-agent : {url: String}
+  // <- web-agent-response : { status: String, data: String }
+  // -> web-agent-actions: { actions: [ { action: String, x: int, y: int, value: String (optional) } ] }
+
+  socket.on('web-agent-response', (data) => {
+    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
+    Services.FileSystem.saveFile(targetDirectoryInContainer, data, `WebAgent_${Date.now()}.txt`);
+    console.log('Received response from web agent - saved to file' );
+  });
+
+  // Add user to a room for a specific jobID when they want to watch it
+  socket.on('testing', () => {
+    socket.join('test'); 
+    Services.Utils.log(`User ${socket.id} is now watching job test`);
+    socket.emit('start-web-agent', { url: 'https://www.google.com' });
+  });
+
+  socket.on('disconnect', () => {
+    Services.Utils.log('User left');
+  });
+});
 
 // Test Endpoint 
 // app.get('/test', async (req, res) => {
@@ -194,18 +241,23 @@ app.get("/getConfig", async (req, res) => {
 
 let server;
 const startServer = () => {
-  server = app.listen(port, () => {
-    Services.Utils.log(`Server running on port ${port}`);
+  server = httpServer.listen(port, () => {
+    Services.Utils.log(`Server running on port ${port} (HTTP + WS)`);
   });
 };
 
 // [][] --- Graceful Sutdown --- [][]
 const gracefulShutdown = async (signal) => {
   Services.Utils.log('Graceful Shutdown Started');
-  // Stop the Express server from accepting new connections
+  
+  if (io) {
+    await io.close(); // Close all websocket connections
+    Services.Utils.log('Socket.io closed');
+  }
+
   if (server) {
     server.close(() => {
-      Services.Utils.log('Server closed');
+      Services.Utils.log('HTTP Server closed');
     });
   }
   // Clear all active timers

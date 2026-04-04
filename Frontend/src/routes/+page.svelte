@@ -33,6 +33,7 @@
 					<p style="padding-top: 20px;">	
 					<a href="/task"><span class="p-6">AGENTS</span></a>
 					<a href="/dashboard"><span class="p-5">DASHBOARD</span></a>
+					<a href="/test"><span class="p-5">TEST</span></a>
 					</p>
 				</div>
 			</div>

@@ -184,7 +184,10 @@ export const MIME_MAP = new Map([
   ["audio/wav", 
     { extension: "wav", name: "Waveform Audio", encoding: "base64", 
       readFN: null, 
-      writeFN: null }
+      writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => {
+        let process = processBase64Audio_ToWavBuffer(fileContent, "audio/L16;codec=pcm;rate=24000");
+        await saveFile(relativeFolderPath, process, fileNameIncExt)
+      } }
     ],
   ["audio/L16;codec=pcm;rate=24000", 
     { extension: "wav", name: "PCM Audio", encoding: "base64", 
