@@ -1,6 +1,6 @@
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl, AppHandle, Manager, Emitter};
 
-pub async fn build_multi_view_window(app: tauri::AppHandle) -> tauri::Result<()> {
+pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String> {
     let width = 1200.;
     let height = 700.;
 
@@ -12,7 +12,7 @@ pub async fn build_multi_view_window(app: tauri::AppHandle) -> tauri::Result<()>
 
             // __TAURI_INTERNALS__ is always available, even with GlobalTauri = false
             if (window.__TAURI_INTERNALS__) {
-                window.__TAURI_INTERNALS__.invoke('print_agent_response', {
+                window.__TAURI_INTERNALS__.invoke('return_dom_to_express', {
                     payload: document.documentElement.outerHTML
                 });
             } else {
@@ -25,32 +25,55 @@ pub async fn build_multi_view_window(app: tauri::AppHandle) -> tauri::Result<()>
     let window = tauri::window::WindowBuilder::new(&app, "agent-window")
     .title("Hive Agent")
     .inner_size(width, height)
-    .build()?;
+    .build();
+    match window {
+        Ok(w) => {
 
-    // Main Webview
-    let webview_builder = tauri::webview::WebviewBuilder::new(
-        "agent-webview1", 
-        WebviewUrl::App("/webAgent".into()),)
-        .initialization_script(preload_js)
-        .auto_resize();
-    let _webview1 = window.add_child(
-    webview_builder,
-    LogicalPosition::new(0., 0.),
-    LogicalSize::new(width * 0.8, height),
-    )?;
+            // Main Webview
+            let webview_builder = tauri::webview::WebviewBuilder::new(
+                "agent-webview1", 
+                WebviewUrl::App("/webAgent".into()),)
+                .initialization_script(preload_js)
+                .auto_resize();
+            
+            // Agent Window
+            let _webview1 = w.add_child(
+                webview_builder,
+                LogicalPosition::new(0., 0.),
+                LogicalSize::new(width * 0.8, height),
+                );
+            match _webview1 {
+                Ok(_) => {},
+                Err(e) => {
+                    let er = format!("Error (build_multi_view_window) : {}", e);
+                    return Err(er);
+                }
+            }
 
-    // Sidebar Webview (botzy agent)
-    let _webview2 = window.add_child(
-    tauri::webview::WebviewBuilder::new(
-        "agent-webview2",
-        WebviewUrl::App("/webAgent".into())
-    )
-    .auto_resize(),
-    LogicalPosition::new(width * 0.8, 0.),
-    LogicalSize::new(width * 0.2, height),
-    )?;
-
-    Ok(())
+            // Sidebar Webview (botzy agent)
+            let _webview2 = w.add_child(
+            tauri::webview::WebviewBuilder::new(
+                "agent-webview2",
+                WebviewUrl::App("/webAgent".into())
+            )
+            .auto_resize(),
+            LogicalPosition::new(width * 0.8, 0.),
+            LogicalSize::new(width * 0.2, height),
+            );
+            match _webview2 {
+                Ok(_) => {},
+                Err(e) => {
+                    let er = format!("Error (build_multi_view_window) : {}", e);
+                    return Err(er);
+                }
+            }
+            return Ok(());
+        },
+        Err(e   ) => {
+            let er = format!("Error (build_multi_view_window) : {}", e);
+            return Err(er);
+        }
+    }
 }
 
 pub fn navigate_webview(handle: AppHandle, url: WebviewUrl, webview_label: &str) -> Result<(), String> {

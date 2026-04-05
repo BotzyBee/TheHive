@@ -4,12 +4,14 @@ use rust_socketio::asynchronous::{ClientBuilder, Client};
 use rust_socketio::Payload;
 use tauri::{AppHandle, Manager, State};
 use std::sync::{OnceLock, Arc};
+use std::ops::Deref;
 use tokio::sync::Mutex; // Changed to Tokio Mutex
 use serde::{Deserialize, Serialize};
 use enigo::{Enigo, Settings};
 use futures_util::FutureExt; 
 
 use crate::window_actions;
+use crate::agent::{self, AgentMessage};
 
 // [][] ---------- STATE & STATIC HANDLES ---------- [][]
 
@@ -26,32 +28,6 @@ pub struct SocketState(pub Arc<Mutex<Option<Client>>>);
 // [][] ---------- STRUCTS & TYPES ---------- [][]
 
 #[derive(Deserialize, Debug)]
-struct StartAgentPayload {
-    url: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct AgentResponsePayload {
-    status: String, 
-    data: String
-}
-
-#[derive(Deserialize, Debug)]
-struct AgentAction {
-    action: String,
-    x: i32,
-    y: i32,
-    value: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct AgentActionPayload {
-    //actions: Vec<AgentAction>,
-    action: String,
-    data: String,
-}
-
-#[derive(Deserialize, Debug)]
 struct TestPayload {
     message: String,
 }
@@ -60,27 +36,19 @@ struct TestPayload {
 // [][] ---------- TAURI COMMANDS ---------- [][]
 
 #[tauri::command]
-async fn send_to_express(
-    event: String, 
-    payload: String, 
-    socket_state: State<'_, SocketState>
-) -> Result<(), String> {
-    // We use .lock().await because this is a tokio::sync::Mutex
-    let client_lock = socket_state.0.lock().await;
-    let client = client_lock.as_ref().ok_or("Socket not connected")?;
-
-    // Emit the data to Express
-    client
-        .emit(event, serde_json::json!({ "data": payload }))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn print_agent_response(payload: String){
-    println!("Received response from Agent: {}", payload);
+async fn return_dom_to_express(payload: String){
+    println!("Received response from Agent - returning to Express");
+    let app_handle: &AppHandle = APP_HANDLE.get().expect("App handle not set");
+    let agent_state: State<'_, agent::AgentState> = app_handle.state::<agent::AgentState>();
+    let agent_state_lock: tokio::sync::MutexGuard<'_, agent::AgentJob> = agent_state.0.lock().await;
+    let agent_state_data = agent_state_lock.deref().clone();
+    let message: AgentMessage<String> = agent::AgentMessage {
+        job_id: agent_state_data.job_id.clone(),
+        base_url: agent_state_data.base_url.clone(),
+        message_type: agent::MessageType::DomResponse,
+        data: payload.clone(),
+    };
+    agent::send_to_express("web-agent-response".to_string(), message, APP_HANDLE.get().unwrap().clone()).await.unwrap();
 }
 
 
@@ -91,12 +59,13 @@ pub fn start_socket() {
     let automation_state = AutomationState(Mutex::new(
         Enigo::new(&Settings::default()).expect("Failed to initialize Enigo")
     ));
-
+    let agent_state = agent::AgentState(Arc::new(Mutex::new(agent::AgentJob::default())));
     let socket_state_inner = Arc::new(Mutex::new(None));
     let socket_state_clone = socket_state_inner.clone();
 
     tauri::Builder::default()
         .manage(automation_state)
+        .manage(agent_state)
         .setup(move |app| {
             let handle = app.handle().clone();
             let _ = APP_HANDLE.set(handle.clone());
@@ -106,41 +75,25 @@ pub fn start_socket() {
                 let socket_result = ClientBuilder::new("http://localhost:3000")
 
                 // Opens webagent window and navigates to URL provided by Express
-                .on("start-web-agent", |payload: Payload, _client| {
+                .on("start-web-agent", |payload: Payload, client| {
                     async move {
                         if let Payload::Text(values) = payload {
                             if let Some(first_val) = values.get(0) {
-                                if let Ok(data) = serde_json::from_value::<StartAgentPayload>(first_val.clone()) {
+                                if let Ok(data) = serde_json::from_value::<agent::AgentMessage<serde_json::Value>>(first_val.clone()) {
                                     if let Some(h) = APP_HANDLE.get() {
                                         let h_clone = h.clone();
-                                        let url_data = data.url.clone();
 
-                                        // Use Tauri's async runtime to spawn the task
-                                        // This prevents the event handler from stalling the main loop
+                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
                                         tauri::async_runtime::spawn(async move {
-                                            let message = format!("Going to {}", url_data);
-
-                                            // 1. Check/Build window
-                                            if !window_actions::check_window_exists(h_clone.clone(), "agent-window") {
-                                                let _ = window_actions::build_multi_view_window(h_clone.clone()).await;
-                                                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // Small delay to ensure window is ready before navigation.
-                                            }
-
-                                            // 2. Navigate (Wrapped in a Result check)
-                                            let target_url = tauri::WebviewUrl::External(url_data.parse().expect("Invalid URL"));
-                                            
-                                            match window_actions::navigate_webview(h_clone.clone(), target_url, "agent-webview1") {
-                                                Ok(_) => {
-                                                    // These will now execute!
-                                                    println!("Received 'start-web-agent' event with URL: {}", url_data);
-                                                    let _ = window_actions::emit_to_specific_webview(
-                                                        h_clone, 
-                                                        "add-status", 
-                                                        &message, 
-                                                        "agent-webview2"
-                                                    );
-                                                }
-                                                Err(e) => eprintln!("Navigation error: {}", e),
+                                            match agent::init_agent(h_clone.clone(), data).await {
+                                                Ok(v) => {
+                                                    let json_payload = serde_json::to_value(v).map_err(|e| e.to_string()).unwrap();
+                                                    client
+                                                        .emit("web-agent-response", json_payload)
+                                                        .await
+                                                        .map_err(|e| e.to_string()).unwrap();
+                                                },
+                                                Err(e) => eprintln!("Error (start-web-agent) : {}", e),
                                             }
                                         });
                                     }
@@ -151,30 +104,55 @@ pub fn start_socket() {
                 })
                 
                 // Follow on actions
-                .on("test2", |payload: Payload, client| {
+                .on("capture-dom", |payload: Payload, client| {
                     async move {
                         if let Payload::Text(values) = payload {
                             if let Some(first_val) = values.get(0) {
-                                if let Some(h) = APP_HANDLE.get() {
-                                println!("Received 'test2' event");
-                                window_actions::emit_to_specific_webview(h.clone(), "add-status", "Potato!", "agent-webview2").unwrap();
+                                if let Ok(data) = serde_json::from_value::<agent::AgentMessage<serde_json::Value>>(first_val.clone()) {
+                                    if let Some(h) = APP_HANDLE.get() {
+                                        let h_clone = h.clone();
+
+                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
+                                        tauri::async_runtime::spawn(async move {
+                                            match window_actions::trigger_agent_dom_capture(h_clone.clone()) {
+                                                Ok(_) => {
+                                                    let message = format!("Triggered DOM capture for job {}", data.job_id);
+                                                    let response = agent::AgentMessage {
+                                                        job_id: data.job_id.clone(),
+                                                        base_url: data.base_url.clone(),
+                                                        message_type: agent::MessageType::Update,
+                                                        data: message,
+                                                    };
+                                                    let json_payload = serde_json::to_value(response).map_err(|e| e.to_string()).unwrap();
+                                                    client
+                                                        .emit("web-agent-response", json_payload)
+                                                        .await
+                                                        .map_err(|e| e.to_string()).unwrap();
+                                                },
+                                                Err(e) => eprintln!("Error (capture-dom) : {}", e),
+                                            }
+                                        });
+                                    }
+                                }
                             }
                         }
-                        }
                     }.boxed()
-                }) // Placeholder for the actual handler
-                .on("test3", |payload: Payload, client| {
+                })
+
+                .on("take-action", |payload: Payload, client| {
                     async move {
                         if let Payload::Text(values) = payload {
                             if let Some(first_val) = values.get(0) {
-                                 if let Some(h) = APP_HANDLE.get() {
-                                    println!("Received 'test3' event");
-                                    let code = "document.dispatchEvent(new Event('__HIVE_CAPTURE_DOM__'));";
-                                    window_actions::eval_in_specific_webview(
-                                        h.clone(), 
-                                        code, 
-                                        "agent-webview1"
-                                    ).unwrap();
+                                if let Ok(data) = serde_json::from_value::<agent::AgentMessage<serde_json::Value>>(first_val.clone()) {
+                                    if let Some(h) = APP_HANDLE.get() {
+                                        let h_clone = h.clone();
+
+                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
+                                        tauri::async_runtime::spawn(async move {
+                                            println!("Received take-action command for job {}: {:?}", data.job_id, data.data);
+                                            // TODO!
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -201,9 +179,7 @@ pub fn start_socket() {
         })
         .manage(SocketState(socket_state_inner)) // Manage the socket state
         .invoke_handler(tauri::generate_handler![
-            send_to_express,
-            print_agent_response
-            //get_external_source
+            return_dom_to_express
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
