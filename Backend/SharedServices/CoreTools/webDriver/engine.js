@@ -2,6 +2,7 @@ import { initWebDriver, getCurrentPageContent  } from "./socket.js";
 import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { connectedSockets } from "../../../app.js";
 import { Services } from '../../index.js';
+import { cleanHtmlString } from './utils.js';
 
 export async function testDrive(){
 
@@ -21,9 +22,17 @@ export async function testDrive(){
         return Err(`Failed to get page content: ${contentResult.value}`);
     }
 
+    // Strip Script / Style tags from the content before saving, also strip style="" inline
+    const cleanedResult = await cleanHtmlString(contentResult.value.data);
+    if(cleanedResult.isErr()){
+        console.error(cleanedResult.value);
+        return Err(`Failed to clean HTML content: ${cleanedResult.value}`);
+    }
+    const strippedContent = cleanedResult.value.cleanedHtml;
+
     const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
     const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
-    Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(contentResult.value, null, 2), `WebAgent_${Date.now()}.txt`);
+    Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(strippedContent, null, 2), `WebAgent_${Date.now()}.txt`);
     return Ok("Test drive completed successfully.");
 
 }

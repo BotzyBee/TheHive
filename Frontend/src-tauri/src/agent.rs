@@ -156,86 +156,34 @@ pub async fn trigger_dom_capture(app: AppHandle) -> Result<(), String> {
     let label = "agent-webview1";
     let webview = app.get_webview(label).ok_or("Webview not found")?;
 
-    // 1. Listen for the event exactly ONCE. 
-    // This replaces your Channel closure completely.
-   webview.once("dom-captured", move |event| {
-    let raw_json = event.payload();
-
-    if let Ok(dom_string) = serde_json::from_str::<String>(raw_json) {
-        println!("[agent-webview1] SUCCESS! DOM Received. Length: {}", dom_string.len());
-
-        // 1. We must clone the app handle to move it into the async task
-        let app_handle = app.clone(); 
-        
-        // 2. Spawn an async task to handle the locking and network request
-        tauri::async_runtime::spawn(async move {
-            let agent_state: tauri::State<'_, AgentState> = app_handle.state::<AgentState>();
-            
-            // Perform the async lock
-            let agent_state_lock: tokio::sync::MutexGuard<'_, AgentJob> = agent_state.inner().0.lock().await;
-            let agent_state_data = &*agent_state_lock;
-            
-            // Build the message (Note: changed 'payload' to 'dom_string')
-            let message = AgentMessage {
-                job_id: agent_state_data.job_id.clone(),
-                base_url: agent_state_data.base_url.clone(),
-                outcome: MessageOutcome::Success,
-                message_type: MessageType::DomResponse,
-                data: dom_string, 
-            };
-
-            // 3. Drop the lock before the network call to avoid deadlocks
-            drop(agent_state_lock);
-
-            // Send to Express
-            let _ = send_to_express(
-                "page-content-response".to_string(), 
-                message, 
-                app_handle
-            ).await;
-        });
-    } else {
-        println!("[agent-webview1] Failed to parse DOM payload. Raw: {}", raw_json);
-    }
-});
-
-    // 2. The Capture Script
     let script = format!(r#"
         (function() {{
-            const label = "{}";
-
-            const performCapture = () => {{
+            const performCapture = async () => {{
                 try {{
-                    const doc = document.documentElement;
-                    if (!doc) return;
+                    const domData = document.documentElement.outerHTML;
                     
-                    const domData = doc.outerHTML;
-                    const internals = window.__TAURI_INTERNALS__;
-                    
-                    // Use Tauri's internal invoke to trigger the Event plugin
-                    if (internals && internals.invoke) {{
-                        internals.invoke('plugin:event|emit', {{
-                            event: 'dom-captured',
-                            payload: domData
-                        }}).then(() => {{
-                            console.log(`[${{label}}] Successfully emitted dom-captured event to Rust`);
-                        }}).catch(err => {{
-                            console.error(`[${{label}}] Emit failed:`, err);
-                        }});
+                    // Identify the correct invoke function based on Tauri version/config
+                    const invoker = window.__TAURI__?.core?.invoke || window.__TAURI__?.invoke;
+
+                    if (invoker) {{
+                        // The 'payload' key must match your Rust function argument name
+                        await invoker('return_dom_to_express', {{ payload: domData }});
+                        console.log("DOM successfully sent to Rust command.");
+                    }} else {{
+                        console.error("Tauri global object not found. Is 'withGlobalTauri' enabled?");
                     }}
                 }} catch (err) {{
-                    console.error(`[${{label}}] Capture error:`, err);
+                    console.error("DOM Capture/Invoke Error:", err);
                 }}
             }};
 
-            // Wait for load if necessary
             if (document.readyState === 'complete') {{
                 performCapture();
             }} else {{
                 window.addEventListener('load', performCapture, {{ once: true }});
             }}
         }})()
-    "#, label);
+    "#);
 
     webview.eval(&script).map_err(|e| e.to_string())
 }

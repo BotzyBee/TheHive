@@ -1,0 +1,19 @@
+# Agent Planning Guide
+# TextToSpeech.txt 
+
+Covers: This guide covers how best to handle task that involve creating text to speech files. The user will provide input text and the agent should then handle this and return a wav file output. 
+
+# Key Consideration
+When planning to undertake a file system action the main considerations are 
+
+1) Knowing the text that the user wants turned into speech. 
+2) Knowing the folder / directory where the output file should be saved. If the user doesn't specify a file path - use the 'workingDirectory' which can be found in the global context. The root directory is /UserFiles/ if you are really stuck.
+
+# Tools
+You will need to use the 'textToSpeech' tool and provide it with the text the user has given you. If you are unsure what text to use - clarify this with the user. 
+
+Once the textToSpeech tool has completed (base64 data - wav format) you will then have to use the 'writeFile' tool to save the base64 data. 
+
+# New Directories
+When saving files you can include a file path to a directory that does not exist. The file saving process will create any new directories needed. This is useful if you are planning on saving or handling multiple files and want to keep them all together for the user. 
+

@@ -204,7 +204,7 @@ pub fn start_socket() {
         })
         .manage(SocketState(socket_state_inner)) // Manage the socket state
         .invoke_handler(tauri::generate_handler![
-            return_dom_to_express
+            return_dom_to_express   
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,11 +4,9 @@
   "description": "Capability for the main window",
   "windows": ["main", "agent-window", "agent-webview1", "agent-webview2"],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "core:event:allow-emit", 
-    "core:event:allow-emit-to", 
-    "core:event:allow-listen", 
-    "core:event:allow-unlisten"
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "core:event:default",
+    "core:event:allow-emit-to"
   ]
 }
