@@ -16,6 +16,7 @@ import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
+import { testDrive } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -187,8 +188,8 @@ app.get("/getConfig", async (req, res) => {
 });
 
 app.get("/test", async (req, res) => {
-  let msg = await initGuideIndex();
-  // Only users who called socket.join('test') will hear this.
+  let msg = await testDrive();
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
   io.to('test').emit('testing', "POTATO ! 🥔");
   res.status(200).json(msg.value);
 });
@@ -197,58 +198,26 @@ app.get("/test", async (req, res) => {
 // [][] -------------------------------------- [][]
 //                 WEBSOCKET EVENTS
 // [][] -------------------------------------- [][]
+export let connectedSockets = []; // shoud only be one for now but can be used for multi-user features in the future.
 
 //Handle Socket.io connections
 io.on('connection', (socket) => {
   Services.Utils.log(`User joined: ${socket.id}`);
-  
-  // NOTES 
-  // -> start-web-agent : {url: String}
-  // <- web-agent-response : { status: String, data: String }
-  // -> web-agent-actions: { actions: [ { action: String, x: int, y: int, value: String (optional) } ] }
+  connectedSockets.push(socket);
 
-  socket.on('web-agent-response', (data) => {
+  socket.on('web-agent-response-old', (data) => {
     const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
     const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
     Services.FileSystem.saveFile(targetDirectoryInContainer, data, `WebAgent_${Date.now()}.txt`);
     console.log('Received response from web agent - saved to file' );
   });
 
-  // Add user to a room for a specific jobID when they want to watch it
-  socket.on('testing', () => {
-    socket.join('test'); 
-    Services.Utils.log(`User ${socket.id} is now watching job test`);
-    socket.emit('start-web-agent', { url: 'https://www.google.com' });
-  });
-
-  socket.on('testing2', (data) => {
-    Services.Utils.log(`User ${socket.id} is now watching job test`);
-    socket.emit('test2', { message: data });
-  });
-
-  socket.on('testing3', (data) => {
-    Services.Utils.log(`User ${socket.id} is now watching job test`);
-    socket.emit('test3', { message: data });
-  });
-
-  socket.on('testing4', () => {
-    Services.Utils.log(`User ${socket.id} is now watching job test`);
-    socket.emit('test4', { message: data });
-  });
-
   socket.on('disconnect', () => {
-    Services.Utils.log('User left');
+    Services.Utils.log(`User left: ${socket.id}`);
+    connectedSockets = connectedSockets.filter(s => s !== socket);
   });
 });
 
-// Test Endpoint 
-// app.get('/test', async (req, res) => {
-//   let tsk = req?.query?.tool;
-//   let x = await getToolDetails(tsk);
-//   //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
-//   //console.log(x);
-//   res.status(200).json({result: x });
-// });
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

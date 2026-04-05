@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use enigo::agent::Agent;
 use rust_socketio::asynchronous::{ClientBuilder, Client};
 use rust_socketio::Payload;
 use tauri::{AppHandle, Manager, State};
@@ -37,18 +38,19 @@ struct TestPayload {
 
 #[tauri::command]
 async fn return_dom_to_express(payload: String){
-    println!("Received response from Agent - returning to Express");
     let app_handle: &AppHandle = APP_HANDLE.get().expect("App handle not set");
     let agent_state: State<'_, agent::AgentState> = app_handle.state::<agent::AgentState>();
     let agent_state_lock: tokio::sync::MutexGuard<'_, agent::AgentJob> = agent_state.0.lock().await;
-    let agent_state_data = agent_state_lock.deref().clone();
+    let agent_state_data = agent_state_lock.deref();
     let message: AgentMessage<String> = agent::AgentMessage {
         job_id: agent_state_data.job_id.clone(),
         base_url: agent_state_data.base_url.clone(),
+        outcome: agent::MessageOutcome::Success,
         message_type: agent::MessageType::DomResponse,
         data: payload.clone(),
     };
-    agent::send_to_express("web-agent-response".to_string(), message, APP_HANDLE.get().unwrap().clone()).await.unwrap();
+    println!("Emitting page content message to Express. Len : {}", message.data.len());
+    agent::send_to_express("page-content-response".to_string(), message, APP_HANDLE.get().unwrap().clone()).await.unwrap();
 }
 
 
@@ -75,66 +77,89 @@ pub fn start_socket() {
                 let socket_result = ClientBuilder::new("http://localhost:3000")
 
                 // Opens webagent window and navigates to URL provided by Express
-                .on("start-web-agent", |payload: Payload, client| {
+                .on("start-web-agent", |payload: Payload, client: Client| {
+                    println!("Starting web agent");
+//Received 'start-web-agent' command with payload: Text([Object {"base_url": String("https://www.wikipedia.org/"), "data": Object {}, "job_id": String("test-job-123"), "message_type": Number(4)}])
                     async move {
-                        if let Payload::Text(values) = payload {
-                            if let Some(first_val) = values.get(0) {
-                                if let Ok(data) = serde_json::from_value::<agent::AgentMessage<serde_json::Value>>(first_val.clone()) {
-                                    if let Some(h) = APP_HANDLE.get() {
-                                        let h_clone = h.clone();
+                        let values = match payload {
+                            Payload::Text(v) => v,
+                            _ => return,
+                        };
 
-                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
-                                        tauri::async_runtime::spawn(async move {
-                                            match agent::init_agent(h_clone.clone(), data).await {
-                                                Ok(v) => {
-                                                    let json_payload = serde_json::to_value(v).map_err(|e| e.to_string()).unwrap();
-                                                    client
-                                                        .emit("web-agent-response", json_payload)
-                                                        .await
-                                                        .map_err(|e| e.to_string()).unwrap();
-                                                },
-                                                Err(e) => eprintln!("Error (start-web-agent) : {}", e),
-                                            }
-                                        });
-                                    }
-                                }
-                            }
+                        let first_val = match values.get(0) {
+                            Some(v) => v,
+                            None => return,
+                        };
+
+                        let data: agent::AgentMessage<serde_json::Value> = match serde_json::from_value(first_val.clone()) {
+                            Ok(d) => d,
+                            Err(_) => return,
+                        };
+
+                        if let Some(h) = APP_HANDLE.get() {
+                            let h_clone = h.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let call = agent::init_agent(h_clone, data).await.unwrap();
+                                let json_payload = serde_json::to_value(call).unwrap();
+                                let x = client.emit("start-agent-response", json_payload).await;
+                            });
                         }
                     }.boxed()
                 })
                 
                 // Follow on actions
                 .on("capture-dom", |payload: Payload, client| {
+                    print!("Received 'capture-dom' command with payload: {:?}", payload);
                     async move {
-                        if let Payload::Text(values) = payload {
-                            if let Some(first_val) = values.get(0) {
-                                if let Ok(data) = serde_json::from_value::<agent::AgentMessage<serde_json::Value>>(first_val.clone()) {
-                                    if let Some(h) = APP_HANDLE.get() {
-                                        let h_clone = h.clone();
+                        let values = match payload {
+                            Payload::Text(v) => v,
+                            _ => return,
+                        };
+                        let first_val = match values.get(0) {
+                            Some(v) => v,
+                            None => return,
+                        };
 
-                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
-                                        tauri::async_runtime::spawn(async move {
-                                            match window_actions::trigger_agent_dom_capture(h_clone.clone()) {
-                                                Ok(_) => {
-                                                    let message = format!("Triggered DOM capture for job {}", data.job_id);
-                                                    let response = agent::AgentMessage {
-                                                        job_id: data.job_id.clone(),
-                                                        base_url: data.base_url.clone(),
-                                                        message_type: agent::MessageType::Update,
-                                                        data: message,
-                                                    };
-                                                    let json_payload = serde_json::to_value(response).map_err(|e| e.to_string()).unwrap();
-                                                    client
-                                                        .emit("web-agent-response", json_payload)
-                                                        .await
-                                                        .map_err(|e| e.to_string()).unwrap();
-                                                },
-                                                Err(e) => eprintln!("Error (capture-dom) : {}", e),
-                                            }
-                                        });
-                                    }
+                        let data: agent::AgentMessage<serde_json::Value> = match serde_json::from_value(first_val.clone()) {
+                            Ok(d) => d,
+                            Err(_) => return,
+                        };
+
+                        if let Some(h) = APP_HANDLE.get() {
+                            let h_clone = h.clone();
+
+                            // Use Tauri's async runtime to spawn the task (dont block the socket listener)
+                            tauri::async_runtime::spawn(async move {
+                                match agent::trigger_dom_capture(h_clone.clone()).await {
+                                    Ok(_) => {
+                                        // Success response will be sent from the webview after DOM capture, so no need to emit here.
+                                        println!("Triggered DOM capture for job {}", data.job_id);
+                                    },
+                                    Err(e) => {
+                                        println!("Error triggering DOM capture for job {}: {}", data.job_id, e);
+                                    },
                                 }
-                            }
+                                // match window_actions::trigger_agent_dom_capture(h_clone.clone()) {
+                                //     Ok(_) => {
+                                //         // Success response will be sent from the webview after DOM capture, so no need to emit here.
+                                //     },
+                                //     Err(e) => {
+                                //             let message = format!("Error triggering DOM capture for job {}: {}", data.job_id, e);
+                                //             let response = agent::AgentMessage {
+                                //                 job_id: data.job_id.clone(),
+                                //                 base_url: data.base_url.clone(),
+                                //                 message_type: agent::MessageType::Update,
+                                //                 outcome: agent::MessageOutcome::Failure,
+                                //                 data: message,
+                                //             };
+                                //             let json_payload = serde_json::to_value(response).map_err(|e| e.to_string()).unwrap();
+                                //             client
+                                //                 .emit("page-content-response", json_payload)
+                                //                 .await
+                                //                 .map_err(|e| e.to_string()).unwrap();
+                                //     },
+                                // }
+                            });
                         }
                     }.boxed()
                 })

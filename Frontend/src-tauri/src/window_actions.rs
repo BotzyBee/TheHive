@@ -1,26 +1,27 @@
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl, AppHandle, Manager, Emitter};
+use tauri::path::BaseDirectory;
 
 pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String> {
     let width = 1200.;
     let height = 700.;
 
     // Preload script to allow capturing DOM and sending it back to Rust via a custom event
-    let preload_js = r#"
-    (function() {      
-        // Listen for a specific secret event name dispatched by Rust
-        document.addEventListener('__HIVE_CAPTURE_DOM__', function() {    
+    // let preload_js = r#"
+    // (function() {      
+    //     // Listen for a specific secret event name dispatched by Rust
+    //     document.addEventListener('__HIVE_CAPTURE_DOM__', function() {    
 
-            // __TAURI_INTERNALS__ is always available, even with GlobalTauri = false
-            if (window.__TAURI_INTERNALS__) {
-                window.__TAURI_INTERNALS__.invoke('return_dom_to_express', {
-                    payload: document.documentElement.outerHTML
-                });
-            } else {
-                console.error("Critical: Internals not found. (Hive error code 1001)");
-            }
-        });
-    })();
-    "#;
+    //         // __TAURI_INTERNALS__ is always available, even with GlobalTauri = false
+    //         if (window.__TAURI_INTERNALS__) {
+    //             window.__TAURI_INTERNALS__.invoke('return_dom_to_express', {
+    //                 payload: document.documentElement.outerHTML
+    //             });
+    //         } else {
+    //             console.error("Critical: Internals not found. (Hive error code 1001)");
+    //         }
+    //     });
+    // })();s
+    // "#;
 
     let window = tauri::window::WindowBuilder::new(&app, "agent-window")
     .title("Hive Agent")
@@ -32,15 +33,15 @@ pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String
             // Main Webview
             let webview_builder = tauri::webview::WebviewBuilder::new(
                 "agent-webview1", 
-                WebviewUrl::App("/webAgent".into()),)
-                .initialization_script(preload_js)
+                 WebviewUrl::External("https://www.wikipedia.org/".parse().expect("Invalid URL")))
+                //.initialization_script()
                 .auto_resize();
             
             // Agent Window
             let _webview1 = w.add_child(
                 webview_builder,
                 LogicalPosition::new(0., 0.),
-                LogicalSize::new(width * 0.8, height),
+                LogicalSize::new(width * 1., height),
                 );
             match _webview1 {
                 Ok(_) => {},
@@ -51,22 +52,22 @@ pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String
             }
 
             // Sidebar Webview (botzy agent)
-            let _webview2 = w.add_child(
-            tauri::webview::WebviewBuilder::new(
-                "agent-webview2",
-                WebviewUrl::App("/webAgent".into())
-            )
-            .auto_resize(),
-            LogicalPosition::new(width * 0.8, 0.),
-            LogicalSize::new(width * 0.2, height),
-            );
-            match _webview2 {
-                Ok(_) => {},
-                Err(e) => {
-                    let er = format!("Error (build_multi_view_window) : {}", e);
-                    return Err(er);
-                }
-            }
+            // let _webview2 = w.add_child(
+            // tauri::webview::WebviewBuilder::new(
+            //     "agent-webview2",
+            //     WebviewUrl::App("/webAgent".into())
+            // )
+            // .auto_resize(),
+            // LogicalPosition::new(width * 0.8, 0.),
+            // LogicalSize::new(width * 0.2, height),
+            // );
+            // match _webview2 {
+            //     Ok(_) => {},
+            //     Err(e) => {
+            //         let er = format!("Error (build_multi_view_window) : {}", e);
+            //         return Err(er);
+            //     }
+            // }
             return Ok(());
         },
         Err(e   ) => {
@@ -133,11 +134,18 @@ pub fn check_window_exists(app: AppHandle, window_label: &str) -> bool {
 
 // Triggers the agent webview to capture the DOM and send it back.
 pub fn trigger_agent_dom_capture(app: AppHandle) -> Result<(), String> {
-    let code = "document.dispatchEvent(new Event('__HIVE_CAPTURE_DOM__'));";
-    eval_in_specific_webview(
-        app, 
-        code, 
-        "agent-webview1"
-    )
+    //let code = "document.dispatchEvent(new Event('__HIVE_CAPTURE_DOM__'));";
+    let code = r#"
+        (function() {
+            if(window.ipc.postMessage) {
+                console.log("Window IPC is available.");
+            } else {
+                console.error("window.ipc.postMessage is not available. DOM capture failed.");
+            }
+        })()
+    "#;
+   
+    let webview = app.get_webview("agent-webview1").ok_or("Webview not found")?;
+    webview.eval(code).map_err(|e| e.to_string())
 }
 
