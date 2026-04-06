@@ -9,68 +9,54 @@ import { Ok, Err } from '../../Utils/helperFunctions.js';
 export async function cleanHtmlString(htmlString, baseUrl = 'http://localhost') {
     try {
         const dom = new JSDOM(htmlString, { url: baseUrl });
-        const { document, window } = dom.window;
+        const { document } = dom.window;
 
-        // 1. Combine all removals into a single query for performance
-        const elementsToRemove = [
-            'style', 'script', 'svg', 'iframe', 'noscript', 'canvas', 'video', 'audio',
-            '.cookie-banner', '#gdpr-dialog', '.social-share-buttons', '.share-bar',
-            '.ad-container', '#ad-block', '[aria-hidden="true"]',
-            // Fast inline-style hiding check (replaces the slow getComputedStyle loop)
-            '[hidden]', '[style*="display: none"]', '[style*="display:none"]', '[style*="visibility: hidden"]'
+        // 1. Heavy Pruning
+        const junkTags = ['style', 'script', 'svg', 'iframe', 'noscript', 'canvas', 'video', 'audio', 'head'];
+        const junkAttrs = ['[aria-hidden="true"]', '[hidden]', '[style*="display: none"]'];
+        document.querySelectorAll([...junkTags, ...junkAttrs].join(', ')).forEach(el => el.remove());
+
+        // 2. Interactive Attribute Whitelist
+        const keeperAttrs = [
+            'id', 'name', 'type', 'placeholder', 'aria-label', 
+            'role', 'href', 'value', 'data-testid', 'data-nav-id'
         ];
 
-        document.querySelectorAll(elementsToRemove.join(', ')).forEach(el => el.remove());
-
-        // 2. Remove HTML comments to save tokens
-        const walker = document.createTreeWalker(document.body, window.NodeFilter.SHOW_COMMENT, null, false);
-        let currentNode;
-        const comments = [];
-        while ((currentNode = walker.nextNode())) {
-            comments.push(currentNode);
-        }
-        comments.forEach(comment => comment.remove());
-
-        // 3. Extract valid HTTP/HTTPS URLs
-        const urls = new Set();
-        document.querySelectorAll('a[href]').forEach(a => {
-            const href = a.getAttribute('href');
-            if (href) {
-                try {
-                    const urlObj = new URL(href, baseUrl);
-                    // Only keep web links (drop mailto:, tel:, javascript:)
-                    if (['http:', 'https:'].includes(urlObj.protocol)) {
-                        urls.add(urlObj.href);
-                    }
-                } catch (e) {
-                    // Ignore invalid URLs
-                }
+        // 3. Process Elements
+        const allElements = document.querySelectorAll('body *');
+        allElements.forEach((el, index) => {
+            const tagName = el.tagName.toLowerCase();
+            const isInteractive = ['button', 'a', 'input', 'textarea', 'select', 'option'].includes(tagName);
+            
+            // Assign a unique "Action ID" to every interactive element
+            // This is the ONLY selector the AI should ideally use.
+            if (isInteractive) {
+                el.setAttribute('data-nav-id', `ix-${index}`);
             }
-        });
 
-        // 4. Aggressive Attribute Stripping (Whitelist approach)
-        const allowedAttributes = ['href', 'src', 'alt'];
-        document.querySelectorAll('body *').forEach(el => {
-            // Iterate backwards because NodeList updates live as attributes are removed
+            // Strip non-essential attributes
             for (let i = el.attributes.length - 1; i >= 0; i--) {
                 const attrName = el.attributes[i].name;
-                if (!allowedAttributes.includes(attrName)) {
+                if (!keeperAttrs.includes(attrName)) {
                     el.removeAttribute(attrName);
                 }
             }
+
+            // Remove empty non-interactive containers (reduces noise)
+            if (!isInteractive && !el.textContent.trim() && !el.children.length) {
+                el.remove();
+            }
         });
 
-        // 5. Minify whitespace (Collapses newlines, tabs, and multi-spaces)
-        const minifiedHtml = document.body.innerHTML
-            .replace(/\s+/g, ' ')
+        // 4. Final Polish
+        let cleaned = document.body.innerHTML
+            .replace(/<!--[\s\S]*?-->/g, '') // Remove comments
+            .replace(/\s+/g, ' ')            // Minify whitespace
             .trim();
 
-        return Ok({
-            cleanedHtml: minifiedHtml,
-            extractedUrls: Array.from(urls)
-        });
+        return Ok(cleaned);
 
     } catch (error) {
-        return Err(`Error (cleanHtmlString): ${error.message}`);
+        return Err(`Error (cleanHtmlString) : ${error.message}`);
     }
 }

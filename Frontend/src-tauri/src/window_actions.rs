@@ -1,11 +1,10 @@
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl, AppHandle, Manager, Emitter};
-use tauri::path::BaseDirectory;
 
-pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn build_multi_view_window(app: &AppHandle) -> Result<(), String> {
     let width = 1200.;
     let height = 700.;
 
-    let window = tauri::window::WindowBuilder::new(&app, "agent-window")
+    let window = tauri::window::WindowBuilder::new(app, "agent-window")
     .title("Hive Agent")
     .inner_size(width, height)
     .build();
@@ -58,7 +57,7 @@ pub async fn build_multi_view_window(app: tauri::AppHandle) -> Result<(), String
     }
 }
 
-pub fn navigate_webview(handle: AppHandle, url: WebviewUrl, webview_label: &str) -> Result<(), String> {
+pub fn navigate_webview(handle: &AppHandle, url: WebviewUrl, webview_label: &str) -> Result<(), String> {
     let window = handle.get_webview(webview_label)
     .ok_or("Window not found")?;
 
@@ -80,17 +79,17 @@ pub fn navigate_webview(handle: AppHandle, url: WebviewUrl, webview_label: &str)
 }
 
 // Used to emit a message to a specific webview
-pub fn emit_to_specific_webview(app: AppHandle, event: &str, payload: &str, webview_label: &str) -> Result<(), String> {
+pub fn emit_to_specific_webview(app: &AppHandle, event: &str, payload: &str, webview_label: &str) -> Result<(), String> {
     app.emit_to(webview_label, event, payload).map_err(|e| e.to_string())
 }
 
-pub fn eval_in_specific_webview(app: AppHandle, js_code: &str, webview_label: &str) -> Result<(), String> {
+pub fn eval_in_specific_webview(app: &AppHandle, js_code: &str, webview_label: &str) -> Result<(), String> {
     let webview = app.get_webview(webview_label).ok_or("Webview not found")?;
     webview.eval(js_code).map_err(|e| e.to_string())
 }
 
 // Show and centre a specific window
-pub fn show_and_center_window(app: AppHandle, window_label: &str) -> Result<(), String> {
+pub fn show_and_center_window(app: &AppHandle, window_label: &str) -> Result<(), String> {
     let window = app.get_window(window_label);
     match window {
         Some(w) => {
@@ -109,7 +108,7 @@ pub fn show_and_center_window(app: AppHandle, window_label: &str) -> Result<(), 
 }
 
 // Checks if a window with the given label exists
-pub fn check_window_exists(app: AppHandle, window_label: &str) -> bool {
+pub fn check_window_exists(app: &AppHandle, window_label: &str) -> bool {
     app.get_window(window_label).is_some()
 }
 

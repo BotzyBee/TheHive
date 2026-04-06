@@ -25,6 +25,7 @@ rust_socketio = { version = "0.6", features = ["async"] }
 futures-util = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
-enigo = "0.6.1"
+# enigo = "0.6.1" - maybe in the future.
 strum = "0.28"
 strum_macros = "0.28"
+rand = "0.10.0"

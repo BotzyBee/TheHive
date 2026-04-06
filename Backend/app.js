@@ -205,12 +205,12 @@ io.on('connection', (socket) => {
   Services.Utils.log(`User joined: ${socket.id}`);
   connectedSockets.push(socket);
 
-  socket.on('web-agent-response-old', (data) => {
-    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
-    Services.FileSystem.saveFile(targetDirectoryInContainer, data, `WebAgent_${Date.now()}.txt`);
-    console.log('Received response from web agent - saved to file' );
-  });
+  // socket.on('web-agent-response-old', (data) => {
+  //   const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+  //   const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
+  //   Services.FileSystem.saveFile(targetDirectoryInContainer, data, `WebAgent_${Date.now()}.txt`);
+  //   console.log('Received response from web agent - saved to file' );
+  // });
 
   socket.on('disconnect', () => {
     Services.Utils.log(`User left: ${socket.id}`);

@@ -1,13 +1,10 @@
-use std::{sync::Arc, ops::Deref};
-use rust_socketio::event;
+use std::{sync::Arc};
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize,};
 use crate::window_actions::{ check_window_exists, build_multi_view_window, navigate_webview, emit_to_specific_webview };
-use tauri::{AppHandle, Manager, Listener};
+use tauri::{AppHandle, Manager};
 use crate::socket::SocketState;
 use strum_macros::{Display, EnumString};
-use tauri::ipc::{Channel, InvokeResponseBody};
-
 
 // [][] -- Agent State -- [][]
 #[derive(Deserialize, Serialize, Debug)]
@@ -72,8 +69,8 @@ pub async fn init_agent<T: Serialize>(app_handle: AppHandle, agent_message: Agen
     println!("Agent state updated: job_id={}, base_url={}", agent_message.job_id, agent_message.base_url);
 
     // Check/Build window
-    if !check_window_exists(app_handle.clone(), "agent-window") {
-        let build = build_multi_view_window(app_handle.clone()).await;
+    if !check_window_exists(&app_handle, "agent-window") {
+        let build = build_multi_view_window(&app_handle).await;
         match build {
             Ok(_) => {
                 println!("Agent window built successfully");
@@ -99,11 +96,11 @@ pub async fn init_agent<T: Serialize>(app_handle: AppHandle, agent_message: Agen
     // Navigate to URL
     let message = format!("Going to {}", agent_message.base_url);
     let target_url = tauri::WebviewUrl::External(agent_message.base_url.parse().expect("Invalid URL"));
-    match navigate_webview(app_handle.clone(), target_url, "agent-webview1") {
+    match navigate_webview(&app_handle, target_url, "agent-webview1") {
         Ok(_) => {
             println!("Navigation successful");
             let _ = emit_to_specific_webview(
-                app_handle, 
+                &app_handle, 
                 "add-status", 
                 &message, 
                 "agent-webview2"
@@ -152,7 +149,7 @@ pub async fn send_to_express<T: Serialize>(
     Ok(())
 }
 
-pub async fn trigger_dom_capture(app: AppHandle) -> Result<(), String> {
+pub async fn trigger_dom_capture(app: &AppHandle) -> Result<(), String> {
     let label = "agent-webview1";
     let webview = app.get_webview(label).ok_or("Webview not found")?;
 
@@ -168,7 +165,7 @@ pub async fn trigger_dom_capture(app: AppHandle) -> Result<(), String> {
                     if (invoker) {{
                         // The 'payload' key must match your Rust function argument name
                         await invoker('return_dom_to_express', {{ payload: domData }});
-                        console.log("DOM successfully sent to Rust command.");
+                        // console.log("DOM successfully sent to Rust command.");
                     }} else {{
                         console.error("Tauri global object not found. Is 'withGlobalTauri' enabled?");
                     }}

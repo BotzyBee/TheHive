@@ -20,7 +20,7 @@ export async function initWebDriver(socket, webUrl, jobID) {
 
         // Response Listener
         const handleResponse = (data) => {
-            console.log("DATA BACK :: ", JSON.stringify(data));
+            console.log("Received response for initWebDriver:", data);
             if (data.job_id === jobID) {
                 clearTimeout(timeout);
                 socket.off('start-agent-response', handleResponse);
@@ -30,6 +30,8 @@ export async function initWebDriver(socket, webUrl, jobID) {
                 } else {
                     resolve(Err(`Error (initWebDriver) : ${data.data}`));
                 }
+            } else {
+                console.warn(`Received response for job_id ${data.job_id}, but expected ${jobID}. Ignoring this response.`);
             }
         };
 

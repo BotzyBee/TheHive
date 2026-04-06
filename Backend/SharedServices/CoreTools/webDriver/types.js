@@ -22,3 +22,14 @@ export const RustMessageOutcome = {
     Error: "Error",
     NotSet: "NotSet"   
 }
+
+export class RustWebAction {
+    constructor(action_type, selector, text, delay_ms, x, y) {
+        this.action_type = action_type || "";
+        this.selector = selector || null;
+        this.text = text || null;
+        this.delay_ms = delay_ms || null;
+        this.x = x || null;
+        this.y = y || null;
+    }
+}
