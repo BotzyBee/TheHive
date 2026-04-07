@@ -1,8 +1,23 @@
-use rand::RngExt;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle};
+use tauri::{AppHandle,};
 use tokio::time::{sleep, Duration};
-use crate::window_actions::{eval_in_specific_webview, emit_to_specific_webview};
+use crate::window_actions::{eval_in_specific_webview, emit_to_specific_webview, show_and_center_window};
+use tauri::{ Manager};
+use tokio::sync::oneshot;
+use enigo::{Enigo, Settings, Mouse, Keyboard, Button, Coordinate, Direction};
+
+use crate::socket::{MetricsChannel};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElementMetrics {
+    pub found: bool,
+    pub visible: bool,
+    pub obstructed: bool,
+    pub off_screen: bool,
+    pub center_x: f64, // Viewport X
+    pub center_y: f64, // Viewport Y
+    pub error_msg: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebActionPayload {
@@ -22,286 +37,238 @@ pub struct WebAction {
 }
 
 impl WebAction {
-    /// Generates the raw JavaScript snippet for instant DOM manipulation.
+pub fn get_metrics_js(&self) -> Option<String> {
+    let selector = self.selector.as_ref()?;
+    let safe_sel = serde_json::to_string(selector).unwrap();
+
+    Some(format!(
+        r#"(() => {{
+            const el = document.querySelector({});
+            let metrics = {{ 
+                found: !!el, visible: false, obstructed: false, off_screen: false, 
+                center_x: 0, center_y: 0, error_msg: null 
+            }};
+            
+            if (el) {{
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                metrics.visible = style.display !== 'none' && style.visibility !== 'hidden';
+                metrics.center_x = rect.left + (rect.width / 2);
+                metrics.center_y = rect.top + (rect.height / 2);
+                metrics.off_screen = (rect.bottom < 0 || rect.top > window.innerHeight);
+
+                if (!metrics.off_screen && metrics.visible) {{
+                    const topEl = document.elementFromPoint(metrics.center_x, metrics.center_y);
+                    metrics.obstructed = topEl !== null && topEl !== el && !el.contains(topEl);
+                }}
+            }}
+
+            const invoker = window.__TAURI__?.core?.invoke || window.__TAURI__?.invoke;
+            if (invoker) {{
+                invoker('submit_metrics', {{ metrics: metrics }});
+            }}
+        }})();"#,
+        safe_sel
+    ))
+}
+
     pub fn to_js_snippet(&self) -> Option<String> {
+        let selector = self.selector.as_ref()?;
+        let safe_sel = serde_json::to_string(selector).unwrap();
+
         match self.action_type.as_str() {
-            "scroll" => {
-                let x = self.x.unwrap_or(0);
-                let y = self.y.unwrap_or(0);
-                // We use scrollBy for relative movement, or scrollTo for absolute. 
-                // Using scrollBy here as it's common for "scroll down a bit" actions.
-                Some(format!(
-                    r#"window.scrollBy({{ top: {}, left: {}, behavior: 'smooth' }});"#,
-                    y, x
-                ))
-            }
-
-            "scroll_into_view" => {
-                let selector = self.selector.as_ref()?;
-                let safe_sel = serde_json::to_string(selector).unwrap();
-                Some(format!(
-                    r#"(() => {{
-                        const el = document.querySelector({});
-                        if (el) {{ 
-                            el.scrollIntoView({{ behavior: 'smooth', block: 'center' }}); 
-                        }}
-                    }})();"#,
-                    safe_sel
-                ))
-            }
-
-            "click" => {
-                let selector = self.selector.as_ref()?;
-                let safe_selector = serde_json::to_string(selector).unwrap();
-                Some(format!(
-                    r#"(() => {{
-                        const el = document.querySelector({});
-                        if (el) {{
-                            el.click(); // Simulate the click
-                            el.focus();
-                        }} else {{
-                            console.warn('Action Failed: Selector not found:', {});
-                        }}
-                    }})();"#,
-                    safe_selector, safe_selector
-                ))
-            }
-
-            "clear_field" => {
-                let selector = self.selector.as_ref()?;
-                let safe_sel = serde_json::to_string(selector).unwrap();
-                Some(format!(
-                    r#"(() => {{
-                        const el = document.querySelector({});
-                        if (!el) return;
-                        el.focus();
-                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        if (setter) {{ setter.call(el, ''); }}
-                        else {{ el.value = ''; }}
-                        el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        el.blur();
-                    }})();"#,
-                    safe_sel
-                ))
-            }
-            "type_text" => {
-                // If delay_ms exists, Rust handles character-by-character typing.
-                if self.delay_ms.is_some() {
-                    return None;
-                }
-                
-                let selector = self.selector.as_ref()?;
-                let text = self.text.as_ref()?;
-                let safe_sel = serde_json::to_string(selector).unwrap();
-                let safe_text = serde_json::to_string(text).unwrap();
-
-                Some(format!(
-                    r#"(() => {{
-                        const el = document.querySelector({});
-                        if (!el) return;
-                        el.focus(); // Focus on the element
-                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        if (setter) {{ setter.call(el, {}); }}
-                        else {{ el.value = {}; }}
-                        el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    }})();"#,
-                    safe_sel, safe_text, safe_text
-                ))
-            }
-            _ => None, // "wait" or unknown types return None
+            "scroll" | "scroll_into_view" => Some(format!(
+                "document.querySelector({}).scrollIntoView({{behavior:'smooth',block:'center'}});", 
+                safe_sel
+            )),
+            "clear_field" => Some(format!(
+                "let el=document.querySelector({}); if(el){{el.value=''; el.dispatchEvent(new Event('input',{{bubbles:true}}));}}", 
+                safe_sel
+            )),
+            _ => None
         }
     }
-
-    pub fn single_char_js(selector: &str, char: char, is_first: bool, is_last: bool) -> String {
-    let safe_sel = serde_json::to_string(selector).unwrap();
-    let safe_char = serde_json::to_string(&char.to_string()).unwrap();
-    let char_code = char as u32;
-
-format!(
-    r#"(() => {{
-        const el = document.querySelector({0});
-        if (!el) return;
-        
-        // Focus the input if it's the first character
-        if ({1}) el.focus();
-        
-        // Simulate keydown for the character
-        el.dispatchEvent(new KeyboardEvent('keydown', {{ 
-            key: {2}, 
-            keyCode: {3}, 
-            code: 'Key{2}', 
-            bubbles: true 
-        }}));
-        
-        // Update the value of the input using the native setter
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        if (setter) {{
-            setter.call(el, el.value + {2});
-        }} else {{
-            el.value += {2};
-        }}
-
-        // Dispatch input and change events for framework reactivity
-        el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-        
-        // Simulate keyup for the character
-        el.dispatchEvent(new KeyboardEvent('keyup', {{ 
-            key: {2}, 
-            keyCode: {3}, 
-            code: 'Key{2}', 
-            bubbles: true 
-        }}));
-        
-        // Blur if it's the last character
-        if ({4}) el.blur();
-    }})();"#,
-    safe_sel,   // {0}
-    is_first,   // {1}
-    safe_char,  // {2}
-    char_code,  // {3}
-    is_last     // {4}
-)
 }
-
-    // pub fn single_char_js(selector: &str, char: char, is_first: bool, is_last: bool) -> String {
-    //     let safe_sel = serde_json::to_string(selector).unwrap();
-    //     let safe_char = serde_json::to_string(&char.to_string()).unwrap();
-
-    //     format!(
-    //         r#"(() => {{
-    //             const el = document.querySelector({});
-    //             if (!el) return;
-    //             if ({}) el.focus();
-    //             el.dispatchEvent(new KeyboardEvent('keydown', {{ key: {}, bubbles: true }}));
-    //             const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-    //             if (setter) {{ setter.call(el, el.value + {}); }}
-    //             else {{ el.value += {}; }}
-    //             el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-    //             el.dispatchEvent(new KeyboardEvent('keyup', {{ key: {}, bubbles: true }}));
-    //             if ({}) el.blur();
-    //         }})();"#,
-    //         safe_sel, is_first, safe_char, safe_char, safe_char, safe_char, is_last
-    //     )
-    // }
-}
-
-
+    
+    
 pub async fn execute_web_actions(
     app: AppHandle,
     webview_label: &str,
     actions: Vec<WebAction>,
 ) -> Result<(), String> {
+    let window_label = "agent-window";
+
+    // Ensure the window is ready for interaction
+    focus_and_center_window(&app, window_label)?;
+    
+    // Small pause to let the OS handle the window transition/focus
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
     for action in actions {
         println!("Executing action: {:?}", action.action_type);
-        match action.action_type.as_str() {
-            "type_text" => {
-                let selector = action.selector.as_deref().ok_or("Missing selector for type_text")?;
-                let text = action.text.as_deref().ok_or("Missing text for type_text")?;
-                let base_delay = action.delay_ms.unwrap_or(20);
+        
+        // Update UI/Status webview if applicable
+        let _ = emit_to_specific_webview(
+            &app, 
+            "add-status", 
+            &action.action_type, 
+            "agent-webview2"
+        );
 
-                // Update sidebar status
-                let _ = emit_to_specific_webview(
-                    &app, 
-                    "add-status", 
-                    "Typing text...", 
-                    "agent-webview2"
-                );
+        // --- STEP 1: Sensory Check & Auto-Scroll Loop ---
+        let mut metrics: Option<ElementMetrics> = None;
+        
+        // We try up to 2 times: once initially, and once more if we had to scroll
+        for attempt in 0..2 {
+            println!("Gathering metrics (Attempt {}) for selector: {:?}", attempt + 1, action.selector);
+            
+            if let Some(js) = action.get_metrics_js() {
+                let (tx, rx) = oneshot::channel();
+                
+                // 1. Place the sender into the global state so the 'submit_metrics' 
+                // command can find it when the JS invokes.
+                {
+                    let metrics_channel = app.state::<MetricsChannel>().inner();
+                        let mut lock = metrics_channel.0.lock().await; 
+                        *lock = Some(tx);
+                } // Lock is dropped here so the command can access it
 
-                // HUMAN MODE
-                let chars: Vec<char> = text.chars().collect();
-                let len = chars.len();
+                // 2. Inject and execute the JS
+                eval_in_specific_webview(&app, &js, webview_label)?;
 
-                // click on the field to focus before typing
-                let js_click = WebAction {
-                    action_type: "click".to_string(),
-                    selector: Some(selector.to_string()),
-                    text: None,
-                    delay_ms: None,
-                    x: None,
-                    y: None,
-                }.to_js_snippet().ok_or("Failed to generate click JS snippet")?;
-                eval_in_specific_webview(&app, &js_click, webview_label)?;
+                // 3. Wait for the JS to call the 'submit_metrics' command
+                // We use a 3-second timeout to prevent the loop from hanging forever
+                match tokio::time::timeout(Duration::from_secs(3), rx).await {
+                    Ok(Ok(m)) => {
+                        if !m.found {
+                            println!("Element not found in DOM.");
+                            break; 
+                        }
+                        if !m.visible {
+                            println!("Element found but not visible (CSS).");
+                            break;
+                        }
+                        
+                        if m.off_screen {
+                            println!("Element off screen. Attempting scroll...");
+                            if let Some(scroll_js) = action.to_js_snippet() {
+                                eval_in_specific_webview(&app, &scroll_js, webview_label)?;
+                            }
+                            sleep(Duration::from_millis(800)).await;
+                            continue; // Re-run the metrics check after scrolling
+                        }
 
-                for (i, &c) in chars.iter().enumerate() {
-                    let js = WebAction::single_char_js(selector, c, i == 0, i == len - 1);
-                    eval_in_specific_webview(&app, &js, webview_label)?;
-
-                    let jitter = rand::rng().random_range(0..250);
-                    sleep(Duration::from_millis(base_delay + jitter)).await;
-                } 
-            }
-
-           "wait" => {
-                // Update sidebar status
-                let _ = emit_to_specific_webview(
-                    &app, 
-                    "add-status", 
-                    "Waiting a little moment...", 
-                    "agent-webview2"
-                );
-                let ms = action.delay_ms.ok_or("Wait action requires delay_ms")?;
-                sleep(Duration::from_millis(ms)).await;
-            }
-
-            "click" => {
-                // update sidebar status
-                let _ = emit_to_specific_webview(
-                    &app, 
-                    "add-status", 
-                    "Clicking element...", 
-                    "agent-webview2"
-                );
-                if let Some(js) = action.to_js_snippet() {
-                    eval_in_specific_webview(&app, &js, webview_label)?;
-                    
-                    // Give the browser time to finish the smooth scroll animation 
-                    // or DOM update before the next action.
-                    let buffer = if action.action_type.contains("scroll") { 300 } else { 50 };
-                    sleep(Duration::from_millis(buffer)).await;
+                        metrics = Some(m);
+                        break; // Coordinates are valid, proceed to execution
+                    }
+                    Ok(Err(_)) => {
+                        println!("Channel closed before receiving metrics.");
+                        break;
+                    }
+                    Err(_) => {
+                        println!("Timeout waiting for element metrics from JS.");
+                        // Clean up the sender if the timeout hit
+                        let metrics_channel = app.state::<MetricsChannel>().inner();
+                        let mut lock = metrics_channel.0.lock().await;
+                        *lock = None;
+                        break;
+                    }
                 }
+            } else {
+                break; // No JS generated for this action type
             }
-
-             "clear_field" => {
-                 // update sidebar status
-                let _ = emit_to_specific_webview(
-                    &app, 
-                    "add-status", 
-                    "Clearing input field...", 
-                    "agent-webview2"
-                );
-                if let Some(js) = action.to_js_snippet() {
-                    eval_in_specific_webview(&app, &js, webview_label)?;
-                    
-                    // Give the browser time to finish the smooth scroll animation 
-                    // or DOM update before the next action.
-                    let buffer = if action.action_type.contains("scroll") { 300 } else { 50 };
-                    sleep(Duration::from_millis(buffer)).await;
-                }
-             }
-
-            "scroll" | "scroll_into_view" => {
-            // update sidebar status
-                let _ = emit_to_specific_webview(
-                    &app, 
-                    "add-status", 
-                    "Doing a little scroll...", 
-                    "agent-webview2"
-                );
-                if let Some(js) = action.to_js_snippet() {
-                    eval_in_specific_webview(&app, &js, webview_label)?;
-                    
-                    // Give the browser time to finish the smooth scroll animation 
-                    // or DOM update before the next action.
-                    let buffer = if action.action_type.contains("scroll") { 300 } else { 50 };
-                    sleep(Duration::from_millis(buffer)).await;
-                }
-            }
-            _ => return Err(format!("Unknown action type: {}", action.action_type)),
         }
-    sleep(Duration::from_millis(502)).await;
+
+        println!("Final metrics for execution: {:?}", metrics);
+
+        // --- STEP 2: Physical Execution ---
+        if let Some(m) = metrics {
+            // Calculate absolute screen coordinates based on window position and DPI scale
+            let (screen_x, screen_y) = {
+                let window = app.get_window(window_label).ok_or("Window not found")?;
+                let win_pos = window.outer_position().map_err(|e| e.to_string())?;
+                let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
+                (
+                    win_pos.x as f64 + (m.center_x * scale_factor),
+                    win_pos.y as f64 + (m.center_y * scale_factor)
+                )
+            };
+
+            match action.action_type.as_str() {
+                "click" | "type_text" | "clear_field" => {
+                    println!("Moving mouse to ({}, {}) and clicking", screen_x, screen_y);
+                    
+                    // Mouse Click Logic
+                    {
+                        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+                        enigo.move_mouse(screen_x as i32, screen_y as i32, Coordinate::Abs).map_err(|e| e.to_string())?;
+                        enigo.button(Button::Left, Direction::Click).map_err(|e| e.to_string())?;
+                    }
+                    
+                    // Keyboard Logic for Typing
+                    if action.action_type == "type_text" {
+                        println!("Typing text: {}", action.text.as_deref().unwrap_or_default());
+                        sleep(Duration::from_millis(200)).await;
+                        let text = action.text.clone().unwrap_or_default();
+                        
+                        for c in text.chars() {
+                            {
+                                let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+                                enigo.text(&c.to_string()).map_err(|e| e.to_string())?;
+                            }
+                            // Human-like jitter between keystrokes
+                            let jitter = rand::random_range(20..120);
+                            sleep(Duration::from_millis(jitter)).await;
+                        }
+                    } else if action.action_type == "clear_field" {
+                        println!("Clearing field via JS execution");
+                        sleep(Duration::from_millis(100)).await;
+                        if let Some(js) = action.to_js_snippet() {
+                            eval_in_specific_webview(&app, &js, webview_label)?;
+                        }
+                    }
+                }
+                _ => {
+                    println!("Action type {} handled via metrics but no physical logic defined.", action.action_type);
+                }
+            }
+        } else if action.action_type == "wait" || action.action_type == "scroll" {
+            // Handle actions that do NOT require element metrics (targetless actions)
+            println!("Executing targetless action: {}", action.action_type);
+            if let Some(js) = action.to_js_snippet() {
+                if action.action_type == "scroll" {
+                    eval_in_specific_webview(&app, &js, webview_label)?;
+                    sleep(Duration::from_millis(500)).await;
+                } else {
+                    let ms = action.delay_ms.unwrap_or(1000);
+                    sleep(Duration::from_millis(ms)).await;
+                }
+            }
+        } else {
+            println!("Action skipped: No metrics found and not a targetless action.");
+        }
+
+        // Post-action "Human" delay to prevent bot detection and allow UI updates
+        let final_delay = rand::random_range(400..700);
+        sleep(Duration::from_millis(final_delay)).await;
     }
+
+    Ok(())
+}
+
+pub fn focus_and_center_window(app: &AppHandle, window_label: &str) -> Result<(), String> {
+    println!("Focusing and centering window: {}", window_label);
+    let window = app.get_window(window_label) // Use get_window for Tauri 2.0
+        .ok_or_else(|| format!("Window label '{}' not found", window_label))?;
+
+    // 1. Make sure it's visible
+    window.show().map_err(|e| e.to_string())?;
+    
+    // 2. Bring it to the front and give it OS focus
+    window.set_focus().map_err(|e| e.to_string())?;
+    
+    // 3. Center it (optional, but keeps coordinates predictable)
+    window.center().map_err(|e| e.to_string())?;
+
     Ok(())
 }

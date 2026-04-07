@@ -3,7 +3,6 @@ import { Ok, Err } from '../../Utils/helperFunctions.js';
 import { connectedSockets } from "../../../app.js";
 import { Services } from '../../index.js';
 import { cleanHtmlString, smartExtractData } from './utils.js';
-import { JobState } from "@google/genai";
 
 let maxLoops = 3;
 export let rustActionState = {

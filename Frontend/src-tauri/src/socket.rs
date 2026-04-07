@@ -5,7 +5,7 @@ use rust_socketio::Payload;
 use tauri::{AppHandle, Manager, State};
 use std::sync::{OnceLock, Arc};
 use std::ops::Deref;
-use tokio::sync::Mutex; 
+use tokio::sync::{Mutex, oneshot}; 
 use futures_util::FutureExt; 
 use crate::agent::{self, AgentMessage};
 use crate::page_automation;
@@ -20,7 +20,23 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 // Thread safe and can be shared across async contexts
 pub struct SocketState(pub Arc<Mutex<Option<Client>>>);
 
+pub struct MetricsChannel(pub Arc<Mutex<Option<oneshot::Sender<page_automation::ElementMetrics>>>>);
+
 // [][] ---------- TAURI COMMANDS ---------- [][]
+
+
+
+#[tauri::command]
+pub async fn submit_metrics(
+    metrics: page_automation::ElementMetrics,
+    state: tauri::State<'_, MetricsChannel>,
+) -> Result<(), String> {
+    let mut lock = state.0.lock().await;
+    if let Some(tx) = lock.take() {
+        let _ = tx.send(metrics);
+    }
+    Ok(())
+}
 
 #[tauri::command]
 async fn return_dom_to_express(payload: String){
@@ -50,6 +66,7 @@ pub fn start_socket() {
 
     tauri::Builder::default()
         .manage(agent_state)
+        .manage(MetricsChannel(Arc::new(Mutex::new(None))))
         .setup(move |app| {
             let handle = app.handle().clone();
             let _ = APP_HANDLE.set(handle.clone());
@@ -115,10 +132,19 @@ pub fn start_socket() {
                             if let Some(first_val) = values.get(0) {
                                 if let Ok(data) = serde_json::from_value(first_val.clone()) as Result<page_automation::WebActionPayload, _> {
                                     if let Some(h) = APP_HANDLE.get() {
-                                        // Use Tauri's async runtime to spawn the task (dont block the socket listener)
+                                        
+                                        // Spawn the task on Tauri's async runtime
                                         tauri::async_runtime::spawn(async move {
-                                            println!("Received take-action command for job : Len of actions : {}", data.actions.len());
-                                            let res = page_automation::execute_web_actions(h.clone(), "agent-webview1", data.actions).await;
+                                            println!("Received take-action command for job: Len of actions: {}", data.actions.len());
+
+                                            // FIX: Directly .await the async function. 
+                                            // Do NOT use block_on inside an existing async runtime.
+                                            let res = page_automation::execute_web_actions(
+                                                h.clone(), 
+                                                "agent-webview1", 
+                                                data.actions
+                                            ).await;
+
                                             match res {
                                                 Ok(_) => {
                                                     println!("Actions executed successfully");
@@ -129,7 +155,9 @@ pub fn start_socket() {
                                                         outcome: agent::MessageOutcome::Success,
                                                         data: "Actions executed successfully".to_string(), 
                                                     };
-                                                    agent::send_to_express("take-action-result".to_string(), message, h.clone()).await.unwrap();
+                                                    
+                                                    // Await the response back to your express server
+                                                    let _ = agent::send_to_express("take-action-result".to_string(), message, h.clone()).await;
                                                 },
                                                 Err(e) => {
                                                     eprintln!("Error executing actions: {}", e);
@@ -140,17 +168,17 @@ pub fn start_socket() {
                                                         outcome: agent::MessageOutcome::Failure,
                                                         data: format!("Error executing actions: {}", e),
                                                     };
-                                                    agent::send_to_express("take-action-result".to_string(), message, h.clone()).await.unwrap();
+                                                    
+                                                    let _ = agent::send_to_express("take-action-result".to_string(), message, h.clone()).await;
                                                 }
                                             }
-                                            // Return trigger 
                                         });
                                     }
                                 }
                             }
                         }
                     }.boxed()
-                }) // Placeholder for the actual handler
+                })
                 
                 .connect()
                 .await; // Async connect
@@ -172,7 +200,8 @@ pub fn start_socket() {
         })
         .manage(SocketState(socket_state_inner)) // Manage the socket state
         .invoke_handler(tauri::generate_handler![
-            return_dom_to_express   
+            return_dom_to_express,
+            submit_metrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
