@@ -119,6 +119,9 @@ pub async fn init_agent<T: Serialize>(app_handle: AppHandle, agent_message: Agen
             return Err(rtn_message);
         }
     }
+    // await for 3 seconds to ensure page is loaded before sending success response. In a production system, you'd want a more robust way to detect page load completion.
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
     println!("Agent initialized and navigated successfully");
     let rtn_message: AgentMessage<String> = AgentMessage {
         job_id: agent_message.job_id.clone(),

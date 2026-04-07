@@ -13,7 +13,7 @@ pub async fn build_multi_view_window(app: &AppHandle) -> Result<(), String> {
             // Main Webview
             let webview_builder = tauri::webview::WebviewBuilder::new(
                 "agent-webview1", 
-                 WebviewUrl::External("https://www.google.org/".parse().expect("Invalid URL"))) 
+                 WebviewUrl::App("/webAgent".into())) 
                 //.initialization_script()
                 .auto_resize();
             

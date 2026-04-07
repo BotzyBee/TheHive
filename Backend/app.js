@@ -16,7 +16,7 @@ import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
-import { testDrive } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
+import { testDrive, rustActionState } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -31,7 +31,7 @@ const initServices = async () => {
     // init Surreal DB agent
     let dbTools = await initDatabaseConnection(false);
     if (dbTools.isErr()) {
-      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`);
+      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${dbTools.value}`);
       process.exit(1);
     }
     // Setup Piscina Pool
@@ -188,9 +188,15 @@ app.get("/getConfig", async (req, res) => {
 });
 
 app.get("/test", async (req, res) => {
-  let msg = await testDrive();
+  let prompt = res.req.query?.prompt || null;
+  let webUrl = res.req.query?.webUrl || null;
+  if(prompt == null || webUrl == null){ 
+    return res.status(400).json({
+        error: `Error : prompt or webUrl parameter is missing or null!`
+    });
+  }
+  let msg = await testDrive(prompt, webUrl);
   if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
-  io.to('test').emit('testing', "POTATO ! 🥔");
   res.status(200).json(msg.value);
 });
 
@@ -205,12 +211,10 @@ io.on('connection', (socket) => {
   Services.Utils.log(`User joined: ${socket.id}`);
   connectedSockets.push(socket);
 
-  // socket.on('web-agent-response-old', (data) => {
-  //   const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-  //   const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
-  //   Services.FileSystem.saveFile(targetDirectoryInContainer, data, `WebAgent_${Date.now()}.txt`);
-  //   console.log('Received response from web agent - saved to file' );
-  // });
+  socket.on('take-action-result', (data) => {
+    rustActionState.result = data; // Store the result in a variable that the engine can access
+    console.log('Received result from Rust WebDriver:', JSON.stringify(data));
+  });
 
   socket.on('disconnect', () => {
     Services.Utils.log(`User left: ${socket.id}`);

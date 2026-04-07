@@ -9,6 +9,7 @@ use tokio::sync::Mutex;
 use futures_util::FutureExt; 
 use crate::agent::{self, AgentMessage};
 use crate::page_automation;
+use crate::window_actions;
 
 // [][] ---------- STATE & STATIC HANDLES ---------- [][]
 
@@ -91,6 +92,12 @@ pub fn start_socket() {
                     print!("Received 'capture-dom' command");
                     async move {
                             if let Some(h) = APP_HANDLE.get() {
+                            let _ = window_actions::emit_to_specific_webview(
+                                &h.clone(), 
+                                "add-status", 
+                                "👀 Having a look...", 
+                                "agent-webview2"
+                            );
                             // Use Tauri's async runtime to spawn the task (dont block the socket listener)
                             tauri::async_runtime::spawn(async move {
                                 // Evals code in browser which captures the dom
@@ -107,11 +114,36 @@ pub fn start_socket() {
                         if let Payload::Text(values) = payload {
                             if let Some(first_val) = values.get(0) {
                                 if let Ok(data) = serde_json::from_value(first_val.clone()) as Result<page_automation::WebActionPayload, _> {
-                                    if let Some(_h) = APP_HANDLE.get() {
+                                    if let Some(h) = APP_HANDLE.get() {
                                         // Use Tauri's async runtime to spawn the task (dont block the socket listener)
                                         tauri::async_runtime::spawn(async move {
                                             println!("Received take-action command for job : Len of actions : {}", data.actions.len());
-                                            page_automation::execute_web_actions(_h.clone(), "agent-webview1", data.actions).await.unwrap();
+                                            let res = page_automation::execute_web_actions(h.clone(), "agent-webview1", data.actions).await;
+                                            match res {
+                                                Ok(_) => {
+                                                    println!("Actions executed successfully");
+                                                    let message = agent::AgentMessage {
+                                                        job_id: data.job_id.clone(),
+                                                        base_url: "not-available".to_string(),
+                                                        message_type: agent::MessageType::Update,
+                                                        outcome: agent::MessageOutcome::Success,
+                                                        data: "Actions executed successfully".to_string(), 
+                                                    };
+                                                    agent::send_to_express("take-action-result".to_string(), message, h.clone()).await.unwrap();
+                                                },
+                                                Err(e) => {
+                                                    eprintln!("Error executing actions: {}", e);
+                                                    let message = agent::AgentMessage {
+                                                        job_id: data.job_id.clone(),
+                                                        base_url: "not-available".to_string(),
+                                                        message_type: agent::MessageType::Update,
+                                                        outcome: agent::MessageOutcome::Failure,
+                                                        data: format!("Error executing actions: {}", e),
+                                                    };
+                                                    agent::send_to_express("take-action-result".to_string(), message, h.clone()).await.unwrap();
+                                                }
+                                            }
+                                            // Return trigger 
                                         });
                                     }
                                 }

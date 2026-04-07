@@ -56,12 +56,17 @@ impl WebAction {
                 Some(format!(
                     r#"(() => {{
                         const el = document.querySelector({});
-                        if (el) {{ el.click(); }} 
-                        else {{ console.warn('Action Failed: Selector not found:', {}); }}
+                        if (el) {{
+                            el.click(); // Simulate the click
+                            el.focus();
+                        }} else {{
+                            console.warn('Action Failed: Selector not found:', {});
+                        }}
                     }})();"#,
                     safe_selector, safe_selector
                 ))
             }
+
             "clear_field" => {
                 let selector = self.selector.as_ref()?;
                 let safe_sel = serde_json::to_string(selector).unwrap();
@@ -95,6 +100,7 @@ impl WebAction {
                     r#"(() => {{
                         const el = document.querySelector({});
                         if (!el) return;
+                        el.focus(); // Focus on the element
                         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                         if (setter) {{ setter.call(el, {}); }}
                         else {{ el.value = {}; }}
@@ -109,25 +115,77 @@ impl WebAction {
     }
 
     pub fn single_char_js(selector: &str, char: char, is_first: bool, is_last: bool) -> String {
-        let safe_sel = serde_json::to_string(selector).unwrap();
-        let safe_char = serde_json::to_string(&char.to_string()).unwrap();
+    let safe_sel = serde_json::to_string(selector).unwrap();
+    let safe_char = serde_json::to_string(&char.to_string()).unwrap();
+    let char_code = char as u32;
 
-        format!(
-            r#"(() => {{
-                const el = document.querySelector({});
-                if (!el) return;
-                if ({}) el.focus();
-                el.dispatchEvent(new KeyboardEvent('keydown', {{ key: {}, bubbles: true }}));
-                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                if (setter) {{ setter.call(el, el.value + {}); }}
-                else {{ el.value += {}; }}
-                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                el.dispatchEvent(new KeyboardEvent('keyup', {{ key: {}, bubbles: true }}));
-                if ({}) el.blur();
-            }})();"#,
-            safe_sel, is_first, safe_char, safe_char, safe_char, safe_char, is_last
-        )
-    }
+format!(
+    r#"(() => {{
+        const el = document.querySelector({0});
+        if (!el) return;
+        
+        // Focus the input if it's the first character
+        if ({1}) el.focus();
+        
+        // Simulate keydown for the character
+        el.dispatchEvent(new KeyboardEvent('keydown', {{ 
+            key: {2}, 
+            keyCode: {3}, 
+            code: 'Key{2}', 
+            bubbles: true 
+        }}));
+        
+        // Update the value of the input using the native setter
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        if (setter) {{
+            setter.call(el, el.value + {2});
+        }} else {{
+            el.value += {2};
+        }}
+
+        // Dispatch input and change events for framework reactivity
+        el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        
+        // Simulate keyup for the character
+        el.dispatchEvent(new KeyboardEvent('keyup', {{ 
+            key: {2}, 
+            keyCode: {3}, 
+            code: 'Key{2}', 
+            bubbles: true 
+        }}));
+        
+        // Blur if it's the last character
+        if ({4}) el.blur();
+    }})();"#,
+    safe_sel,   // {0}
+    is_first,   // {1}
+    safe_char,  // {2}
+    char_code,  // {3}
+    is_last     // {4}
+)
+}
+
+    // pub fn single_char_js(selector: &str, char: char, is_first: bool, is_last: bool) -> String {
+    //     let safe_sel = serde_json::to_string(selector).unwrap();
+    //     let safe_char = serde_json::to_string(&char.to_string()).unwrap();
+
+    //     format!(
+    //         r#"(() => {{
+    //             const el = document.querySelector({});
+    //             if (!el) return;
+    //             if ({}) el.focus();
+    //             el.dispatchEvent(new KeyboardEvent('keydown', {{ key: {}, bubbles: true }}));
+    //             const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    //             if (setter) {{ setter.call(el, el.value + {}); }}
+    //             else {{ el.value += {}; }}
+    //             el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    //             el.dispatchEvent(new KeyboardEvent('keyup', {{ key: {}, bubbles: true }}));
+    //             if ({}) el.blur();
+    //         }})();"#,
+    //         safe_sel, is_first, safe_char, safe_char, safe_char, safe_char, is_last
+    //     )
+    // }
 }
 
 
@@ -156,20 +214,24 @@ pub async fn execute_web_actions(
                 let chars: Vec<char> = text.chars().collect();
                 let len = chars.len();
 
+                // click on the field to focus before typing
+                let js_click = WebAction {
+                    action_type: "click".to_string(),
+                    selector: Some(selector.to_string()),
+                    text: None,
+                    delay_ms: None,
+                    x: None,
+                    y: None,
+                }.to_js_snippet().ok_or("Failed to generate click JS snippet")?;
+                eval_in_specific_webview(&app, &js_click, webview_label)?;
+
                 for (i, &c) in chars.iter().enumerate() {
                     let js = WebAction::single_char_js(selector, c, i == 0, i == len - 1);
                     eval_in_specific_webview(&app, &js, webview_label)?;
 
                     let jitter = rand::rng().random_range(0..250);
                     sleep(Duration::from_millis(base_delay + jitter)).await;
-                }
-
-                // // ROBOT MODE (Instant)
-                // if let Some(js) = action.to_js_snippet() {
-                //     eval_in_specific_webview(&app, &js, webview_label)?;
-                //     sleep(Duration::from_millis(50)).await;
-                // }
-                
+                } 
             }
 
            "wait" => {
