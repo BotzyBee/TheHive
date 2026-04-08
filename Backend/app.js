@@ -1,3 +1,5 @@
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import {
@@ -14,6 +16,7 @@ import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
+import { testDrive, rustActionState } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
 
 export let dbAgent = null;
 let servicesStarted = false;
@@ -28,7 +31,7 @@ const initServices = async () => {
     // init Surreal DB agent
     let dbTools = await initDatabaseConnection(false);
     if (dbTools.isErr()) {
-      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${call.value}`);
+      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${dbTools.value}`);
       process.exit(1);
     }
     // Setup Piscina Pool
@@ -90,11 +93,22 @@ const initServices = async () => {
     servicesStarted = true;
   }
 };
-// Express init
+// init express 
 export const app = express();
 const port = 3000;
-app.use(cors()); // Enable CORS for all origins <=== should be changed if not running locally !!)
-app.use(express.json()); // Enable JSON body parsing
+app.use(cors());
+app.use(express.json());
+
+// 1. Create the explicit HTTP server (wrapping the Express app)
+const httpServer = createServer(app);
+
+// 2. Initialize Socket.io
+export const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Matches your current Express CORS logic
+    methods: ["GET", "POST"]
+  }
+});
 
 // [][] -------------------------------------- [][]
 //                 API ENDPOINTS
@@ -173,20 +187,41 @@ app.get("/getConfig", async (req, res) => {
   res.status(200).json(msg);
 });
 
-// app.get("/test", async (req, res) => {
-//   let msg = await initGuideIndex();
-//   res.status(200).json(msg.value);
-// });
+app.get("/test", async (req, res) => {
+  let prompt = res.req.query?.prompt || null;
+  let webUrl = res.req.query?.webUrl || null;
+  if(prompt == null || webUrl == null){ 
+    return res.status(400).json({
+        error: `Error : prompt or webUrl parameter is missing or null!`
+    });
+  }
+  let msg = await testDrive(prompt, webUrl);
+  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
+  res.status(200).json(msg.value);
+});
 
 
-// Test Endpoint 
-// app.get('/test', async (req, res) => {
-//   let tsk = req?.query?.tool;
-//   let x = await getToolDetails(tsk);
-//   //let x = await Services.CoreTools.AgentCompatible.readFile.run( Services, { filePath : 'UserFiles/testing/A.txt' } );
-//   //console.log(x);
-//   res.status(200).json({result: x });
-// });
+// [][] -------------------------------------- [][]
+//                 WEBSOCKET EVENTS
+// [][] -------------------------------------- [][]
+export let connectedSockets = []; // shoud only be one for now but can be used for multi-user features in the future.
+
+//Handle Socket.io connections
+io.on('connection', (socket) => {
+  Services.Utils.log(`User joined: ${socket.id}`);
+  connectedSockets.push(socket);
+
+  socket.on('take-action-result', (data) => {
+    rustActionState.result = data; // Store the result in a variable that the engine can access
+    console.log('Received result from Rust WebDriver:', JSON.stringify(data));
+  });
+
+  socket.on('disconnect', () => {
+    Services.Utils.log(`User left: ${socket.id}`);
+    connectedSockets = connectedSockets.filter(s => s !== socket);
+  });
+});
+
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START
@@ -194,18 +229,23 @@ app.get("/getConfig", async (req, res) => {
 
 let server;
 const startServer = () => {
-  server = app.listen(port, () => {
-    Services.Utils.log(`Server running on port ${port}`);
+  server = httpServer.listen(port, () => {
+    Services.Utils.log(`Server running on port ${port} (HTTP + WS)`);
   });
 };
 
 // [][] --- Graceful Sutdown --- [][]
 const gracefulShutdown = async (signal) => {
   Services.Utils.log('Graceful Shutdown Started');
-  // Stop the Express server from accepting new connections
+  
+  if (io) {
+    await io.close(); // Close all websocket connections
+    Services.Utils.log('Socket.io closed');
+  }
+
   if (server) {
     server.close(() => {
-      Services.Utils.log('Server closed');
+      Services.Utils.log('HTTP Server closed');
     });
   }
   // Clear all active timers
