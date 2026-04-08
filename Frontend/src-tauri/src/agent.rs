@@ -152,6 +152,7 @@ pub async fn send_to_express<T: Serialize>(
     Ok(())
 }
 
+
 pub async fn trigger_dom_capture(app: &AppHandle) -> Result<(), String> {
     let label = "agent-webview1";
     let webview = app.get_webview(label).ok_or("Webview not found")?;
