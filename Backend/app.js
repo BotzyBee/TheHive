@@ -70,7 +70,7 @@ const initServices = async () => {
           await pool.run({}, { name: 'poolIndexKnowledgebase' });
         }
       },
-      60000
+      { delay: 0, intervalMs: 60000, isOneOff : false }
     );
 
     //New Job Scheduler (every 5 seconds)
@@ -79,17 +79,17 @@ const initServices = async () => {
         if (JOBS.isAllocatorActive() == false) {
             await JOBS.checkNonAllocated();
         }
-    }, 5000);
+    }, { delay: 0, intervalMs: 5000, isOneOff : false });
 
     // Prune completed jobs every 10 mins
     Services.CoreTools.Timers.addNewTimer("Prune_Completed_Jobs", async () => {
       await JOBS.jobListManager({ prune: true });
-    }, 600000);
+    }, { delay: 0, intervalMs: 600000, isOneOff : false });
 
     // Write logs to file every 2 mins
     Services.CoreTools.Timers.addNewTimer("Write_Logs_To_File", async () => {
       await writeLogsToFile();
-    }, 120000);
+    }, { delay: 0, intervalMs: 120000, isOneOff : false });
     servicesStarted = true;
   }
 };
