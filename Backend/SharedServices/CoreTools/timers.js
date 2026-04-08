@@ -3,48 +3,103 @@ import dotenv from 'dotenv';
 let allTimers = []; // Array of Timer Class
 
 class timerClass {
-  constructor(timerName, callbackFn, intervalMs) {
-    this.timerID = null;
+  constructor(timerName, callbackFn, options = {}) {
     this.timerName = timerName;
-    this.callbackFn = callbackFn; // either function name or anon function () => { testFN(param1, param2) }
-    this.intervalMs = intervalMs;
+    this.callbackFn = callbackFn;
+    
+    // Destructure options with defaults
+    this.intervalMs = options.intervalMs || 0;
+    this.delayMs = options.delayMs || 0;
+    this.isOneOff = options.isOneOff || false;
+    
+    this.timerID = null; // Reference to the active timeout
+    this.isRunning = false;
   }
-  startTimer(optIntervalMs) {
-    // clear any already running timers
-    if (this.timerID !== null) {
-      clearInterval(this.timerID);
+
+  startTimer() {
+    this.stopTimer(); // Safety clear
+    this.isRunning = true;
+
+    // Phase 1: The Initial Delay
+    this.timerID = setTimeout(() => {
+      this.execute();
+    }, this.delayMs);
+  }
+
+  async execute() {
+    if (!this.isRunning) return;
+
+    try {
+      // Execute the callback (supports both sync and async)
+      await this.callbackFn();
+    } catch (err) {
+      console.error(`Timer ${this.timerName} failed:`, err);
     }
-    if (optIntervalMs) {
-      // use new interval
-      this.timerID = setInterval(this.callbackFn, optIntervalMs);
-    } else {
-      // use interval from class init
-      this.timerID = setInterval(this.callbackFn, this.intervalMs);
+
+    // Phase 2: Decide whether to schedule the next run or cleanup
+    if (!this.isOneOff && this.intervalMs > 0 && this.isRunning) {
+      this.timerID = setTimeout(() => this.execute(), this.intervalMs);
+    } else if (this.isOneOff) {
+      this.isRunning = false;
+      removeTimer(null, this.timerID); // Clean up one-off timers
     }
   }
+
   stopTimer() {
-    clearInterval(this.timerID);
+    this.isRunning = false;
+    if (this.timerID) {
+      clearTimeout(this.timerID);
+      this.timerID = null;
+    }
+  }
+
+  toJSON() {
+    // Return only the properties that are "data"
+    // Exclude timerID because it's a circular system object
+    // Exclude callbackFn because functions can't be stringified
+    return {
+      timerName: this.timerName,
+      intervalMs: this.intervalMs,
+      delayMs: this.delayMs,
+      isOneOff: this.isOneOff,
+      isRunning: this.isRunning
+    };
   }
 }
 
 
-export function addNewTimer(timerName, callbackFn, intervalMs) {
-  // check for duplicates
-  allTimers.forEach((timer) => {
-    if (timer.timerName === timerName) {
-      return su.Err(
-        `Error(addNewTimer) - ${timerName} already exists!`
-      );
-    }
-  });
-  // create new class
-  let tmr = new timerClass(timerName, callbackFn, intervalMs);
+/**
+ * @param {string} timerName 
+ * @param {function} callbackFn 
+ * @param {object} options - { delay: number|Date, intervalMs: number, isOneOff: boolean }
+ * @param {number|Date} options.delay - Initial delay before the first execution. Can be a number (ms) or a Date object.
+ * @param {number} options.intervalMs - If provided and isOneOff is false, the timer will repeat at this interval.
+ * @param {boolean} options.isOneOff - If true, the timer will execute only once.
+ * @returns {Result[string]} - Ok(timerName) if created successfully, Err(message) if failed (e.g., duplicate name).
+ */
+export function addNewTimer(timerName, callbackFn, config = {}) {
+  // Check for duplicates
+  if (allTimers.some(t => t.timerName === timerName)) {
+    return su.Err(`Error(addNewTimer) - ${timerName} already exists!`);
+  }
+
+  // Calculate delay if a Date object was provided
+  let delay = config.delay || 0;
+  if (delay instanceof Date) {
+    delay = Math.max(0, delay.getTime() - Date.now());
+  }
+
+  const options = {
+    delayMs: delay,
+    intervalMs: config.intervalMs || 0,
+    isOneOff: config.isOneOff || false
+  };
+
+  const tmr = new timerClass(timerName, callbackFn, options);
   tmr.startTimer();
 
-  // push to allTimers
   allTimers.push(tmr);
-  su.log(`Interval timer : ${tmr.timerName} added. ID: ${tmr.timerID}`);
-  return su.Ok(tmr.timerID);
+  return su.Ok(timerName);
 }
 
 export function removeTimer(optTimerName, optTimerID) {
@@ -73,6 +128,7 @@ export function removeTimer(optTimerName, optTimerID) {
 }
 
 export function getAllTimersAsString() {
+  // JSON.stringify will automatically call .toJSON() on every timerClass instance in the array
   return su.Ok(JSON.stringify(allTimers));
 }
 

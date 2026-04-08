@@ -39,7 +39,8 @@ Each agent has access to the following tools:
  - textCombiner : Allows the agent to combine blocks of text without passing them through the LLM (saves context / tokens)
  - superEditor : Performs edits on files using diffs (can edit large files - saves context / tokens)
  - createMermaidDiagram : Create mermaid code for creating diagrams such as flow charts. 
- - deepResearchTool : Performs deep research on the user topic. Includes fact-checking. 
+ - deepResearchTool : Performs deep research on the user topic. Includes fact-checking.
+ - scheduleJobTool : Used for scheduling agent jobs, getting details of any cron timers and removing cron timers.
  - (More coming soon...)
 
 ### LLM Providers 🤖
