@@ -18,6 +18,7 @@ export class QuickAskAgent extends AiJob {
     this.messageHistory.addMessage(new TextMessage({ role: Roles.User, textData: task}));
     this.task = task;
     this.agentType = "QuickAsk"; 
+    this.debugParams = [];
   }
 
   async run(){
@@ -36,6 +37,7 @@ export class QuickAskAgent extends AiJob {
       if(taskCall.isErr()){
         this.setFailed();
         this.isRunning = false; 
+        this.errors.push(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`);
         return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
       this.task = taskCall.value;
        this.addAiCount(1);
@@ -47,7 +49,8 @@ export class QuickAskAgent extends AiJob {
     if(tools.isErr()){ 
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`) 
+      this.errors.push(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
+      return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
     }
 
     // Make call to determine the tool to use. 
@@ -62,7 +65,8 @@ export class QuickAskAgent extends AiJob {
     if(routingCall.isErr()) {
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`)
+      this.errors.push(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
+      return Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
     }
     // catch no-suitable tool Or clarify task
     if(routingCall.value.nextAction == "no-suitable-tool" || 
@@ -85,6 +89,7 @@ export class QuickAskAgent extends AiJob {
     if(toolDetails.isErr()){
       this.setFailed();
       this.isRunning = false;
+      this.errors.push(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`);
       return Err(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`)
     };
      
@@ -106,7 +111,8 @@ export class QuickAskAgent extends AiJob {
     if(paramsCall.isErr()) {
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> paramsCall ) : ${paramsCall.value}`)
+      this.errors.push(`Error (Quick Task Agent -> startTask -> paramsCall ) : ${paramsCall.value}`);
+      return Err(`Error (Quick Task Agent -> startTask -> paramsCall ) : ${paramsCall.value}`);
     }
 
     // Build params into object (injecting data if needed)
@@ -115,10 +121,15 @@ export class QuickAskAgent extends AiJob {
     if(paramObject.isErr()){ 
       this.setFailed();
       this.isRunning = false;
-      return Err(`Error (Quick Task Agent -> startTask -> buildObject ) : ${JSON.stringify(paramObject)}`)
+      this.errors.push(`Error (Quick Task Agent -> startTask -> buildObject ) : ${JSON.stringify(paramObject)}`);
+      return Err(`Error (Quick Task Agent -> startTask -> buildObject ) : ${JSON.stringify(paramObject)}`);
     }
 
     // Call Tool
+    this.debugParams.push({
+      toolName: toolDetails.value.details.toolName,
+      inputParams: paramObject.value
+    })
     console.log(`Calling ${toolDetails.value.details.toolName} ...`);
     this.status.setCustomStatus(`Calling ${toolDetails.value.details.toolName} ...`);
     let toolCall = await callAgentTool(
@@ -129,6 +140,7 @@ export class QuickAskAgent extends AiJob {
     if(toolCall.isErr()){
       this.setFailed();
       this.isRunning = false;
+      this.errors.push(`Error (Quick Task Agent -> startTask -> toolCall ) : ${toolCall.value}`);
       return Err(`Error (Quick Task Agent -> startTask -> toolCall ) : ${toolCall.value}`);    
     }
     this.addToolCount(1);
@@ -144,6 +156,7 @@ export class QuickAskAgent extends AiJob {
         if(processed.isErr()){
           this.setFailed();
           this.isRunning = false;
+          this.errors.push(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);
           return Err(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);   
         }
         // Add data to tool context;
@@ -163,6 +176,7 @@ export class QuickAskAgent extends AiJob {
     if( formattedOP.isErr()){
       this.setFailed();
       this.isRunning = false;
+      this.errors.push(`Error (Quick Task Agent -> startTask -> finialiseOutput ) : ${formattedOP.value}`);
       return formattedOP; // already has Result Class
     }
 
@@ -171,6 +185,8 @@ export class QuickAskAgent extends AiJob {
     this.setComplete();
     this.isRunning = false;
     // Write output for debugging.
+    this.debugParams = []; // reset debug params
+    this.stats.loopNumber += 1;
     const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
     const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
     await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);

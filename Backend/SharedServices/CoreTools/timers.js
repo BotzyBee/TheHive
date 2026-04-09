@@ -103,12 +103,6 @@ export function addNewTimer(timerName, callbackFn, config = {}) {
 }
 
 export function removeTimer(optTimerName, optTimerID) {
-  // catch no imput params
-  if (optTimerID == null || optTimerName == null) {
-    return su.Err(
-      `Error (removeTimer) - you have to provide a timerName or TimerID as params`
-    );
-  }
   let allTimerLen = allTimers.length ?? 0;
   // catch empty allTimers array
   if (allTimerLen == 0) {

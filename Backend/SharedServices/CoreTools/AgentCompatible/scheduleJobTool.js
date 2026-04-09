@@ -4,10 +4,10 @@
 
 export const details = {
     toolName: "scheduleJobTool",
-    version: "0.1.0",
+    version: "0.2.1",
     creator: "Botzy Bee",
     overview: "Manages scheduled tasks within the system. Supports three modes: 1 (Schedule an AI call), 2 (Cancel a scheduled task by ID), and 3 (List all active tasks). Limitations: AI callbacks run in the background and their text results are outputted to system logs rather than returned immediately to the user.",
-    guide: "Always invoke with an explicit 'mode'. For Mode 1, provide a unique timerName, aiComments, and scheduling timing (delayMs or date). For Mode 2, provide the timerID. For Mode 3, no additional parameters are required. When using mode 1 - you should only add intervalMs when the user specifically indicates they want a recurring or repeating task.",
+    guide: "Always invoke with an explicit 'mode'. For Mode 1, provide a unique timerName, aiComments, and scheduling timing. If the user specifies a relative time ('in 5 minutes'), use 'delayMs'. If the user specifies an absolute time ('at 21:00 on 15/10/24'), calculate and provide the exact ISO 8601 string for 'targetTime'. For Mode 2, provide the timerID. For Mode 3, no additional parameters are required. Add 'intervalMs' only if a recurring task is requested.",
     inputSchema: JSON.stringify({
         "type": "object",
         "properties": {
@@ -22,11 +22,11 @@ export const details = {
             },
             "delayMs": {
                 "type": "integer",
-                "description": "Mode 1: The delay in milliseconds before the first execution."
+                "description": "Mode 1: The delay in milliseconds before the first execution (for relative times)."
             },
-            "date": {
+            "targetTime": {
                 "type": "string",
-                "description": "Mode 1: A specific Date/Time for execution (ISO 8601 string)."
+                "description": "Mode 1: A specific Date/Time for execution (ISO 8601 string, for absolute times)."
             },
             "intervalMs": {
                 "type": "integer",
@@ -48,12 +48,12 @@ export const details = {
 
 /**
  * Handles Mode 1: Scheduling an AI call
- * @param {object} Shared - Core Hive services
+ * @param {object} Shared - Core Hive services (Must include Shared.dateFns)
  * @param {object} params - Inputs defined in inputSchema
  * @returns {Promise<object>} Result wrapper containing operation metadata
  */
 async function handleScheduleMode(Shared, params) {
-    const { timerName, delayMs, date, intervalMs, aiComments } = params;
+    const { timerName, delayMs, targetTime, intervalMs, aiComments } = params;
 
     if (!timerName) {
         return Shared.Utils.Err("Mode 1 requires 'timerName' to uniquely identify the schedule.");
@@ -62,12 +62,24 @@ async function handleScheduleMode(Shared, params) {
         return Shared.Utils.Err("Mode 1 requires 'aiComments' defining the AI instructions.");
     }
 
-    let delay = delayMs || 0;
-    if (date) {
-        const parsedDate = new Date(date);
-        if (!isNaN(parsedDate.getTime())) {
-            delay = parsedDate;
+    let calculatedDelay = 0;
+    
+    if (targetTime) {
+        const parsedDate = Shared.Utils.parseISOHelper(targetTime);
+        
+        if (!Shared.Utils.isValidHelper(parsedDate)) {
+            return Shared.Utils.Err(`Invalid targetTime format provided: ${targetTime}. Must be a valid ISO 8601 string.`);
         }
+
+        // Calculate milliseconds between now and the target date
+        const now = new Date();
+        calculatedDelay = Shared.Utils.differenceInMillisecondsHelper(parsedDate, now);
+
+        if (calculatedDelay < 0) {
+            return Shared.Utils.Err("Cannot schedule a task in the past.");
+        }
+    } else if (delayMs !== undefined) {
+        calculatedDelay = Math.max(0, delayMs); // Ensure we don't get negative delays
     }
 
     const isOneOff = !intervalMs || intervalMs <= 0;
@@ -78,7 +90,7 @@ async function handleScheduleMode(Shared, params) {
     };
 
     const config = {
-        delay,
+        delay: calculatedDelay,
         intervalMs: intervalMs || 0,
         isOneOff
     };
@@ -93,6 +105,7 @@ async function handleScheduleMode(Shared, params) {
         action: "scheduled",
         timerName,
         isOneOff,
+        delayMsUsed: calculatedDelay,
         status: "success"
     }));
 }
@@ -105,11 +118,8 @@ async function handleScheduleMode(Shared, params) {
  */
 async function handleCancelMode(Shared, params) {
     const { timerID, timerName } = params;
+    console.log(`Attempting to cancel timer with ID: ${timerID} or Name: ${timerName}`);
     
-    if (!timerID && !timerName) {
-        return Shared.Utils.Err("Mode 2 requires 'timerID' (or 'timerName' as fallback) to cancel a task.");
-    }
-
     const cancelResult = Shared.CoreTools.Timers.removeTimer(timerName, timerID);
     
     if (cancelResult.isErr()) {
@@ -174,8 +184,9 @@ export async function run(Shared, params = {}) {
 
     // Construct response standardized across all modes
     let instructions = mode === 1 ? "AI task has been scheduled as requested." : 
-                        mode === 2 ? "Scheduled task cancellation has been completed." : 
-                        "Active timers retrieved successfully.";
+                       mode === 2 ? "Scheduled task cancellation has been completed." : 
+                       "Active timers retrieved successfully.";
+    
     const message = new Shared.Classes.TextMessage({
         role: Shared.Classes.Roles.Tool,
         textData: operationResult.value,

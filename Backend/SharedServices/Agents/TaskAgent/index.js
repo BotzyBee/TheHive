@@ -6,6 +6,7 @@ import { getToolsOrGuidesForTask, getToolDetails } from "../../Database/helpers.
 import { processMessageForContext, finialiseOutput,stripOutAudioAndImageData } from "../agentUtils.js";
 import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js'
 import { callAgentTool } from "../../CoreTools/helperFunctions.js";
+import { tool } from '@langchain/core/tools';
 
 export const TaskPhases = {
     Plan: "Planning Phase",
@@ -83,6 +84,7 @@ export class TaskAgent extends AiJob {
         this.maxLoops = 10; // this is updated when a plan is created.
         this.summaryDataSizeThreshold = summaryDataSizeThreshold; // How many characters before context summarisation
         this.toolOutputData = []; // temp holds tool output prior to review;
+        this.debugParams = []; // used to store params crafted for tools for debugging and improvement purposes.
     }
 
     // [][] ---- PLAN MANAGEMENT FUNCTIONS ---- [][]
@@ -382,11 +384,6 @@ export class TaskAgent extends AiJob {
                 { role: Roles.Tool, textData: "Re-planning tool has created an updated plan.", 
                     toolName: "rePlanTool", instructions: this.phaseMessage, metadata: {actionID: nextAction.id }});
             this.toolOutputData.push(msg);
-            // let processOP = await this.#processToolOutput([msg]);
-            // if(processOP.isErr()) return processOP; // has result.
-            // processOP.value.rawMessages.forEach( msg => this.messageHistory.addMessage(msg));
-            // this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
-            // Next-Phase and phase message handled in updatePlan();
             return Ok("Re-Planning Complete - moving to action phase.");
         }
         if(nextAction.tool == 'returnToUser'){ 
@@ -398,10 +395,6 @@ export class TaskAgent extends AiJob {
                 { role: Roles.Tool, textData: this.phaseMessage, 
                     toolName: "returnToUser", instructions: "Return the output to user.", metadata: {actionID: nextAction.id }});
             this.toolOutputData.push(msg);
-            // let processOP = await this.#processToolOutput([msg]); 
-            // this.contextData.toolData = {...this.contextData.toolData, ...processOP.value.summaryObj };
-            // // Note - we don't need to push OP to messageHistory as this is done by finaliseOutput in review stage.
-            // if(processOP.isErr()) return processOP; // has result.
             return Ok("Return to user tool was called");
         }
 
@@ -438,6 +431,8 @@ export class TaskAgent extends AiJob {
             if(resolvedParams.isErr()){ 
             return Err(`Error (performAction -> parseNunjucksTemplate ) : ${JSON.stringify(resolvedParams)}`)
             }
+            // save params for debugging/improvement purposes.
+            this.debugParams.push({tool: nextAction.tool, paramsCrafted: craftedParams.value.params, paramsResolved: resolvedParams.value, toolInputSchema: toolObj.value.details.inputSchema });
 
             // Call Tool
             this.status.setCustomStatus(`Using Tool: ${toolObj.value.details.toolName}`)
@@ -789,7 +784,9 @@ export class TaskAgent extends AiJob {
             if(this.nextPhase == TaskPhases.Plan){
                 let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan, useTaskPlanGuides: true });
                 if(plan.isErr()){ 
-                    console.log("ERROR Plan - ", plan.value);
+                    let e = `Error in planning phase: ${plan.value}`;
+                    this.errors.push(e);
+                    console.log(e);
                     this.status.setFailed();
                     this.isRunning = false;
                     return Err(`Error (Run -> plan) : ${plan.value}`);
@@ -801,7 +798,9 @@ export class TaskAgent extends AiJob {
                 let action = await this.#performNextAction();
                 console.log(JSON.stringify(action.value));
                 if(action.isErr()){ 
-                    console.log("ERROR Action - ", action.value);
+                    let e = `Error in action phase: ${action.value}`;
+                    this.errors.push(e);
+                    console.log(e);
                     this.status.setFailed(); // sets isRunning to false
                     return Err(`Error (Run -> action) : ${action.value}`);
                 }
@@ -813,7 +812,9 @@ export class TaskAgent extends AiJob {
                 let review = await this.#reviewAndReturn();
                 console.log(JSON.stringify(review.value));
                 if(review.isErr()){ 
-                    console.log("ERROR Review - ", review.value);
+                    let e = `Error in review phase: ${review.value}`;
+                    this.errors.push(e);
+                    console.log(e);
                     this.status.setFailed(); // sets isRunning to false
                     return Err(`Error (Run -> review) : ${review.value}`);
                 }
@@ -821,6 +822,9 @@ export class TaskAgent extends AiJob {
 
             // catch max loops
             if(this.stats.loopNumber >= this.maxLoops){
+                let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
+                this.errors.push(e);
+                console.log(e);
                 this.status.setMaxLoopsHit()
                 this.nextPhase = TaskPhases.Review;
             }
@@ -829,6 +833,7 @@ export class TaskAgent extends AiJob {
     
     // TEMP - Save output for de-bugging.
     this.setEndTime();
+    this.debugParams = [];
     const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
     const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
     await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);

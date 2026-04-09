@@ -26,7 +26,7 @@ export async function fetchPluginAgentGuides(){
             results.push({
                 filePath: fp,
                 guideName: allFiles[i],
-                version: fileStats.value.mtimeMs, // use modified time as version
+                version: JSON.stringify(fileStats.value.mtimeMs), // use modified time as version
                 overview: "No-overview-provided",
                 content: readFile.value,
             })
@@ -55,7 +55,7 @@ export async function initGuideIndex(){
         // if exists - check if needs updated
         if(check.value[0].length != 0 ){ 
             if(check.value[0][0].GuideName == plugIn.value[i].guideName && check.value[0][0].Version != plugIn.value[i].version){
-                let dCall = await removeGuideFromDB(db, plugIn.value[i].toolName);
+                let dCall = await removeGuideFromDB(db, plugIn.value[i].guideName);
                 if(dCall.isErr()){
                     return Services.Utils.Err(`Error ( initToolIndex -> removeGuideFromDB ) : ${dCall.value}`);
                 }
@@ -91,9 +91,9 @@ export async function initGuideIndex(){
  * @param {object} dbObject - DB agent - use getDbAgent() for this
  * @param {object} guideObject - { guideName: string, overview: string, version: string, filePath: string } 
  */
-async function addGuideToDB(dbObject, toolObject){
+async function addGuideToDB(dbObject, guideObject){
     // create summary of the guide for embedding.
-    let summary = await createSummary(toolObject.content);
+    let summary = await createSummary(guideObject.content);
     if(summary.isErr()){
         return Services.Utils.Err(`Error ( addGuideToDB -> createSummary ) : ${summary.value}`);
     }
@@ -103,10 +103,10 @@ async function addGuideToDB(dbObject, toolObject){
     let dbCall = await Services.Database.addVectorGuideToDB(
         dbObject,
         guideTableName,
-        toolObject.guideName,
+        guideObject.guideName,
         summary.value,
-        toolObject.version,
-        toolObject.filePath,
+        guideObject.version,
+        guideObject.filePath,
         vec.value[0]
     );
     if(dbCall.isErr()){
