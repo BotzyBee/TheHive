@@ -8,7 +8,42 @@ export const details = {
     version: "1.1.0",
     creator: "System",
     overview: "Comprehensive Google Calendar management. Supports full CRUD operations and time-range based searching for events.",
-    guide: "When the user asks for 'today', 'this week', or a specific date range, use the 'list' action and provide 'timeMin' and 'timeMax' in ISO 8601 format. Always request 'singleEvents: true' in your internal API call to ensure recurring events are expanded into individual instances. When creating events, ensure you have both a summary and valid start/end ISO timestamps.",
+    guide: 
+`CALENDAR TOOL EXECUTION PROTOCOL
+To ensure successful tool execution and prevent parameter errors, strictly adhere to the following logic gates based on the selected action:
+NOTE - IF not specifed, all times are UK time by default. Please specify timezone in eventDetails if different.
+
+1. ACTION SELECTION & REQUIRED PARAMETERS
+'list': Use for searching ranges or checking schedules.
+Required: timeMin, timeMax (Both must be ISO 8601 strings).
+Optional: q (keyword search), calendarId (default: "primary").
+
+'read': Use ONLY when you have a specific eventId.
+Required: eventId.
+Forbidden: eventDetails, timeMin, timeMax.
+
+'create': Use to add new events.
+Required: eventDetails (must include summary, start.dateTime, and end.dateTime).
+
+'update': Use to modify an existing event.
+Required: eventId AND eventDetails (only include the fields being changed).
+
+'delete': Use to remove an event.
+Required: eventId.
+
+2. DATA FORMATTING RULES
+Timestamp Integrity: All timeMin, timeMax, and eventDetails.start/end.dateTime values must be in ISO 8601 format (e.g., 2026-04-10T15:30:00Z).
+ID Persistence: Never hallucinate an eventId. If the user asks to "delete my last meeting" and you do not have the ID, you must perform a list action first to retrieve the correct eventId.
+Object Nesting: When using eventDetails, ensure start and end are objects containing the dateTime key. Do not pass strings directly to start or end.
+
+3. OPERATIONAL CONSTRAINTS
+Defaulting: Always use "calendarId": "primary" unless the user explicitly specifies a secondary calendar ID.
+Exclusivity: Do not provide timeMin or timeMax when performing read, update, or delete actions.
+Search: Use the q parameter for text-based queries (e.g., "Doctor" or "Meeting") only within the list action.
+
+EXAMPLE CALL LOGIC
+User wants to see today's plan: Action: list + timeMin (start of day) + timeMax (end of day).
+User wants to change a meeting time: Action: update + eventId + eventDetails (new start and end).`,
     inputSchema: JSON.stringify({
         "type": "object",
         "properties": {
