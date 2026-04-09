@@ -9,6 +9,7 @@ import { JOBS } from "../../Engine/jobManager.js";
 import { createTaskAgentJob } from "../../Engine/routes/taskAgent.js";
 import { FrontendMessageFormat, TextMessage, Roles } from "../Classes/aiMessages.js";
 import { parseISO, differenceInMilliseconds, isValid} from 'date-fns';
+import axios from 'axios';
 
 /**
  * Return Ok
@@ -45,6 +46,7 @@ export const evaluateHelper = (input) => { evaluate(input) }
 export const parseISOHelper = parseISO;
 export const differenceInMillisecondsHelper = differenceInMilliseconds;
 export const isValidHelper = isValid;
+export const axiosHelper = axios;
 
 /**
  * 

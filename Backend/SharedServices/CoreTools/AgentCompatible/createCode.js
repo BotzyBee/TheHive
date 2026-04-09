@@ -23,7 +23,7 @@ export const details = {
 export async function run(Shared, params = {}) {
     const { taskDescription, context } = params;
     const aiCall = new Shared.AiCall.AiCall();
-    const superEditor = new Shared.CoreTools.SuperEditor(); 
+    const superEditor = Shared.CoreTools.AgentCompatible.superEditor.run; 
     let retAR = [];
 
     // [][] --- STEP 1: ARCHITECT THE SKELETON --- [][]
@@ -31,7 +31,8 @@ export async function run(Shared, params = {}) {
     const archSys = "You are a Software Architect. Create a valid file SKELETON. " +
         "Include all boilerplate, imports, and function signatures. " +
         "Inside every empty function or logic block, put a unique marker like '// [INJECT_1]', '// [INJECT_2]'. " +
-        "Return a JSON list of what each marker should contain.";
+        "Return a JSON list of what each marker should contain." +
+        `Here is any context: \n ${context} \n`;
 
     const archSchema = {
         "type": "object",
@@ -55,6 +56,7 @@ export async function run(Shared, params = {}) {
     const archCall = await aiCall.generateCode(archSys, taskDescription, {structuredOutput : archSchema});
     if (archCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
 
+    let _save = await Shared.FileSystem.saveFile('./', archCall.value.skeleton, 'skeleton.txt'); // TEMP - for debugging
     let currentFileState = archCall.value.skeleton;
     const mimeType = archCall.value.mimeType;
     const orders = archCall.value.workOrders;
@@ -67,36 +69,28 @@ export async function run(Shared, params = {}) {
                        `Requirement: ${order.description}. ` +
                        `Context: You are working within this file skeleton:\n${currentFileState}`+
                        `Your goal is to produce 'production-ready' code that balances immediate functionality with long-term maintainability. `+
-                       `Include error handling, edge-case validation, and clear logging. Write expressive variable names. Add comments only to explain 'why,' not 'what.'`;
+                       `Include error handling, guard clauses, edge-case validation, and clear logging. Write expressive variable names. Add comments only to explain 'why,' not 'what.'`+
+                       `Here is any additional context: \n ${context} \n`;
         
-        const devCall = await aiCall.generateText(devSys, "Output ONLY the raw code logic. No markdown. No preamble.");
-        
-        if (devCall.isOk()) {
-            const generatedSnippet = devCall.value;
+        const devCall = await aiCall.generateCode(devSys, "Output ONLY the raw code logic. No markdown. No preamble.");
+        if (devCall.isErr()){ return Shared.Utils.Err(`Error (createCodeTool -> Development phase) : ${devCall.value}`)}
 
-            // B: Command the "Dumb" SuperEditor to perform the swap
-            // We give it a literal, unambiguous command.
-            const editorPrompt = `REPLACE the marker '${order.marker}' with the following code:\n\n${generatedSnippet}`;
+        const generatedSnippet = devCall.value;
 
-            const editResult = await superEditor.run(Shared, {
-                prompt: editorPrompt,
-                document: currentFileState,
-                context: `Targeting marker ${order.marker} for task: ${taskDescription}`
-            });
+        // B: Use superEditor to inject the generated snippet into the correct place in the skeleton
+        const editorPrompt = `REPLACE the marker '${order.marker}' with the code provided in the context.`;
 
-            if (editResult.isOk()) {
-                // Assuming DataMessage contains the updated document in its 'data' payload
-                const editData = editResult.value[0].data;
-                if (editData.success) {
-                    currentFileState = editData.editedDocument;
-                    retAR.push(new Shared.Classes.TextMessage({
-                        role: Shared.Classes.Roles.Assistant,
-                        textData: `Successfully injected logic into ${order.marker}`,
-                        toolName: "createCodeTool"
-                    }));
-                }
-            }
-        }
+        const editResult = await superEditor(Shared, {
+            prompt: editorPrompt,
+            document: currentFileState,
+            context: generatedSnippet
+        });
+        if (editResult.isErr()){ return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor phase) : ${editResult.value}`)}
+
+        // Unpack the data message returned by superEditor
+        const editData = editResult.value[0].data;
+        currentFileState = editData.editedDocument;
+        let _save = await Shared.FileSystem.saveFile('./', currentFileState, `edit_${order.marker}.txt`); // TEMP - for debugging
     }
 
     // [][] --- FINAL OUTPUT --- [][]
