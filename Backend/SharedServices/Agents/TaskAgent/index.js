@@ -63,9 +63,10 @@ export class TaskAgent extends AiJob {
             aiSettings = {}, 
             toolRetryCount = 2,
             maxLoopBuffer = 5,
-            summaryDataSizeThreshold = 500
+            summaryDataSizeThreshold = 500,
+            socketId = null
         } = {}){
-        super({aiSettings}) // setup parent class
+        super({aiSettings, socketId}) // setup parent class
         this.messageHistory.addMessage(new TextMessage({ role: Roles.User, textData: task}));
         this.task = task;
         this.agentType = "TaskAgent"; 
@@ -772,73 +773,83 @@ export class TaskAgent extends AiJob {
     // [][] --- MAIN ENTRY POINT --- [][]
     
     async run(){
-        console.log("Starting Task Agent Job")
-        // Start / Re-start the agent
-        this.isRunning = true;
-        this.taskOutput = [];
-        if(this.startEpochMs == 0) this.setStartTime();
-        
-        // Main Loop :: Plan -> Act -> Review
-        while(this.isRunning == true){
-            // PLAN
-            if(this.nextPhase == TaskPhases.Plan){
-                let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan, useTaskPlanGuides: true });
-                if(plan.isErr()){ 
-                    let e = `Error in planning phase: ${plan.value}`;
-                    this.errors.push(e);
-                    console.log(e);
-                    this.status.setFailed();
-                    this.isRunning = false;
-                    return Err(`Error (Run -> plan) : ${plan.value}`);
-                }
-            }
+        // Use try/ catch to handle any unexpected errors and ensure the agent can fail gracefully.
+        try{
+            console.log("Starting Task Agent Job")
+            // Start / Re-start the agent
+            this.isRunning = true;
+            this.taskOutput = [];
+            if(this.startEpochMs == 0) this.setStartTime();
             
-            // ACTION
-            if(this.nextPhase == TaskPhases.Action){
-                let action = await this.#performNextAction();
-                console.log(JSON.stringify(action.value));
-                if(action.isErr()){ 
-                    let e = `Error in action phase: ${action.value}`;
+            // Main Loop :: Plan -> Act -> Review
+            while(this.isRunning == true){
+                // PLAN
+                if(this.nextPhase == TaskPhases.Plan){
+                    let plan = await this.#planningEngine({updatePlan : this.updateExistingPlan, useTaskPlanGuides: true });
+                    if(plan.isErr()){ 
+                        let e = `Error in planning phase: ${plan.value}`;
+                        this.errors.push(e);
+                        console.log(e);
+                        this.status.setFailed();
+                        this.isRunning = false;
+                        return Err(`Error (Run -> plan) : ${plan.value}`);
+                    }
+                }
+                
+                // ACTION
+                if(this.nextPhase == TaskPhases.Action){
+                    let action = await this.#performNextAction();
+                    console.log(JSON.stringify(action.value));
+                    if(action.isErr()){ 
+                        let e = `Error in action phase: ${action.value}`;
+                        this.errors.push(e);
+                        console.log(e);
+                        this.status.setFailed(); // sets isRunning to false
+                        return Err(`Error (Run -> action) : ${action.value}`);
+                    }
+                }
+
+                // REVIEW & RESPOND
+                if(this.nextPhase == TaskPhases.Review){
+                    console.log("Reviewing...");
+                    let review = await this.#reviewAndReturn();
+                    console.log(JSON.stringify(review.value));
+                    if(review.isErr()){ 
+                        let e = `Error in review phase: ${review.value}`;
+                        this.errors.push(e);
+                        console.log(e);
+                        this.status.setFailed(); // sets isRunning to false
+                        return Err(`Error (Run -> review) : ${review.value}`);
+                    }
+                }
+
+                // catch max loops
+                if(this.stats.loopNumber >= this.maxLoops){
+                    let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
                     this.errors.push(e);
                     console.log(e);
-                    this.status.setFailed(); // sets isRunning to false
-                    return Err(`Error (Run -> action) : ${action.value}`);
+                    this.status.setMaxLoopsHit()
+                    this.nextPhase = TaskPhases.Review;
                 }
+                this.addLoopCount(1);
+            }// end main loop
+            
+            // TEMP - Save output for de-bugging.
+            this.setEndTime();
+            this.debugParams = [];
+            const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
+            const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
+            await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
+            
+            return Ok("Task Agent has stopped or completed");
             }
+        catch(e){
 
-            // REVIEW & RESPOND
-            if(this.nextPhase == TaskPhases.Review){
-                console.log("Reviewing...");
-                let review = await this.#reviewAndReturn();
-                console.log(JSON.stringify(review.value));
-                if(review.isErr()){ 
-                    let e = `Error in review phase: ${review.value}`;
-                    this.errors.push(e);
-                    console.log(e);
-                    this.status.setFailed(); // sets isRunning to false
-                    return Err(`Error (Run -> review) : ${review.value}`);
-                }
-            }
-
-            // catch max loops
-            if(this.stats.loopNumber >= this.maxLoops){
-                let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
-                this.errors.push(e);
-                console.log(e);
-                this.status.setMaxLoopsHit()
-                this.nextPhase = TaskPhases.Review;
-            }
-            this.addLoopCount(1);
-        }// end main loop
-    
-    // TEMP - Save output for de-bugging.
-    this.setEndTime();
-    this.debugParams = [];
-    const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-    const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
-    await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
-    
-    return Ok("Task Agent has stopped or completed");
+                this.errors.push(`Unexpected error: ${e}`);
+                this.status.setFailed();
+                this.isRunning = false;
+                return Err(`Unexpected error: ${e}`);   
+        }
     }
 }// end Task Agent
 

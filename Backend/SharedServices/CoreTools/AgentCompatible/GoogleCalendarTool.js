@@ -116,9 +116,8 @@ export async function run(Shared, params = {}) {
 
     try {
         let resultData;
-        let primaryCalendarId = 'bec156bfe09e07404c528f0d6313bb936723894ca654c97230200511a94307fb@group.calendar.google.com'; // Botzy Shared Calendar.
         const requestedAction = params.action;
-        const targetCalendarId = encodeURIComponent(params.calendarId || primaryCalendarId);
+        const targetCalendarId = encodeURIComponent(params.calendarId || "primary");
         const targetEventId = params.eventId ? encodeURIComponent(params.eventId) : null;
         const targetEventDetails = params.eventDetails || null;
 

@@ -4,6 +4,7 @@ import { MessageLog } from "./aiMessages.js";
 import { processApiMessagesToClasses } from "../../Engine/routes/index.js";
 import { Err } from "../Utils/index.js";
 import { AiCall } from "../CallAI/index.js";
+import { emitToSocket } from "../../app.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
@@ -202,9 +203,12 @@ export class ContextTemplate {
 
 // Base Class for all AI Jobs / Agents 
 export class AiJob {
-  constructor({ idPrefix = "AI", aiSettings } = {}){ 
+  constructor({ idPrefix = "AI", aiSettings, socketId } = {}){ 
     /**@type {string} */
     this.id = generateLongID(idPrefix);
+
+    /**@type {string | null} - Socket ID for linking to the correct user for updates */
+    this.socketId = socketId || null; 
 
     /**@type {string} - used to differentiate between base class and classes that extend AiJob*/
     this.agentType = "AiJob";
@@ -248,6 +252,20 @@ export class AiJob {
   /** Run must be implemented in any subclasses - the run function must start / handle the main agent loop or actions. */
   async run() {
     return Err("Method 'run()' must be implemented in the subclass");
+  }
+
+  /**
+   * Sends status update back to the user. 
+   * @param {string} statusMessage - Status text to send to the user.
+   */
+  emitUpdateStatus(statusMessage){
+    if(this.socketId){
+        let status = new TaskStatus().setCustomStatus(statusMessage);
+        emitToSocket(this.socketId, 'job_update', { 
+            jobID: this.id, 
+            status: status 
+        });
+    }
   }
 
   /**
@@ -339,6 +357,8 @@ export class AiJob {
         } else if(key == "taskOutput"){
             let msgs = processApiMessagesToClasses(data[key]).value;
             this.taskOutput = msgs;
+        } else if(key == "socketId"){
+            this.socketId = data[key];
         }
         else {
             this[key] = data[key];

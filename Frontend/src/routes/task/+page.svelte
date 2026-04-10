@@ -8,7 +8,7 @@
     let isSidebarCollapsed = true;
     let prompt = '';
     let inputTextArea;
-    let chatContainer; // This will now refer to the <main> element
+    let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Ai Assistant";
     function toggleSidebar() {
@@ -18,8 +18,6 @@
     function toggleSettings() {
         isSettingsOpen = !isSettingsOpen;
     }
-
-
 
     // Intelligent Scroll Logic
     $: if ($chatStore.messageHistory && chatContainer) {

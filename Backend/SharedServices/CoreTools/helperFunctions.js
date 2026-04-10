@@ -6,23 +6,24 @@ import { typeOf } from "mathjs";
 
 /**
  * 
- * @param {string} toolName - The name of the  
+ * @param {string} toolName - The name of the tool to call.
  * @param {string} filePath - this will either be the path to the plugin or 'built-in'
  * @param {object} params - the input parameters object for the tool. 
+ * @param {object} agentDependencies - this is an optional parameter that can be used to pass in any additional dependencies the tool may need. 
  * @returns {Result(any)} - returns the output from the agent tool.
  */
-export async function callAgentTool(toolName, filePath, params){
+export async function callAgentTool(toolName, filePath, params, agentDependencies = {}){
     if(toolName == null || filePath == null){
         return Services.Utils.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
     }
     if (filePath == Services.Constants.builtInFilePath){
         // built-in tool
-        return Services.CoreTools.AgentCompatible[toolName].run(Services, params); // tools must return Ok/ Err.
+        return Services.CoreTools.AgentCompatible[toolName].run(Services, params, agentDependencies); // tools must return Ok/ Err.
     } else {
         // plug-in tool
         let readFile = await import(/* @vite-ignore */ filePath);
         if(readFile){
-            return readFile.run(Services, params);
+            return readFile.run(Services, params, agentDependencies);
         } else {
            return Services.Utils.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
         }

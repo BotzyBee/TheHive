@@ -7,9 +7,10 @@ import { processApiMessagesToClasses } from './index.js';
 /**
  * Creates a new QuickAsk Agent and adds it to non-allocated jobs.
  * @param {FrontendMessageFormat} frontendMessage 
+ * @param {string} socketId - Socket ID to link the job to the correct user for updates.
  * @returns {Result<FrontendMessageFormat | string>} - Result( FrontendMessageFormat | string )
  */
-export async function createTaskAgentJob(frontendMessage){
+export async function createTaskAgentJob(frontendMessage, socketId){
     if(!frontendMessage instanceof FrontendMessageFormat){
         return Services.Utils.Err(
             'Error (createTaskAgentJob) : frontendMessage is not a FrontendMessageFormat class message.'
@@ -25,6 +26,7 @@ export async function createTaskAgentJob(frontendMessage){
     let job = new Services.Agents.TaskAgent.TaskAgent({
         task: message, 
         aiSettings: frontendMessage.aiSettings, 
+        socketId: socketId,
         // All below are optional
         //toolRetryCount, 
         //maxLoopBuffer, 
