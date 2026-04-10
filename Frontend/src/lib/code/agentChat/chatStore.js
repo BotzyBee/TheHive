@@ -16,10 +16,10 @@ function createChatStore() {
         latestJobRef: null,
         lastStatus: null,
         aiSettings: {
-            agent: "Task Agent"
+            agent: "Task_Agent"
         },
         config: {}
-    };
+    }; 
 
     const { subscribe, set, update } = writable(state);
 
@@ -39,7 +39,7 @@ function createChatStore() {
         // Handles interim updates (e.g., streaming status or partial text)
         socket.on('job_update', (data) => {
             const currentStore = get({ subscribe });
-            if (data.jobID !== currentStore.latestJobRef) return; // Ignore old job updates
+            if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
             let parsedStatus = parseStatus(data.status);
             let il = true;
             let jd = false;
@@ -57,12 +57,16 @@ function createChatStore() {
 
         // Handles the final payload when a job finishes
         socket.on('job_complete', (data) => {
+            console.log("Received job_complete event:", data);
             const currentStore = get({ subscribe });
-            if (data.jobID !== currentStore.latestJobRef) return;
+
+            // Ensure this update is for the current job
+            if (data.aiJobId != currentStore.latestJobRef) return;
 
             const { messages, metadata } = data;
             
             let processedMessages = processApiMessagesToClasses(messages || []);
+            console.log("Processed messages:", processedMessages);
             let sanitisedMessages = [];
             
             for(let i=0; i<processedMessages.length; i++){
@@ -77,7 +81,7 @@ function createChatStore() {
                 }
                 sanitisedMessages.push(msg);
             }
-
+            console.log("Sanitised messages:", sanitisedMessages);
             update(s => ({
                 ...s,
                 isLoading: false,
@@ -97,7 +101,7 @@ function createChatStore() {
         // Handles catastrophic backend errors on a running job
         socket.on('job_error', (data) => {
             const currentStore = get({ subscribe });
-            if (data.jobID !== currentStore.latestJobRef) return;
+            if (data.aiJobId !== currentStore.latestJobRef) return;
 
             update(s => ({
                 ...s,
@@ -136,7 +140,6 @@ function createChatStore() {
         try {
             // Emitting instead of HTTP POST. It waits for the ack callback to resolve.
             const response = await emitTask([userMsg], currentState.latestJobRef, currentState.aiSettings);
-            
             update(s => ({
                 ...s,
                 latestJobRef: response.aiJobId,
@@ -163,7 +166,7 @@ function createChatStore() {
         set({
             ...state, // Reset to initial blank state defined at top
             aiSettings: {
-                agent: currentState.aiSettings.agent || "Task Agent"
+                agent: currentState.aiSettings.agent || "Task_Agent"
             }
         });
     }

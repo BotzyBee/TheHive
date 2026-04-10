@@ -29,8 +29,8 @@ export function getConfigForFrontend(){
     ModelTypes: Services.Constants.ModelTypes,
     AiQuality: Services.Constants.AiQuality,
     Agents: {
-      taskAgent: "Task Agent",
-      quckAsk: "Quick-Ask Agent"
+      taskAgent: "Task_Agent",
+      quickAsk: "Quick_Ask_Agent"
     }
   }
   return rtnObject;

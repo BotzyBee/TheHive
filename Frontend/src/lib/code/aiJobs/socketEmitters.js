@@ -18,7 +18,7 @@ export async function emitTask(messages = [], jobId = null, settings = {}) {
         messages: messages 
     });
 
-    const eventName = settings?.agent === "Quick Agent" ? 'submit_quick_ask' : 'submit_task';
+    const eventName = settings?.agent === "Quick_Ask_Agent" ? 'submit_quick_ask' : 'submit_task';
 
     // Wrap the socket emit in a Promise so we can await the backend's acknowledgment
     return new Promise((resolve, reject) => {

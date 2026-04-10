@@ -9,7 +9,7 @@ import { processApiMessagesToClasses } from './index.js';
  * @param {FrontendMessageFormat} frontendMessage 
  * @returns {Result<FrontendMessageFormat | string>} - Result( FrontendMessageFormat | string )
  */
-export async function createQuickAskJob(frontendMessage){
+export async function createQuickAskJob(frontendMessage, socketId = null){
     if(!frontendMessage instanceof FrontendMessageFormat){
         return Services.Utils.Err(
             'Error (createQuickAskJob) : frontendMessage is not a FrontendMessageFormat class message.'
@@ -24,7 +24,8 @@ export async function createQuickAskJob(frontendMessage){
     }
     let job = new Services.Agents.QuickAsk.QuickAskAgent({
         task: message,
-        aiSettings: frontendMessage.aiSettings
+        aiSettings: frontendMessage.aiSettings,
+        socketId: socketId,
     });
     // add to queue
     JOBS.addNewJob(job);
@@ -39,7 +40,7 @@ export async function createQuickAskJob(frontendMessage){
     return Services.Utils.Ok(rtnMessage);
 }
 
-export async function handleQAMessage(frontendMessage){
+export async function handleQAMessage(frontendMessage, socketId = null){
     // Process Messages
     let id = frontendMessage.aiJobId;
     let msg = new FrontendMessageFormat({ aiJobId: id, aiSettings: frontendMessage.aiSettings });
@@ -50,7 +51,7 @@ export async function handleQAMessage(frontendMessage){
     msg.addMessages(processedMsg.value);
     // No ID - New Task
     if(id == null){
-    let newJob = await createQuickAskJob(msg);
+    let newJob = await createQuickAskJob(msg, socketId);
     if(newJob.isErr()){
         return Services.Utils.Err(`Error : (createQuickAskJob) - ${newJob.value}`);
     }

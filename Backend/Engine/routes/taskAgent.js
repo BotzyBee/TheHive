@@ -46,7 +46,7 @@ export async function createTaskAgentJob(frontendMessage, socketId){
     return Services.Utils.Ok(rtnMessage);
 }
 
-export async function handleTAMessage(frontendMessage){
+export async function handleTAMessage(frontendMessage, socketId = null){
     // Process Messages
     let id = frontendMessage.aiJobId;
     // No ID - New Task
@@ -61,7 +61,7 @@ export async function handleTAMessage(frontendMessage){
         return Services.Utils.Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
         }
         rtnMsg.addMessages(processedMsg.value);
-        let newJob = await createTaskAgentJob(rtnMsg);
+        let newJob = await createTaskAgentJob(rtnMsg, socketId);
         if(newJob.isErr()){
             return Services.Utils.Err(`Error : (handleTAMessage) - ${newJob.value}`);
         }

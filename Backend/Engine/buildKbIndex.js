@@ -8,17 +8,22 @@ let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
 let deleteJobs = []; // array of files + dirs to be deleted from DB
 let deleteJobsReadable = []; // human readable version for error logging
+export let indexTimerActive = false;
 
 // Indexing Stats
 let kbTotal = 0; // knowledgebase checks
 let dbTotal = 0; // database checks
 let totalJobCount = 0; // total number of jobs completed
 
-export async function indexKnowledgebase(dbAgent) {
-  // Index in progress. Catch repeat timer calls & exit early
-  if (indexingActive == true) {
-    return su.Ok('Indexing is already in progress.');
+export async function indexKnowledgebase() {
+  indexTimerActive = true;
+  let fetchDbAgent = await Services.Database.getDbAgent();
+  if (fetchDbAgent.isErr()) {
+    indexTimerActive = false;
+    return su.Err(`Error (indexKnowledgebase -> getDbAgent) : ${fetchDbAgent.value}`);
   }
+  let dbAgent = fetchDbAgent.value;
+
   // reset Index Stats
   kbTotal = 0;
   dbTotal = 0;
@@ -31,12 +36,11 @@ export async function indexKnowledgebase(dbAgent) {
   // Check update millis
   let MsNow = new Date().getTime(); // for updating mgmt record when done. \
   // Begin index from root
-  indexingActive = true;
   dotenv.config({ path: '.env' });
   const kbURL = process.env.knowledgebaseURL;
   let rootUpdates = await checkAndUpdateDirAndFiles(dbAgent, kbURL);
   if (rootUpdates.isErr()) {
-    indexingActive = false;
+indexTimerActive = false;
     return su.logAndErr(
       `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(Root) ${rootUpdates.value}`
     );
@@ -52,7 +56,7 @@ export async function indexKnowledgebase(dbAgent) {
       furtherChecks[i]
     );
     if (nextUpdateDir.isErr()) {
-      indexingActive = false;
+      indexTimerActive = false;
       return su.logAndErr(
         `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(index ${i}) ${nextUpdateDir.value}`
       );
@@ -75,14 +79,14 @@ export async function indexKnowledgebase(dbAgent) {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
-    indexingActive = false;
+    indexTimerActive = false;
     su.logAndErr(
       `Error (indexKnowledgebase) - Could not update Mgmt Record : ${updateMgmtRec.value}`
     );
   }
 
   // set indexing Active false
-  indexingActive = false;
+  indexTimerActive = false;
   su.log(`Indexing Complete: 
         Filesystem hits: ${kbTotal}
         Database hits: ${dbTotal}

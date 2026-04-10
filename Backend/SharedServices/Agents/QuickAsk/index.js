@@ -218,7 +218,11 @@ export class QuickAskAgent extends AiJob {
       const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
       const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
       await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
-      this.emitUpdateStatus("Done :)");
+      
+      // Emit final message with output and stats
+      this.emitUpdateStatus("Done 🐝");
+      this.emitFinalResult();
+
       return Ok(this.taskOutput);
       } catch (e) {
         this.setFailed();

@@ -5,6 +5,7 @@ import { processApiMessagesToClasses } from "../../Engine/routes/index.js";
 import { Err } from "../Utils/index.js";
 import { AiCall } from "../CallAI/index.js";
 import { emitToSocket } from "../../app.js";
+import { FrontendMessageFormat } from "./aiMessages.js";
 
 // [][] ------------------------------------------ [][]
 // [][] -- Base constants / classes for AI Jobs -- [][]
@@ -260,11 +261,25 @@ export class AiJob {
    */
   emitUpdateStatus(statusMessage){
     if(this.socketId){
-        let status = new TaskStatus().setCustomStatus(statusMessage);
+        let status = new TaskStatus();
+        status.setCustomStatus(statusMessage);
         emitToSocket(this.socketId, 'job_update', { 
             jobID: this.id, 
             status: status 
         });
+    }
+  }
+
+  emitFinalResult(){
+    if(this.socketId){
+        let res = new FrontendMessageFormat({ 
+            aiJobId: this.id, 
+            status: this.status, 
+            isRunning: this.isRunning,
+            messages: this.taskOutput, 
+            metadata: this.stats
+        });
+        emitToSocket(this.socketId, 'job_complete', res);
     }
   }
 

@@ -22,12 +22,10 @@ export const initSocket = (url) => {
 
     // Listen for core lifecycle events
     socket.on('connect', () => {
-        console.log('Socket connected:', socket.id);
         socketStatus.set({ connected: true, id: socket.id });
     });
 
     socket.on('disconnect', () => {
-        console.log('Socket disconnected');
         socketStatus.set({ connected: false, id: null });
     });
 

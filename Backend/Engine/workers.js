@@ -5,13 +5,13 @@ Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
 import { Piscina } from 'piscina';
-import { getDbAgent } from '../SharedServices/Database/index.js';
-import { indexKnowledgebase } from './buildKbIndex.js'; 
+// import { getDbAgent } from '../SharedServices/Database/index.js';
+// import { indexKnowledgebase } from './buildKbIndex.js'; 
 import * as su from '../SharedServices/Utils/index.js';
 import { AiJob } from '../SharedServices/Classes/index.js';
 import { QuickAskAgent } from '../SharedServices/Agents/QuickAsk/index.js';
 
-export let indexTimerActive = false;
+
 /**@type {Piscina} */
 export let pool; // Piscina worker pool (multi-thread)
 
@@ -23,18 +23,18 @@ export function setupPool() {
   });
 }
 
-export async function poolIndexKnowledgebase(){
-    indexTimerActive = true;
-    let dbAgent = await getDbAgent();
-    if(dbAgent.isOk()){
-        let call = await indexKnowledgebase(dbAgent.value);
-        indexTimerActive = false;
-        return call;
-    } else {
-        indexTimerActive = false;
-        return su.Err(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
-    }
-}
+// export async function poolIndexKnowledgebase(){
+//     indexTimerActive = true;
+//     let dbAgent = await getDbAgent();
+//     if(dbAgent.isOk()){
+//         let call = await indexKnowledgebase(dbAgent.value);
+//         indexTimerActive = false;
+//         return call;
+//     } else {
+//         indexTimerActive = false;
+//         return su.Err(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
+//     }
+// }
 
 // Process AI JOB
 export async function poolRunAiJob({jobClassObject}){

@@ -29,7 +29,7 @@
     "piscina": "^5.0.0",
     "puppeteer-core": "^24.12.1",
     "socket.io": "^4.8.3",
-    "surrealdb": "^2.0.2"
+    "surrealdb": "^2.0.3"
   },
   "devDependencies": {
     "prettier": "3.8.1",

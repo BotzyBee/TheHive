@@ -8,7 +8,6 @@ import {
 } from './SharedServices/Database/index.js';
 import { setupPool, pool } from './Engine/workers.js';
 import { Services } from './SharedServices/index.js';
-import { indexTimerActive } from './Engine/workers.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getConfigForFrontend } from './Engine/routes/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
@@ -16,6 +15,7 @@ import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
+import { indexKnowledgebase, indexTimerActive } from './Engine/buildKbIndex.js';
 import { testDrive, rustActionState } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
 
 export let dbAgent = null;
@@ -29,13 +29,14 @@ const initServices = async () => {
   // only call once
   if (!servicesStarted) {
     // init Surreal DB agent
+    console.log('Initializing database connection...');
     let dbTools = await initDatabaseConnection(false);
     if (dbTools.isErr()) {
       Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${dbTools.value}`);
       process.exit(1);
     }
     // Setup Piscina Pool
-    setupPool();
+    // setupPool(); // Picina is broken at the moment (doesn't play well with ESM modules / SurrealDB)
     // Load Tools
     console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
     Services.Utils.log("Loading Tools...");
@@ -62,16 +63,16 @@ const initServices = async () => {
       `${guides.value.updated} updated \n`+
       `${guides.value.removed} removed.`)
 
-      //Knowledgebase re-indexing timer (every 60 seconds)
-    // Services.CoreTools.Timers.addNewTimer(
-    //   'KB_Indexing_Timer',
-    //   async () => {
-    //     if (!indexTimerActive) {
-    //       await pool.run({}, { name: 'poolIndexKnowledgebase' });
-    //     }
-    //   },
-    //   { delay: 0, intervalMs: 60000, isOneOff : false }
-    // );
+    //Knowledgebase re-indexing timer (every 60 seconds)
+    Services.CoreTools.Timers.addNewTimer(
+      'KB_Indexing_Timer',
+      async () => {
+        if (!indexTimerActive) {
+          await indexKnowledgebase()
+        }
+      },
+      { delay: 0, intervalMs: 60000, isOneOff : false }
+    );
 
     //New Job Scheduler (every 5 seconds)
     Services.CoreTools.Timers.addNewTimer("New_Job_Scheduler", async () => {
@@ -208,6 +209,7 @@ export let connectedSockets = []; // shoud only be one for now but can be used f
 
 // helper function to emit to a specific socket (used for pushing updates to the correct user for their jobs)
 export const emitToSocket = (socketId, event, data) => {
+  console.log(`Emitting event "${event}" to socket ${socketId} with data:`, data);
   const socket = io.sockets.sockets.get(socketId); 
   if (socket) {
     socket.emit(event, data);
@@ -222,13 +224,14 @@ io.on('connection', (socket) => {
 
     // --- 1. SUBMIT TASK (Task Agent) ---
     socket.on('submit_task', async (data, callback) => {
+      console.log("Task Agent Job Received");
         const frontendMessage = data?.fmf || null;
         if (!frontendMessage) {
             return callback({ error: "fmf is missing or invalid" });
         }
 
         // Start the background process
-        let result = await handleTAMessage(frontendMessage);
+        let result = await handleTAMessage(frontendMessage, socket.id);
         
         if (result.isErr()) {
             return callback({ error: result.value });
@@ -243,10 +246,11 @@ io.on('connection', (socket) => {
 
     // --- 2. SUBMIT QUICK ASK ---
     socket.on('submit_quick_ask', async (data, callback) => {
+      console.log("Quick Ask Job Received");
         const frontendMessage = data?.fmf || null;
         if (!frontendMessage) return callback({ error: "fmf is missing" });
 
-        let result = await handleQAMessage(frontendMessage);
+        let result = await handleQAMessage(frontendMessage, socket.id);
         if (result.isErr()) return callback({ error: result.value });
 
         callback(result.value);
