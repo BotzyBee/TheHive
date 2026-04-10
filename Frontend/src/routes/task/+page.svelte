@@ -10,7 +10,7 @@
     let inputTextArea;
     let chatContainer; 
     let lastMessageCount = 0;
-    let agentName = "Ai Assistant";
+    let agentName = "Botzy Bee";
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
