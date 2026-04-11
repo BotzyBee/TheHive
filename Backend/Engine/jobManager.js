@@ -200,29 +200,29 @@ class AI_JOB_MANAGER{
         return Services.Utils.Err("Error (jobListManager): No valid operation provided.");
     }
 
-    /**
-     * Main method for getting the result of a job or an update on status.
-     * @param {string} jobID - Which job to lookup. 
-     * @returns {Result<FrontendMessageFormat>} - Returns Result(FrontendMessageFormat)
-     */
-    getUpdateOrResult(jobID){
-        if(jobID == null){
-            return Services.Utils.Err('Error (getUpdateOrResult) : JobID Missing or null');
-        }
-        let data = this.jobListManager({getJob: jobID});
-        if(data.isErr()){
-          return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
-        }
-        let msg = new FrontendMessageFormat({ 
-            aiJobId: jobID, 
-            status: data.value.status, 
-            isRunning: data.value.isRunning,
-            messages: data.value.taskOutput, 
-            metadata: data.value.stats
-            });
+    // /**
+    //  * Main method for getting the result of a job or an update on status.
+    //  * @param {string} jobID - Which job to lookup. 
+    //  * @returns {Result<FrontendMessageFormat>} - Returns Result(FrontendMessageFormat)
+    //  */
+    // getUpdateOrResult(jobID){
+    //     if(jobID == null){
+    //         return Services.Utils.Err('Error (getUpdateOrResult) : JobID Missing or null');
+    //     }
+    //     let data = this.jobListManager({getJob: jobID});
+    //     if(data.isErr()){
+    //       return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
+    //     }
+    //     let msg = new FrontendMessageFormat({ 
+    //         aiJobId: jobID, 
+    //         status: data.value.status, 
+    //         isRunning: data.value.isRunning,
+    //         messages: data.value.taskOutput, 
+    //         metadata: data.value.stats
+    //         });
 
-        return Services.Utils.Ok(msg);
-    }
+    //     return Services.Utils.Ok(msg);
+    // }
 
     isAllocatorActive(){
         return this.#allocatingJobs;

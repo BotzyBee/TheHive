@@ -120,19 +120,6 @@ app.get('/', (req, res) => {
   res.status(200).send('The Hive is online 🐝');
 });
 
-// QuickAsk Agent Endpoint
-app.post("/quickAsk", async (req, res) => {
-  const frontendMessage = req.body?.fmf || null;
-  if(frontendMessage == null ){ 
-    return res.status(400).json({
-        error: `Error : fmf is either missing or not a FrontendMessageFormat`
-    });
-  }
-  let msg = await handleQAMessage(frontendMessage);
-  if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
-  res.status(200).json(msg.value);
-});
-
 // Task Agent Endpoint
 app.post("/taskAgent", async (req, res) => {
   const frontendMessage = req.body?.fmf || null;
@@ -209,7 +196,6 @@ export let connectedSockets = []; // shoud only be one for now but can be used f
 
 // helper function to emit to a specific socket (used for pushing updates to the correct user for their jobs)
 export const emitToSocket = (socketId, event, data) => {
-  console.log(`Emitting event "${event}" to socket ${socketId} with data:`, data);
   const socket = io.sockets.sockets.get(socketId); 
   if (socket) {
     socket.emit(event, data);
@@ -239,9 +225,6 @@ io.on('connection', (socket) => {
 
         // Acknowledge receipt and send initial JobID back to frontend
         callback(result.value);
-
-        // Start watching for updates to push to the client
-       // monitorJobProgress(result.value.aiJobId, socket);
     });
 
     // --- 2. SUBMIT QUICK ASK ---
@@ -249,12 +232,11 @@ io.on('connection', (socket) => {
       console.log("Quick Ask Job Received");
         const frontendMessage = data?.fmf || null;
         if (!frontendMessage) return callback({ error: "fmf is missing" });
-
+        
         let result = await handleQAMessage(frontendMessage, socket.id);
         if (result.isErr()) return callback({ error: result.value });
 
         callback(result.value);
-       // monitorJobProgress(result.value.aiJobId, socket);
     });
 
     // --- 3. STOP JOB ---
@@ -274,7 +256,6 @@ io.on('connection', (socket) => {
                 textData: `Job ${jobID} has been stopped.` 
             })]
         });
-        
         callback(rtnMsg);
     });
 
@@ -289,45 +270,6 @@ io.on('connection', (socket) => {
     });
 });
 
-
-// /**
-//  * Helper to bridge your existing Job Logic with the Socket.
-//  * This effectively replaces the "Polling" that the frontend used to do.
-//  */
-// async function monitorJobProgress(jobID, socket) {
-//     // We create a loop or a listener that checks the status of the AI engine
-//     const checkInterval = setInterval(async () => {
-//         // Use your existing logic to get the current state
-//         let update = await JOBS.getUpdateOrResult(jobID);
-        
-//         if (update.isErr()) {
-//             socket.emit('job_error', { jobID, error: update.value });
-//             clearInterval(checkInterval);
-//             return;
-//         }
-
-//         const data = update.value;
-
-//         if (data.isRunning) {
-//             // Push status updates (Streaming)
-//             socket.emit('job_update', { 
-//                 jobID, 
-//                 status: data.status 
-//             });
-//         } else {
-//             // Job is finished! Send final payload and stop monitoring
-//             socket.emit('job_complete', {
-//                 jobID,
-//                 messages: data.messages,
-//                 metadata: data.metadata
-//             });
-//             clearInterval(checkInterval);
-//         }
-//     }, 1000); // Check every 1s (tighter than the 1.5s old polling)
-
-//     // Clean up if the user disconnects while job is running
-//     socket.on('disconnect', () => clearInterval(checkInterval));
-// }
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

@@ -30,6 +30,11 @@ export const details = {
         }
     };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
 
 /**
  * 
@@ -42,7 +47,8 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
     // Destructure input
     let { taskDescription, referenceText, targetURL } = params;
@@ -68,6 +74,8 @@ export async function run(
     `You are a tool which searches for information online. Focus on quality and accuracy in completing the task.
     Do NOT add your own thoughts, comments or working notes.`;
     let usrText = `Here are your instructions <task>${taskDescription}</task>. ${addText}. ${context}`;
+    
+    safeEmit(agent, `Performing web-search via Gemini and Perplexity - 🐝🔍`);
     let providers = Shared.Constants.AiProviders;
     let allCalls = [
         new Shared.AiCall.AiCall().webSearch(sysText, usrText, { provider: providers.gemini }),

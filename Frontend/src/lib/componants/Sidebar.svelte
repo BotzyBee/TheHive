@@ -34,7 +34,7 @@
     </div>
     <ul>
         <li><a href="/">Home</a></li>
-        <li><a href="/task">Agents</a></li>
+        <li><a href="/agents">Agents</a></li>
     </ul>
 </aside>
 {/if}

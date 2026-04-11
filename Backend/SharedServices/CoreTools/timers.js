@@ -1,6 +1,7 @@
 import * as su from '../Utils/index.js';
 import dotenv from 'dotenv';
 let allTimers = []; // Array of Timer Class
+dotenv.config({ path: ".env" });
 
 class timerClass {
   constructor(timerName, callbackFn, options = {}) {
@@ -142,7 +143,7 @@ export function stopAndClearAllTimers() {
  */
 export function getDateTime(params = {}) {
     const locale = params.dateFormat || 'en-GB';
-    dotenv.config({ path: ".env" });
+    
     const tz = process.env.TIMEZONE;
     const timeZone = tz;
     try {

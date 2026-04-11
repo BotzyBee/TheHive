@@ -263,10 +263,14 @@ export class AiJob {
     if(this.socketId){
         let status = new TaskStatus();
         status.setCustomStatus(statusMessage);
-        emitToSocket(this.socketId, 'job_update', { 
-            jobID: this.id, 
-            status: status 
+        let fmf = new FrontendMessageFormat({
+            aiJobId: this.id,
+            status: status,
+            isRunning: this.isRunning,
+            messages: [],
+            metadata: this.stats
         });
+        emitToSocket(this.socketId, 'job_update', fmf);
     }
   }
 

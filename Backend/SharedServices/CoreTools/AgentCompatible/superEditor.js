@@ -65,16 +65,22 @@ IMPORTANT: If no edits are needed output 'NO-EDITS-NEEDED'.`,
     })
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * Core plugin execution interface.
  */
-export async function run(Shared, params = {}) {
+export async function run(Shared, params = {}, agent = {}) {
     const { prompt, document, context, chunkSize = 100000 } = params; // chunk size not included in schema as it's just for testing.
     const CHUNK_SIZE = chunkSize; // Character limit per AI call
     if (!prompt || typeof document !== 'string') {
         return Shared.Utils.Err("SuperEditor: Missing prompt or document.");
     }
-
+    safeEmit(agent, `Using SuperEditor to process the document - 🐝🔧`);
     // Failsafe for empty documents
     if (document.trim() === "") {
         return await handleNewDocument(Shared, prompt, context);
@@ -90,6 +96,7 @@ export async function run(Shared, params = {}) {
         const processedChunks = [];
 
         for (let i = 0; i < chunks.length; i++) {
+            safeEmit(agent, `SuperEditor - Editing chunk ${i + 1}/${chunks.length} 🐝`);
             const currentChunk = chunks[i];
             
             // 2. Build instructions for this specific slice

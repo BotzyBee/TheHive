@@ -209,11 +209,12 @@ export class TaskAgent extends AiJob {
         const { isUpdate = false, useTaskPlanGuides } = options;
         const statusLabel = isUpdate ? "Updating Task Plan..." : "Creating Task Plan...";
         console.log(statusLabel);
-        this.status.setCustomStatus(statusLabel);
+        this.emitUpdateStatus(statusLabel);
 
         // Get Planning / Task Guides. 
         let guideText = ""
         if(useTaskPlanGuides === true){
+            this.emitUpdateStatus("Fetching planning guides relevant to the task...");
             let fetchGuides = await this.#getSuitableGuides(this.task);
             if( fetchGuides.isErr()) return fetchGuides;
             guideText = fetchGuides.value;
@@ -222,6 +223,7 @@ export class TaskAgent extends AiJob {
         const oldPlan = isUpdate ? [...this.plan] : [];
 
         // Step 1 - Generate/Refine Atomic Actions
+        this.emitUpdateStatus("Breaking the task down into specific actions...");
         const systemPrompt = isUpdate 
             ? `${PromptsAndSchemas.planning.sys}\nIMPORTANT: Do not duplicate completed work. Focus solely on remaining actions.`
             : PromptsAndSchemas.planning.sys;
@@ -269,6 +271,7 @@ export class TaskAgent extends AiJob {
         }
 
         // Get tools
+        this.emitUpdateStatus("Looking for tools relevant to the task and plan...");
         let Step1PlanMerged = actionStep.value.plan.map(item => item.action).join('\n') 
         let tools = await getToolsOrGuidesForTask(`${this.task} \n\n ${Step1PlanMerged}`, 15);
         if(tools.isErr()){ 
@@ -288,6 +291,7 @@ export class TaskAgent extends AiJob {
         });
 
         // Phase 2: Map Actions to Tools
+        this.emitUpdateStatus("Creating the final plan by matching actions to tools...");
         const toolsOverview = tools.value;
         const toolUserPrompt = PromptsAndSchemas.planningTools.usr(
             this.task, 
@@ -364,13 +368,13 @@ export class TaskAgent extends AiJob {
             return Ok("Task Agent is showing stopped status.");
         }
         this.toolOutputData = []
-        this.status.setCustomStatus("Preparing to perform next action...");
+        this.emitUpdateStatus("Starting next action...");
         let nextAction = this.#getNextAction(); // {id: string, action: string, complete: bool, attempt: num, tool: string } 
         // catch null output
         if(nextAction == null){
             this.nextPhase = TaskPhases.Review;
             this.phaseMessage = `The plan has no further actions outstanding.`;
-            this.status.setCustomStatus('All actions complete - reviewing and finalising output...');
+            this.emitUpdateStatus('All tool actions complete - creating final output...');
             return Ok("All actions complete");
         }
         this.actionReviewID = nextAction.id; // setup for next review 
@@ -436,12 +440,13 @@ export class TaskAgent extends AiJob {
             this.debugParams.push({tool: nextAction.tool, paramsCrafted: craftedParams.value.params, paramsResolved: resolvedParams.value, toolInputSchema: toolObj.value.details.inputSchema });
 
             // Call Tool
-            this.status.setCustomStatus(`Using Tool: ${toolObj.value.details.toolName}`)
+            this.emitUpdateStatus(`Using Tool: ${toolObj.value.details.toolName}`);
             console.log(`Calling tool ${toolObj.value.details.toolName}`);
             toolCall = await callAgentTool(
                 toolObj.value.details.toolName,
                 toolObj.value.filePath,
-                resolvedParams.value
+                resolvedParams.value,
+                this // give the tool access to agent functions. 
             ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
             if(toolCall.isErr()){
                 toolErrorText = toolCall.value;
@@ -509,7 +514,7 @@ export class TaskAgent extends AiJob {
         // Catch new message from User 
         if( this.status.isStatus(Status.NewInfoAdded) ){ 
             console.log("Processing message from user...");
-            this.status.setCustomStatus("Processing message from user..."); 
+            this.emitUpdateStatus("Processing message from user..."); 
             // user message will have been added to message history by jobManager
             let convoHistory = this.messageHistory.getSimpleUserAgentComms();
             let processUserMessage = await this.#generateText(
@@ -538,7 +543,7 @@ export class TaskAgent extends AiJob {
             }
             // update task & plan 
             if(processUserMessage.value.action == "update task & plan"){
-                this.status.setCustomStatus("Re-wording task and updating plan...");
+                this.emitUpdateStatus("Re-wording task and updating plan...");
                 // Craft new task
                 let newTaskWording = await this.#generateText(
                     PromptsAndSchemas.newTaskWording.sys,
@@ -617,7 +622,7 @@ export class TaskAgent extends AiJob {
 
         // [][] -- TOOL REVIEW -- [][]
         // custom status & inProgress status handled here
-        this.status.setCustomStatus("Reviewing Tool Output...");
+        this.emitUpdateStatus("Reviewing Tool Output...");
         if(this.actionReviewID == null || this.actionReviewID == undefined){
             this.errors.push('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
             return Err('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
@@ -643,7 +648,7 @@ export class TaskAgent extends AiJob {
         }
         // Catch return to user tool (tool to end task) 
         if(toolOutput[0].toolName == 'returnToUser'){
-            this.status.setCustomStatus('Tasks Completed - Finalising Output...');
+            this.emitUpdateStatus('All tool tasks complete, drafting final output...');
             this.isRunning = false;
             this.phaseMessage = "";
             this.setEndTime();
@@ -725,7 +730,7 @@ export class TaskAgent extends AiJob {
         if(completeCheck.value.status == "COMPLETE"){   
             // Process the tool output(s)
             console.log("Action is complete! Processing tool output and updating context...");
-            this.status.setCustomStatus("Processing tool output into context");
+            this.emitUpdateStatus("Adding tool output to context...");
             let processedToolOp = await this.#processToolOutput(toolOutput); 
             if(processedToolOp.isErr()){ 
                 this.errors.push(`Error (reviewAndReturn -> processToolOutput 1) : ${processedToolOp.value}`);
@@ -752,7 +757,7 @@ export class TaskAgent extends AiJob {
             // (Only gets here if 'returnToUser' tool isn't added to the plan)
             const newOustandingActionCount = this.#getOustandingActionCount();
             if (newOustandingActionCount === 0) {
-                this.status.setCustomStatus("All actions complete - finalising output...");
+                this.emitUpdateStatus("All tool actions complete - drafting final output...");
                 this.isRunning = false;
                 this.phaseMessage = "";
                 this.setEndTime();
@@ -841,6 +846,7 @@ export class TaskAgent extends AiJob {
             const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/TestJobs/');
             await Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
             
+            this.emitFinalResult();
             return Ok("Task Agent has stopped or completed");
             }
         catch(e){

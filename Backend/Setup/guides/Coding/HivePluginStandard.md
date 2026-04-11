@@ -31,6 +31,7 @@ The core logic must be an exported `async` function.
     * `Shared.Utils.Ok()`: Success wrapper.
     * `Shared.Utils.Err()`: Failure wrapper.
 * **`params`:** An object containing the arguments extracted from the AI's prompt based on your `inputSchema`.
+* **`agent`:** An optional object for passing the agent object - to allow use of functions like emitUpdateStatus() or get agent data like agent.id (jobID).
 
 ### Return Value
 The function must return a `Shared.Utils` wrapper:
@@ -68,14 +69,21 @@ export const details = {
     })
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * @param {object} Shared - Core Hive services
  * @param {object} params - Inputs defined in inputSchema
  */
-export async function run(Shared, params = {}) {
+export async function run(Shared, params = {}, agent = {}) {
     const { query } = params;
 
     try {
+        safeEmit(agent, `This is a status update message`); // send status updates back to user. 
         // 1. Tool Logic Here
         const resultData = {
             success: true,

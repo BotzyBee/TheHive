@@ -49,3 +49,10 @@ export const emitSocket = (event, data, callback) => {
         console.error(`Cannot emit ${event}: Socket not connected.`);
     }
 };
+
+// Socket initialization moved to onMount in the layout to ensure it's available globally and only initialized once when the app loads.
+export function refreshSocket() {
+    const backendUrl = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
+    const socket = initSocket(backendUrl); 
+    socket.connect();
+}

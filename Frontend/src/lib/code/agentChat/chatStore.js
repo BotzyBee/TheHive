@@ -38,6 +38,7 @@ function createChatStore() {
 
         // Handles interim updates (e.g., streaming status or partial text)
         socket.on('job_update', (data) => {
+            console.log("Received job_update event:", data);
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
             let parsedStatus = parseStatus(data.status);

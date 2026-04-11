@@ -3,8 +3,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
     import { initSocket, socketStore } from '$lib/code/agentChat/socketStore.js';
-
-	// Socket initialization moved to onMount in the layout to ensure it's available globally and only initialized once when the app loads.
+    
     onMount(() => {
         if (browser) {
 			const backendUrl = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';

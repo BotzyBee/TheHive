@@ -14,6 +14,7 @@ import { AiJob } from '../../Classes/aiJob.js';
  */
 export class QuickAskAgent extends AiJob {
   constructor({ task = "", aiSettings = {}, socketId = null } = {}){
+    console.log("Socket ID in QuickAskAgent constructor: ", socketId);
     super({aiSettings, socketId}) // setup parent class
     this.messageHistory.addMessage(new TextMessage({ role: Roles.User, textData: task}));
     this.task = task;
@@ -152,7 +153,8 @@ export class QuickAskAgent extends AiJob {
         toolCall = await callAgentTool(
           toolDetails.value.details.toolName,
           toolDetails.value.filePath,
-          paramObject.value
+          paramObject.value,
+          this // give the tool access to agent functions. 
         ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
         if(toolCall.isErr()){
           failedCount += 1;

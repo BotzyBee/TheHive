@@ -52,6 +52,12 @@ export const MIME_MAP = new Map([
       writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 
         await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
     ],
+  ["text/svelte", 
+  { extension: "svelte", name: "Svelte Component", encoding: "utf-8", 
+    readFN: async (filePath) => await readFileContent(filePath, false), 
+    writeFN: async ({relativeFolderPath, fileContent, fileNameIncExt}) => 
+      await saveFile(relativeFolderPath, fileContent, fileNameIncExt) }
+  ],
   ["image/x-icon", 
     { extension: "ico", name: "Icon Image", encoding: "base64", 
       readFN: async (filePath) => await readImageFileToBase64({ filePath, mimeType: "image/x-icon" }), 

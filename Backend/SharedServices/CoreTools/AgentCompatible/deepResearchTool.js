@@ -44,6 +44,12 @@ export const details = {
     }
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 const INGORE_DOMAINS = []; // Example domains to ignore during source gathering
 let stats = { aiCount: 0 }; // To track AI calls for cost management and analysis
 
@@ -238,7 +244,7 @@ let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the en
  * @param {string} params.jobID - The ID of the agent job for passing updates.
  * @returns {Promise<object>} Shared.Utils.Ok or Shared.Utils.Err.
  */
-export async function run(Shared, params = {}) {
+export async function run(Shared, params = {}, agent = {}) {
     stats.aiCount = 0; // Reset AI call count at the start of each run.
     const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID } = params;
     
@@ -248,6 +254,7 @@ export async function run(Shared, params = {}) {
 
     // [][] ----- RESEARCH PHASE ------ [][]
     // Scope the topic, find best questions and sources to research.
+    safeEmit(agent, `Scoping research task and gathering sources - 🤖🐝`);
     let scoping = await scopeTopic(Shared, topic, breadth); 
     if (scoping.isErr()){ return Shared.Utils.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
     let firstChunk = new ResearchChunk();
@@ -259,8 +266,11 @@ export async function run(Shared, params = {}) {
     for (let i = 0; i < questionLength; i++) {
         let question = scoping.value.questions[i];
         let chunk = new ResearchChunk({ Shared: Shared, question: question });
+        safeEmit(agent, `Conducting research for question ${i + 1}/${questionLength} - 🤖🐝`);
         await chunk.getInitialResearch();
+        safeEmit(agent, `Doing a little fact checking 🕵️`);
         await chunk.factCheckClaims();
+        safeEmit(agent, `Finalising research chunk ⚙️`);
         await chunk.finaliseResearchChunk();
         RESEARCH_CHUNKS.push(chunk); // Store each research chunk for potential later review or report generation.
         console.log(`Completed research for question ${i + 1}/${questionLength}`);
@@ -272,9 +282,9 @@ export async function run(Shared, params = {}) {
     let chunkLength = RESEARCH_CHUNKS.length ?? 0;
     // reverse order as first chunk is just definitions and terms.
     let latestPlan = ""; 
+    safeEmit(agent, `Starting writing phase - creating report plan 🤖🐝`);
     for (let i = chunkLength - 1; i >= 0; i--){
-        console.log(`Generating report plan based on research chunk ${((i + 2)-chunkLength)}/${chunkLength}`);
-
+        safeEmit(agent, `Generating report plan based on research chunk ${((i + 2)-chunkLength)}/${chunkLength}`);
         let planCall = await callAI.generateText(
             PromptsAndSchemas.reportPlan.sys,
             PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
@@ -300,7 +310,7 @@ export async function run(Shared, params = {}) {
     // combine research chunks
     let combinedResearch = RESEARCH_CHUNKS.map(c => c.output).join(`\n \n`);
     for(let i=0; i<planLen; i++){
-         console.log(`Writing report section for section ${i + 1}/${planLen}`);
+         safeEmit(agent, `Writing report section for section ${i + 1}/${planLen} ⌨️🐝`);
         let sectionCall = await callAI.generateText(
             PromptsAndSchemas.writeSection.sys,
             PromptsAndSchemas.writeSection.usr(planArray[i], combinedResearch, latestReport)
@@ -313,6 +323,7 @@ export async function run(Shared, params = {}) {
     // Final Review and Polishing (1)
     for(let i=0; i<3; i++){ // Run 3 loops of review and polish to ensure quality and coherence.
         console.log(`Final review loop ${i + 1}/3`);
+        safeEmit(agent, `Final review and polish of the report - loop ${i + 1}/3 🛠️🐝`);
         let sectionCall = await callAI.generateText(
             PromptsAndSchemas.finalCheck.sys,
             PromptsAndSchemas.finalCheck.usr(latestReport),
@@ -329,7 +340,8 @@ export async function run(Shared, params = {}) {
             let polishPrompt = sectionCall.value.edits[j];     
             let editAgent = await Shared.CoreTools.AgentCompatible.superEditor.run(
                 Shared,
-                { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" }
+                { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" },
+                agent
             ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
             if (editAgent.isErr()){ return Shared.Utils.Err(`Error in run -> superEditor : ${editAgent.value}`)}
             latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
@@ -340,6 +352,7 @@ export async function run(Shared, params = {}) {
     // [][] ----- WRITING PHASE - MANAGE REFERENCES ------ [][]
     
     // Merge all references
+    safeEmit(agent, `Adding references.. almost done! 🏁🐝`);
     let allRefChunks = [];
     for(let chunk of RESEARCH_CHUNKS){
         allRefChunks.push(chunk.mergeAllReferences());

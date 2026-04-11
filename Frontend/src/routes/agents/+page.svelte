@@ -3,6 +3,8 @@
     import Sidebar from '$lib/componants/Sidebar.svelte';
     import { slide } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
+    import { socketStore, refreshSocket } from '../../lib/code/agentChat/socketStore.js';
+    import { onMount } from 'svelte';
     
     let isSettingsOpen = false;
     let isSidebarCollapsed = true;
@@ -11,6 +13,14 @@
     let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Botzy Bee";
+
+    onMount(() => {
+        // refresh the socket if it doesn't exist. 
+        if (!socketStore.socket) {
+            refreshSocket();
+        }
+    });
+
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
@@ -187,6 +197,40 @@
 </div>
 
 <style>
+/* 1. Fix the Code Block Container */
+    :global(.ai-response pre), :global(.user-message pre) {
+        background-color: #2d2d2d; /* Professional dark theme */
+        color: #f8f8f2;
+        padding: 16px;
+        border-radius: 12px;
+        margin: 12px 0;
+        
+        /* The Magic Sauce */
+        overflow-x: auto;   /* Adds horizontal scrollbar when needed */
+        max-width: 100%;    /* Constrains it to the message bubble width */
+        display: block;     /* Ensures it behaves as a block */
+    }
+
+    /* 2. Style the Code inside the block */
+    :global(.ai-response pre code) {
+        font-family: 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        white-space: pre;   /* Forces horizontal scroll rather than wrapping */
+        background: transparent; /* Remove background if already on 'pre' */
+        padding: 0;
+    }
+
+    /* 3. Style Inline Code (e.g. `const x = 1`) */
+    :global(.ai-response :not(pre) > code) {
+        background-color: rgba(0, 0, 0, 0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.95em;
+        word-break: break-word; /* Let inline code wrap if it's too long */
+    }
+    
     :root {
         --sidebar-width: 250px;
         --open-btn-size: 48px;

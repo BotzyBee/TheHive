@@ -84,6 +84,12 @@ export const details = {
     }
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * Generates an Image using AI 
  * @param {string} contentMessage - Input prompt for the AI to follow 
@@ -99,7 +105,8 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
     // Destructure input
     const { contentMessage, options } = params;
@@ -109,6 +116,7 @@ export async function run(
     }
 
     // Make the call
+    safeEmit(agent, `Creating image using AI - 🤖🐝`);
     const aiCall = new Shared.AiCall.AiCall();
     let call = await aiCall.generateImage(contentMessage, options)
     if(call.isErr()){

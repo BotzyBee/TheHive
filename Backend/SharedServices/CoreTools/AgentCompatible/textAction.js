@@ -42,6 +42,12 @@ export const details = {
         }
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * 
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
@@ -56,7 +62,8 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
     // Destructure input
     const { taskDescription, context } = params;
@@ -70,6 +77,7 @@ export async function run(
         ref = JSON.stringify(ref);
     }
     // Make the call
+    safeEmit(agent, `Crafting text using AI - 🤖🐝`);
     const aiCall = new Shared.AiCall.AiCall();
     const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;

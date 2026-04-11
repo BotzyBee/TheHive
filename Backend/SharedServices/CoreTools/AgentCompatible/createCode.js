@@ -1,106 +1,232 @@
 /*
     Uses The Hive Plugin Tool Standard
-    Orchestrator Version: Skeleton + SuperEditor Driver
+    Orchestrator Version: Multi-Modal (Router -> Skeleton / Editor / Reviewer)
 */
 export const details = {
     toolName:   "createCodeTool",
-    version:    "2026.4.0",
+    version:    "2026.5.1",
     creator:    "Botzy Bee",
-    overview:   "This tool uses AI to create, check or modify code. It can also answer queries about coding or code."+
-    " The Tool can output in a range of common code languages - for example HTML, Javascript, python, rust, CSS.  \n"+
-    " Great for frontend or backend development. This tool DOES NOT execute code.",
+    overview:   "This tool uses AI to create, edit, or review code. \n" +
+                "- CREATE: Builds new code from scratch using an architectural skeleton.\n" +
+                "- EDIT: Modifies existing code provided in the context.\n" +
+                "- REVIEW: Analyzes code to find bugs, suggest improvements, or answer questions.\n" +
+                "The Tool can output in a range of common code languages. This tool DOES NOT execute code." + 
+                "Code text can be identified by the use of terms such as function, var, let, const, class, def, import, include, #include, package, public, private, protected, void, int, string, etc. " +
+                "The tool can also output markdown formatted text for code reviews or explanations.",
     guide: null,
     inputSchema: {
         "type": "object",
         "properties": {
-            "taskDescription": { "type": "string", "description": "The coding task." },
-            "context": { "type": "string", "description": "Reference context." }
+            "taskDescription": { "type": "string", "description": "The coding task, request, or question." },
+            "context": { "type": "string", "description": "Reference context or the existing code to be edited/reviewed." }
         },
         "required": ["taskDescription"]
     }
 };
 
-export async function run(Shared, params = {}) {
-    const { taskDescription, context } = params;
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
+export async function run(Shared, params = {}, agent = {}) {
+    const { taskDescription, context = "" } = params;
     const aiCall = new Shared.AiCall.AiCall();
     const superEditor = Shared.CoreTools.AgentCompatible.superEditor.run; 
     let retAR = [];
 
-    // [][] --- STEP 1: ARCHITECT THE SKELETON --- [][]
+    // [][] --- STEP 0: ROUTER PHASE --- [][]
+    // Determine what the user actually wants to do with the code.
 
-    const archSys = "You are a Software Architect. Create a valid file SKELETON. " +
-        "Include all boilerplate, imports, and function signatures. " +
-        "Inside every empty function or logic block, put a unique marker like '// [INJECT_1]', '// [INJECT_2]'. " +
-        "Return a JSON list of what each marker should contain." +
-        `Here is any context: \n ${context} \n`;
+    const routerSys = "You are a routing agent for a coding tool. Based on the user's task description and whether context is provided, determine the mode of operation:\n" +
+                      "- 'CREATE': The user wants to build new code or a new file from scratch.\n" +
+                      "- 'EDIT': The user wants to modify, update, or refactor existing code provided in the context.\n" +
+                      "- 'REVIEW': The user is asking a question about the code, looking for bugs, or wants an opinion/explanation (text response only).";
 
-    const archSchema = {
+    const routerSchema = {
         "type": "object",
         "properties": {
-            "mimeType": { "type": "string" },
-            "skeleton": { "type": "string" },
-            "workOrders": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "marker": { "type": "string" },
-                        "description": { "type": "string", "description": "Detailed logic requirements for this marker." }
-                    }
-                }
+            "mode": { 
+                "type": "string", 
+                "enum": ["CREATE", "EDIT", "REVIEW"],
+                "description": "The selected execution mode."
             }
         },
-        "required": ["mimeType", "skeleton", "workOrders"]
+        "required": ["mode"]
     };
+    safeEmit(agent, "Coding Tool: Determining user intent (Create, Edit, Review)...");
+    const routerCall = await aiCall.generateCode(routerSys, `Task: ${taskDescription}\nContext Provided: ${context.trim() ? 'Yes' : 'No'}`, { structuredOutput: routerSchema });
+    if (routerCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Router phase) : ${routerCall.value}`);
 
-    const archCall = await aiCall.generateCode(archSys, taskDescription, {structuredOutput : archSchema});
-    if (archCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
+    const mode = routerCall.value.mode;
 
-    let _save = await Shared.FileSystem.saveFile('./', archCall.value.skeleton, 'skeleton.txt'); // TEMP - for debugging
-    let currentFileState = archCall.value.skeleton;
-    const mimeType = archCall.value.mimeType;
-    const orders = archCall.value.workOrders;
+    // [][] --- EXECUTE BASED ON MODE --- [][]
 
-    // [][] --- STEP 2 & 3: GENERATE & INJECT (LOOP) --- [][]
-
-    for (const order of orders) {
-        // A: Generate the specific logic snippet
-        const devSys = `You are a Senior Developer. Write ONLY the code required for ${order.marker}. ` +
-                       `Requirement: ${order.description}. ` +
-                       `Context: You are working within this file skeleton:\n${currentFileState}`+
-                       `Your goal is to produce 'production-ready' code that balances immediate functionality with long-term maintainability. `+
-                       `Include error handling, guard clauses, edge-case validation, and clear logging. Write expressive variable names. Add comments only to explain 'why,' not 'what.'`+
-                       `Here is any additional context: \n ${context} \n`;
+    if (mode === "REVIEW") {
+        safeEmit(agent, "Coding Tool: Reviewing the user provided code...");
+        // --- MODE: REVIEW (Text/Analysis Output) ---
+        const reviewSys = "You are an expert Senior Developer. Review the provided code based on the user's task description. " +
+                          "Provide clear, concise, and insightful analysis. Point out bugs, security flaws, or performance issues if asked. " +
+                          "Output your response in standard markdown format (not raw code).";
         
-        const devCall = await aiCall.generateCode(devSys, "Output ONLY the raw code logic. No markdown. No preamble.");
-        if (devCall.isErr()){ return Shared.Utils.Err(`Error (createCodeTool -> Development phase) : ${devCall.value}`)}
+        const reviewCall = await aiCall.generateCode(reviewSys, `Task: ${taskDescription}\n\nCode to Review:\n${context}`);
+        if (reviewCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Review phase) : ${reviewCall.value}`);
 
-        const generatedSnippet = devCall.value;
+        retAR.push(new Shared.Classes.TextMessage({
+            role: Shared.Classes.Roles.Tool,
+            mimeType: "text/markdown",
+            textData: reviewCall.value,
+            toolName: "createCodeTool",
+            instructions: "Code review and analysis complete."
+        }));
 
-        // B: Use superEditor to inject the generated snippet into the correct place in the skeleton
-        const editorPrompt = `REPLACE the marker '${order.marker}' with the code provided in the context.`;
-
-        const editResult = await superEditor(Shared, {
-            prompt: editorPrompt,
-            document: currentFileState,
-            context: generatedSnippet
-        });
-        if (editResult.isErr()){ return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor phase) : ${editResult.value}`)}
-
-        // Unpack the data message returned by superEditor
-        const editData = editResult.value[0].data;
-        currentFileState = editData.editedDocument;
-        let _save = await Shared.FileSystem.saveFile('./', currentFileState, `edit_${order.marker}.txt`); // TEMP - for debugging
+        return Shared.Utils.Ok(retAR);
     }
 
-    // [][] --- FINAL OUTPUT --- [][]
-    retAR.push(new Shared.Classes.TextMessage({
-        role: Shared.Classes.Roles.Tool,
-        mimeType: mimeType,
-        textData: currentFileState,
-        toolName: "createCodeTool",
-        instructions: "Final Refined Code Assembly Complete"
-    }));
+if (mode === "EDIT") {
+        safeEmit(agent, "Coding Tool: Creating a list of specific edits...");
+        // --- MODE: EDIT (Modify Existing Code) ---
+        if (!context || context.trim() === "") {
+             return Shared.Utils.Err("Error: EDIT mode selected by router, but no existing code was provided in the context.");
+        }
 
-    return Shared.Utils.Ok(retAR);
+        // 1. Generate an Edit Plan
+        const editPlanSys = "You are a Senior Developer. Review the existing code and the user's edit request. " +
+                            "Break down the required changes into a sequence of distinct, logical edits. " +
+                            "For each edit, provide a clear instruction for a 'dumb' text replacement tool and the EXACT new code snippet that needs to be inserted, added, or replaced. " +
+                            "Ensure the code snippets are production-ready and contain no markdown wrappers.";
+
+        const editPlanSchema = {
+            "type": "object",
+            "properties": {
+                "edits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "instruction": { "type": "string", "description": "Specific instruction for the editor, e.g., 'Replace the calculateTotal function with the provided code' or 'Insert the provided imports at the top of the file'." },
+                            "codeSnippet": { "type": "string", "description": "The raw code snippet to be inserted or swapped in. Provide ONLY the raw code." }
+                        }
+                    }
+                }
+            },
+            "required": ["edits"]
+        };
+
+        const editPlanCall = await aiCall.generateCode(
+            editPlanSys, 
+            `Task: ${taskDescription}\n\nExisting Code:\n${context}`, 
+            { structuredOutput: editPlanSchema }
+        );
+
+        if (editPlanCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Edit Plan phase) : ${editPlanCall.value}`);
+
+        let currentFileState = context;
+        const edits = editPlanCall.value.edits;
+
+        // 2. Loop through the plan and use superEditor for each targeted change
+        for (const [index, edit] of edits.entries()) {
+            safeEmit(agent, `Coding Tool: Applying edit - ${index + 1} of ${edits.length}...`);
+            const editResult = await superEditor(Shared, {
+                prompt: edit.instruction,
+                document: currentFileState,
+                context: edit.codeSnippet // Pass the newly generated code snippet as context for the editor
+            });
+
+            if (editResult.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor Edit phase) : ${editResult.value}`);
+
+            // Update the working document for the next iteration
+            currentFileState = editResult.value[0].data.editedDocument;
+        }
+
+        // 3. Output the final modified document
+        retAR.push(new Shared.Classes.TextMessage({
+            role: Shared.Classes.Roles.Tool,
+            mimeType: "text/plain", 
+            textData: currentFileState,
+            toolName: "createCodeTool",
+            instructions: "Iterative code modifications complete."
+        }));
+
+        return Shared.Utils.Ok(retAR);
+    }
+
+    if (mode === "CREATE") {
+        safeEmit(agent, "Coding Tool: Creating new code...");
+        // --- MODE: CREATE (Skeleton + Injector Orchestrator) ---
+        const archSys = "You are a Software Architect. Create a valid file SKELETON. " +
+            "Include all boilerplate, imports, and function signatures. " +
+            "Inside every empty function or logic block, put a unique marker like '// [INJECT_1]', '// [INJECT_2]'. " +
+            "Return a JSON list of what each marker should contain." +
+            `Here is any context: \n ${context} \n`;
+
+        const archSchema = {
+            "type": "object",
+            "properties": {
+                "mimeType": { "type": "string" },
+                "skeleton": { "type": "string" },
+                "workOrders": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "marker": { "type": "string" },
+                            "description": { "type": "string", "description": "Detailed logic requirements for this marker." }
+                        }
+                    }
+                }
+            },
+            "required": ["mimeType", "skeleton", "workOrders"]
+        };
+
+        safeEmit(agent, "Coding Tool: Creating the architectural skeleton...");
+        const archCall = await aiCall.generateCode(archSys, taskDescription, {structuredOutput : archSchema});
+        if (archCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
+
+        let currentFileState = archCall.value.skeleton;
+        const mimeType = archCall.value.mimeType;
+        const orders = archCall.value.workOrders;
+
+        // Generate & Inject Loop
+        for (const [index, order] of orders.entries()) {
+            safeEmit(agent, `Coding Tool: Generating code for marker ${order.marker} (${index + 1} of ${orders.length})...`);
+            const devSys = `You are a Senior Developer. Write ONLY the code required for ${order.marker}. ` +
+                           `Requirement: ${order.description}. ` +
+                           `Context: You are working within this file skeleton:\n${currentFileState}\n`+
+                           `Your goal is to produce 'production-ready' code that balances immediate functionality with long-term maintainability. `+
+                           `Include error handling, guard clauses, edge-case validation, and clear logging. Write expressive variable names. Add comments only to explain 'why,' not 'what.'`+
+                           `Here is any additional context: \n ${context} \n`;
+            
+            const devCall = await aiCall.generateCode(devSys, "Output ONLY the raw code logic. No markdown. No preamble.");
+            if (devCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Development phase) : ${devCall.value}`);
+
+            const generatedSnippet = devCall.value;
+            const editorPrompt = `REPLACE the marker '${order.marker}' with the code provided in the context.`;
+
+            safeEmit(agent, `Coding Tool: Applying new code to document...`);
+            const editResult = await superEditor(Shared, {
+                prompt: editorPrompt,
+                document: currentFileState,
+                context: generatedSnippet
+            });
+
+            if (editResult.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor phase) : ${editResult.value}`);
+
+            const editData = editResult.value[0].data;
+            currentFileState = editData.editedDocument;
+        }
+
+        retAR.push(new Shared.Classes.TextMessage({
+            role: Shared.Classes.Roles.Tool,
+            mimeType: mimeType,
+            textData: currentFileState,
+            toolName: "createCodeTool",
+            instructions: "Final Refined Code Assembly Complete"
+        }));
+
+        return Shared.Utils.Ok(retAR);
+    }
+    
+    return Shared.Utils.Err("Error: Router failed to select a valid mode.");
 }
