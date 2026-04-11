@@ -223,6 +223,7 @@ export class TaskAgent extends AiJob {
         const oldPlan = isUpdate ? [...this.plan] : [];
 
         // Step 1 - Generate/Refine Atomic Actions
+        if (!this.isRunning) return Ok("Job stopped by user."); 
         this.emitUpdateStatus("Breaking the task down into specific actions...");
         const systemPrompt = isUpdate 
             ? `${PromptsAndSchemas.planning.sys}\nIMPORTANT: Do not duplicate completed work. Focus solely on remaining actions.`
@@ -272,6 +273,7 @@ export class TaskAgent extends AiJob {
 
         // Get tools
         this.emitUpdateStatus("Looking for tools relevant to the task and plan...");
+        if (!this.isRunning) return Ok("Job stopped by user.");
         let Step1PlanMerged = actionStep.value.plan.map(item => item.action).join('\n') 
         let tools = await getToolsOrGuidesForTask(`${this.task} \n\n ${Step1PlanMerged}`, 15);
         if(tools.isErr()){ 
@@ -291,6 +293,7 @@ export class TaskAgent extends AiJob {
         });
 
         // Phase 2: Map Actions to Tools
+        if (!this.isRunning) return Ok("Job stopped by user."); 
         this.emitUpdateStatus("Creating the final plan by matching actions to tools...");
         const toolsOverview = tools.value;
         const toolUserPrompt = PromptsAndSchemas.planningTools.usr(
@@ -404,6 +407,7 @@ export class TaskAgent extends AiJob {
         }
 
         // Get full tool object for next tool.
+        if (!this.isRunning) return Ok("Job stopped by user."); 
         let toolObj = await getToolDetails(nextAction.tool);
         if(toolObj.isErr()){
             this.errors.push(`Error (Task Agent -> getToolDetails) : ${toolObj.value}`);
@@ -413,6 +417,7 @@ export class TaskAgent extends AiJob {
         let toolErrorText = "";
         let toolCall;
         for(let i=0; i< this.toolRetryCount; i++){
+            if (!this.isRunning) return Ok("Job stopped by user."); 
             // Craft input params AI Calls
             let craftedParams = await this.#generateText(
                 parserPrompts.craftParams.sys,
@@ -440,6 +445,7 @@ export class TaskAgent extends AiJob {
             this.debugParams.push({tool: nextAction.tool, paramsCrafted: craftedParams.value.params, paramsResolved: resolvedParams.value, toolInputSchema: toolObj.value.details.inputSchema });
 
             // Call Tool
+            if (!this.isRunning) return Ok("Job stopped by user."); 
             this.emitUpdateStatus(`Using Tool: ${toolObj.value.details.toolName}`);
             console.log(`Calling tool ${toolObj.value.details.toolName}`);
             toolCall = await callAgentTool(
@@ -621,6 +627,7 @@ export class TaskAgent extends AiJob {
         }
 
         // [][] -- TOOL REVIEW -- [][]
+        if (!this.isRunning) return Ok("Job stopped by user."); 
         // custom status & inProgress status handled here
         this.emitUpdateStatus("Reviewing Tool Output...");
         if(this.actionReviewID == null || this.actionReviewID == undefined){

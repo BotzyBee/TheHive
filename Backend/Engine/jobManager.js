@@ -160,9 +160,12 @@ class AI_JOB_MANAGER{
 
         // STOP
         if (stopJob) {
+            console.log(`Attempting to stop Job ID: ${stopJob}`);
             const job = this.AI_JOBS.find(job => job.id === stopJob);
             if (job) {
                 job.status.setStoppedByUser();
+                job.isRunning = false; // ensure job stops
+                console.log(`Job ID: ${stopJob} has been stopped.`);
                 return Services.Utils.Ok(`ID ${stopJob} Stopped`);
             }
             return Services.Utils.Err(`Error (jobListManager): Could not find ID: ${stopJob}`);

@@ -4,7 +4,9 @@
     import { slide } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
     import { socketStore, refreshSocket } from '../../lib/code/agentChat/socketStore.js';
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
+    import { invoke } from '@tauri-apps/api/core';
+    import { open } from '@tauri-apps/plugin-dialog';
     
     let isSettingsOpen = false;
     let isSidebarCollapsed = true;
@@ -13,6 +15,11 @@
     let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Botzy Bee";
+
+    // For slash command menu
+    let menuOpen = false;
+    let filteredOptions = [];
+    let selectedIndex = 0;
 
     onMount(() => {
         // refresh the socket if it doesn't exist. 
@@ -56,7 +63,34 @@
 
     function adjustHeight(node) {
         node.style.height = 'auto';
-        node.style.height = Math.min(node.scrollHeight, 200) + 'px';
+        node.style.height = Math.min(node.scrollHeight, 300) + 'px';
+    }
+
+    function promptInput(e){
+        const cursor = e.target.selectionStart;
+        const textBeforeCursor = prompt.slice(0, cursor);
+        const words = textBeforeCursor.split(/\s/);
+        const lastWord = words[words.length - 1];
+
+        if (lastWord.startsWith("/")) {
+        const query = lastWord.slice(1).toLowerCase();
+        
+        // 1. Initial Categories
+        let options = [
+            { label: 'folder', icon: '📁', type: 'cmd' },
+            { label: 'file', icon: '📄', type: 'cmd' }
+        ];
+
+        // 2. If user typed "/folder " or similar, we could trigger Rust here
+        // For this example, we filter the initial command list
+        filteredOptions = options.filter(opt => 
+            opt.label.toLowerCase().includes(query)
+        );
+
+        menuOpen = filteredOptions.length > 0;
+        } else {
+        menuOpen = false;
+        }
     }
 
     async function handleSubmit(event) {
@@ -65,7 +99,6 @@
         if (!userPrompt || $chatStore.isLoading || $chatStore.jobDone === false) return;
         // The store handles API logic, polling, and markdown parsing
         await chatStore.submitPrompt({ promptText: userPrompt });
-        
         prompt = '';
         if (inputTextArea) inputTextArea.style.height = 'auto';
     }
@@ -74,7 +107,52 @@
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             handleSubmit(event);
+            return;
         }
+    }
+
+    // For slash command menu - handles both cmd options and tools (if implemented)
+    async function selectOption(option) {
+        const cursor = inputTextArea.selectionStart;
+        const textBeforeCursor = prompt.slice(0, cursor);
+        const textAfterCursor = prompt.slice(cursor);
+        const words = textBeforeCursor.split(/\s/);
+
+        if (option.label === 'folder' || option.label === 'file') {
+        // Trigger a native Tauri dialog for better UX than a manual text list
+        try {
+            const selected = await open({
+            directory: option.label === 'folder',
+            multiple: false,
+            defaultPath: import.meta.env.VITE_KNOWLEDGEBASE_PATH
+            });
+            
+            if (selected) {
+                // Get relative path
+                let selectedPath = selected.replace(/\\/g, '/');
+                const basePath = import.meta.env.VITE_KNOWLEDGEBASE_PATH.replace(/\\/g, '/');
+                const base = new URL(`file:///${basePath}/`);
+                const target = new URL(`file:///${selectedPath}`);
+                let relative = target.pathname.replace(base.pathname, '');
+                // Ensure leading slash
+                if (!relative.startsWith('/')) {
+                relative = '/' + relative;
+                }
+                words[words.length - 1] = relative;
+            }
+        } catch (err) {
+            console.error("Dialog error:", err);
+        }
+        } else {
+        // It's a tool or a specific command
+        words[words.length - 1] = `[${option.label}]`;
+        }
+
+        prompt = words.join(" ") + textAfterCursor;
+        menuOpen = false;
+        
+        await tick();
+        inputTextArea.focus();
     }
 
     // Helper to determine CSS class based on Role
@@ -170,18 +248,34 @@
         </div>
 
         <div class="input-form-container">
+
             <form on:submit={handleSubmit} class="input-form">
+                <!-- Slash Command Menu -->
+                {#if menuOpen}
+                <ul class="dropdown" transition:slide={{ duration: 200 }}>
+                    {#each filteredOptions as opt, i}
+                    <li>
+                        <button type="button" class:active={i === selectedIndex} on:mousedown={() => selectOption(opt)}>
+                            <span class="icon" style="cursor: pointer;">{opt.icon}</span>
+                            <span class="label" style="cursor: pointer;">{opt.label}</span>
+                        </button>
+                    </li>
+                    {/each}
+                </ul>
+                {/if}
+                <!-- Input Prompt -->
                 <textarea
                     bind:value={prompt}
                     bind:this={inputTextArea}
-                    on:input={() => adjustHeight(inputTextArea)}
+                    on:input={(event) => {adjustHeight(inputTextArea); promptInput(event)}}
                     on:keydown={handleKeydown}
                     placeholder="Message Agent..."
                     rows="1"
                     class="input-textarea"
-                    disabled={$chatStore.isLoading && $chatStore.jobDone === false}
+                    disabled={($chatStore.isLoading && $chatStore.jobDone === false) && $chatStore.errorMessage === ""}
                 ></textarea>
-                
+
+                <!-- Submit Button -->
                 <button type="submit" class="send-button" disabled={$chatStore.isLoading || !prompt.trim() || $chatStore.jobDone === false}>
                     {#if $chatStore.isLoading && $chatStore.jobDone === false}
                         <svg class="spinner" viewBox="0 0 50 50">
@@ -230,6 +324,39 @@
         font-size: 0.95em;
         word-break: break-word; /* Let inline code wrap if it's too long */
     }
+
+    /* Slash Command Menu */
+    .dropdown {
+        position: absolute;
+        bottom: 100%;      /* Changed from top: 100% */
+        left: 0;
+        right: 0;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 12px;
+        margin-bottom: 10px; /* Spacing between menu and input */
+        list-style: none;
+        padding: 5px 0;
+        overflow-y: auto;    /* Allow scrolling if list is long */
+        max-height: 300px;   /* Keep it within viewable area */
+        z-index: 1000;       /* Ensure it floats above chat history */
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.2); /* Shadow on the top side */
+    }
+
+    .dropdown li {
+        padding: 0.75rem 1rem;
+        display: flex;
+        gap: 12px;
+        cursor: pointer;
+        color: #ccc;
+    }
+
+    .dropdown li.active {
+        background: #333;
+        color: white;
+    }
+
+    .icon { opacity: 0.7; }
     
     :root {
         --sidebar-width: 250px;
@@ -306,6 +433,7 @@
     }
 
     .input-form {
+        position: relative;
         pointer-events: auto; /* Re-enable clicks for the actual input */
         width: 100%;
         max-width: var(--input-form-max-width);
@@ -513,8 +641,8 @@
         resize: none;
         color: var(--text-color-dark);
         transition: border-color 0.2s ease;
-        overflow-y: hidden;
-        max-height: 200px;
+        overflow-y: auto;
+        max-height: 300px;
     }
 
     .input-textarea::placeholder {

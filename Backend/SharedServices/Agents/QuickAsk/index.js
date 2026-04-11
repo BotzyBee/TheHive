@@ -94,7 +94,9 @@ export class QuickAskAgent extends AiJob {
         this.taskOutput.push(msg);
         return Ok("Agent has messaged the user.");
       }
+
       // Get tool details
+      if (!this.isRunning) return Ok("Job stopped by user."); 
       let toolDetails = await getToolDetails(routingCall.value.toolName);
       if(toolDetails.isErr()){
         this.setFailed();
@@ -110,7 +112,9 @@ export class QuickAskAgent extends AiJob {
       let loopErrors = [];
       let toolCall;
       // Try Params / Tools a few times if they fail.
+      
       for(let i=0; i<this.toolRetryCount; i++){
+        if (!this.isRunning) return Ok("Job stopped by user."); 
         let paramsCall = await this.aiCall.generateText(
           parserPrompts.craftParams.sys,
           parserPrompts.craftParams.usr(
@@ -199,6 +203,8 @@ export class QuickAskAgent extends AiJob {
         }
       }
       
+      if (!this.isRunning) return Ok("Job stopped by user."); 
+
       // Finalise output
       this.emitUpdateStatus('Task Completed - Finalising Output...');
       let formattedOP = await finialiseOutput(this, 'UserFiles/QuickAskOutputs');

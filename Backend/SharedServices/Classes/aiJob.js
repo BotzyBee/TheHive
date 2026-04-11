@@ -260,7 +260,7 @@ export class AiJob {
    * @param {string} statusMessage - Status text to send to the user.
    */
   emitUpdateStatus(statusMessage){
-    if(this.socketId){
+    if(this.socketId && this.isRunning == true){
         let status = new TaskStatus();
         status.setCustomStatus(statusMessage);
         let fmf = new FrontendMessageFormat({

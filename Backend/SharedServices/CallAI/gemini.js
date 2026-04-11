@@ -5,7 +5,7 @@ import { makeSchemaStrict } from './index.js';
 import { ModelTypes } from '../constants.js';
 import { ImageMessage, AudioMessage } from '../Classes/aiMessages.js';
 import { Services } from '../index.js';
-
+dotenv.config({ path: '.env' });
 // Uses Google API not Langchain interface
 // https://ai.google.dev/gemini-api/docs#javascript
 
@@ -125,7 +125,7 @@ function processGrounding(apiResponse) {
 // Generate Text 
 /**
  * Uses Gemini to generate text
- * @param {*} systemMessage - System message for the AI to follow.
+ * @param {string} systemMessage - System message for the AI to follow.
  * @param {string} contentMessage - Prompt for the AI to follow
  * @param {string} model - Model to use,, optional
  * @param {object} options - further options, optional
@@ -138,11 +138,10 @@ export async function generateText(
   contentMessage,
   model,
   options = {}
-){
-  dotenv.config({ path: '.env' });
+) {
   const gemiKey = process.env.GEM_KEY;
   const { structuredOutput, useWeb = false } = options;
-  const schemaWithStrictness = makeSchemaStrict(structuredOutput); // enforce strictness;
+  const schemaWithStrictness = makeSchemaStrict(structuredOutput);
 
   // Validation: Ensure a model is provided
   if (!model) {
@@ -151,10 +150,12 @@ export async function generateText(
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
   try {
+    // ------------------------------------------------------------------
     // Case 1: Structured Output WITH Web Search (Requires 2-step process)
+    // ------------------------------------------------------------------
     if (structuredOutput && useWeb) {
-      // First call: Get grounded information
-      const firstResponse = await ai.models.generateContent({
+      // Step 1: Get grounded information (Streamed internally to prevent timeout)
+      const firstResponseStream = await ai.models.generateContentStream({
         model: model,
         contents: [contentMessage],
         config: {
@@ -163,10 +164,16 @@ export async function generateText(
         },
       });
 
-      // Second call: Format grounded info into JSON schema
+      let firstPassText = "";
+      for await (const chunk of firstResponseStream) {
+        firstPassText += chunk.text; // Accumulate quietly
+      }
+
+      // Step 2: Format grounded info into JSON schema
+      // This is usually fast enough not to timeout, so standard generateContent is fine
       const secondResponse = await ai.models.generateContent({
         model: model,
-        contents: [firstResponse],
+        contents: [firstPassText],
         config: {
           responseMimeType: 'application/json',
           responseSchema: schemaWithStrictness,
@@ -178,39 +185,65 @@ export async function generateText(
       return su.Ok(JSON.parse(secondResponse.text));
     }
 
+    // ------------------------------------------------------------------
     // Case 2 & 3: Standard Chat or Structured Output (Single step)
+    // ------------------------------------------------------------------
     const config = {
       systemInstruction: systemMessage,
     };
 
-    // Add Web Search tool if requested (and not handled by Case 1)
     if (useWeb) {
       config.tools = [{ googleSearch: {} }];
     }
-
-    // Add JSON schema if requested
     if (structuredOutput) {
       config.responseMimeType = 'application/json';
       config.responseSchema = schemaWithStrictness;
     }
 
-    const response = await ai.models.generateContent({
+    // Call the streaming endpoint
+    const responseStream = await ai.models.generateContentStream({
       model: model,
       contents: [contentMessage],
       config: config,
     });
 
-    const finalResult = structuredOutput
-      ? JSON.parse(response.text)
-      : response.text;
+    let fullText = "";
+    let finalCandidate = null;
 
-    let groundedResponse = finalResult;
-    if(useWeb){
-      let grd = processGrounding(response);
-      groundedResponse = grd; // {text: "The response with [0][1] etc for grounded refs", references: [urls,..] }
+    // Consume the stream internally
+    for await (const chunk of responseStream) {
+      fullText += chunk.text;
+      
+      // The grounding metadata is usually attached to the final chunk's candidates array
+      if (chunk.candidates && chunk.candidates.length > 0) {
+        finalCandidate = chunk.candidates[0];
+      }
     }
 
-    return su.Ok(groundedResponse);
+    // --- Stream Finished: Format and Return ---
+
+    // Process Grounding if requested
+    if (useWeb && finalCandidate && finalCandidate.groundingMetadata) {
+      // Reconstruct an object that matches what your existing processGrounding expects
+      const mockApiResponse = {
+        candidates: [{
+          content: { parts: [{ text: fullText }] },
+          groundingMetadata: finalCandidate.groundingMetadata
+        }]
+      };
+      
+      const groundedResponse = processGrounding(mockApiResponse);
+      return su.Ok(groundedResponse);
+    }
+
+    // Parse JSON if Structured Output
+    if (structuredOutput) {
+      return su.Ok(JSON.parse(fullText));
+    }
+
+    // Standard text completion
+    return su.Ok(fullText);
+
   } catch (error) {
     return su.logAndErr(`Error (callGemini -> generateText): ${error}`);
   }
@@ -237,7 +270,6 @@ async function generateImage(
   if (!model) {
     return su.Err('Error (callGemini -> generateImage): No model provided in options.');
   }
-  dotenv.config({ path: '.env' });
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
@@ -305,7 +337,6 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
     return su.Err('Error (callGemini -> generateAudio): No contentMessage provided.');
   }
 
-  dotenv.config({ path: '.env' });
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
