@@ -15,6 +15,7 @@
     let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Botzy Bee";
+    let providerName = "Default"
 
     // For slash command menu
     let menuOpen = false;
@@ -45,7 +46,13 @@
         if($chatStore.aiSettings.agent){
             agentName = $chatStore.aiSettings.agent;
         }
-        
+
+        if($chatStore.aiSettings.provider && $chatStore.aiSettings?.randomModel != true){
+            providerName = $chatStore.aiSettings.provider;  
+        } else if($chatStore.aiSettings.randomModel == true){
+            providerName = "Multiple Providers";  
+        }
+
         // Calculate if user is near the bottom (within 100px)
         const threshold = 100;
         const isNearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
@@ -197,6 +204,7 @@
                 <div class="start-message">
                     <p>Welcome to Botzy Bee.. give me a task or ask a question</p>
                     <p style="padding-top: 5px; color: #FFF; font-size: 14px;">Using Agent : {agentName}</p>
+                    <p style="padding-top: 5px; color: #FFF; font-size: 14px;">Provider : {providerName}</p>
                 </div>
             {/if}
             

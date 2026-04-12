@@ -287,6 +287,19 @@ export class AiJob {
     }
   }
 
+    emitFailed(){
+    if(this.socketId){
+        let res = new FrontendMessageFormat({ 
+            aiJobId: this.id, 
+            status: this.status, 
+            isRunning: this.isRunning,
+            messages: this.taskOutput, 
+            metadata: this.stats
+        });
+        emitToSocket(this.socketId, 'job_error', res);
+    }
+  }
+
   /**
    * Fetches all global and tool context (summarised to save tokens)
    * @returns {object} - { context : { globalData: {}, toolData: {} } }  

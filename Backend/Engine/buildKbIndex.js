@@ -1,28 +1,27 @@
-import { Services } from '../SharedServices/index.js';
 import { indexJob } from './classes.js';
 import { dirTableName } from '../SharedServices/constants.js';
 import dotenv from 'dotenv';
-import * as su from '../SharedServices/Utils/index.js';
+import { Ok, Err, logAndErr } from '../SharedServices/Utils/helperFunctions.js';
+import { log } from '../SharedServices/Utils/misc.js';
+import * as Database from '../SharedServices/Database/index.js';
+import * as FileSystem from '../SharedServices/FileSystem/index.js';
 
 let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
 let deleteJobs = []; // array of files + dirs to be deleted from DB
 let deleteJobsReadable = []; // human readable version for error logging
-export let indexTimerActive = false;
 
 // Indexing Stats
 let kbTotal = 0; // knowledgebase checks
 let dbTotal = 0; // database checks
 let totalJobCount = 0; // total number of jobs completed
 
-export async function indexKnowledgebase() {
-  indexTimerActive = true;
-  let fetchDbAgent = await Services.Database.getDbAgent();
-  if (fetchDbAgent.isErr()) {
-    indexTimerActive = false;
-    return su.Err(`Error (indexKnowledgebase -> getDbAgent) : ${fetchDbAgent.value}`);
-  }
-  let dbAgent = fetchDbAgent.value;
+export async function indexKnowledgebase(dbAgent) {
+  // let fetchDbAgent = await Database.getDbAgent();
+  // if (fetchDbAgent.isErr()) {
+  //   return Err(`Error (indexKnowledgebase -> getDbAgent) : ${fetchDbAgent.value}`);
+  // }
+  //let dbAgent = fetchDbAgent.value;
 
   // reset Index Stats
   kbTotal = 0;
@@ -40,12 +39,11 @@ export async function indexKnowledgebase() {
   const kbURL = process.env.knowledgebaseURL;
   let rootUpdates = await checkAndUpdateDirAndFiles(dbAgent, kbURL);
   if (rootUpdates.isErr()) {
-indexTimerActive = false;
-    return su.logAndErr(
+    return logAndErr(
       `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(Root) ${rootUpdates.value}`
     );
   }
-  su.log(rootUpdates.value);
+  log(rootUpdates.value);
 
   // Complete furtherChecks
   let furtherChecksNeeded = furtherChecks.length ?? 0;
@@ -56,42 +54,39 @@ indexTimerActive = false;
       furtherChecks[i]
     );
     if (nextUpdateDir.isErr()) {
-      indexTimerActive = false;
-      return su.logAndErr(
+      return logAndErr(
         `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(index ${i}) ${nextUpdateDir.value}`
       );
     }
     furtherChecksNeeded = furtherChecks.length ?? 0; // update len with any new dirs found
-    su.log(nextUpdateDir.value);
+    log(nextUpdateDir.value);
     i++;
   }
 
   // Process delete actions
   let deleteActions = await processDeleteJobs();
   if (deleteActions.isErr()) {
-    return su.logAndErr(
+    return logAndErr(
       `Error (indexKnowledgebase -> processDeleteJobs) : ${deleteActions}`
     );
   }
 
   // Update mgmt record with last change time for root directory
-  let updateMgmtRec = await Services.Database.updateMgmtData(dbAgent, {
+  let updateMgmtRec = await Database.updateMgmtData(dbAgent, {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
-    indexTimerActive = false;
-    su.logAndErr(
+    logAndErr(
       `Error (indexKnowledgebase) - Could not update Mgmt Record : ${updateMgmtRec.value}`
     );
   }
 
   // set indexing Active false
-  indexTimerActive = false;
-  su.log(`Indexing Complete: 
+  log(`Indexing Complete: 
         Filesystem hits: ${kbTotal}
         Database hits: ${dbTotal}
         Changes made: ${totalJobCount}`);
-  return su.Ok('All files/ Directories Indexed');
+  return Ok('All files/ Directories Indexed');
 }
 
 async function checkAndUpdateDirAndFiles(dbAgent, Url) {
@@ -108,24 +103,24 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let kbFiles = [];
 
   // Get this Url's Dir Ref
-  let getRec = await Services.Database.getRecords(dbAgent, dirTableName, 'Url', Url);
+  let getRec = await Database.getRecords(dbAgent, dirTableName, 'Url', Url);
   if (getRec.isErr()) {
-    return su.logAndErr(
+    return logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : ${getRec.value}`
     );
   }
   let getRecLen = getRec.value[0].length ?? 0;
   if (getRecLen == 0) {
-    return su.logAndErr(
+    return logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : No record found for Url ${Url}. Unable to progress!`
     );
   }
   let thisDirRef = getRec.value[0][0].DirRef;
   // Get data from database
-  let subDirsFiles = await Services.Database.getDirsAndFilesFromUrl(dbAgent, Url);
+  let subDirsFiles = await Database.getDirsAndFilesFromUrl(dbAgent, Url);
   // catch error
   if (subDirsFiles.isErr()) {
-    return su.logAndErr(
+    return logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getDirsAndFilesFromUrl ) : ${subDirsFiles.value}`
     );
   }
@@ -134,11 +129,11 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await Services.FileSystem.getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir = await FileSystem.getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
-    return su.logAndErr(
-      `Error (checkAndUpdateDirAndFiles -> getFilesAndDirectoriesFromDir) : ${kbFilDir}`
+    return logAndErr(
+      `Error (checkAndUpdateDirAndFiles -> getFilesAndDirectoriesFromDir) : ${kbFilDir.value}`
     );
   }
   kbDirs = kbFilDir.value.directoryList;
@@ -332,7 +327,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
       }
     }
     if (jobComplete == false) {
-      return su.logAndErr(`Error (checkAndUpdateDirAndFiles) :
+      return logAndErr(`Error (checkAndUpdateDirAndFiles) :
                 Failed to complete indexJob after 3 attempts
                 Dir Url : ${Url}
                 indexJob : ${changeListReadable[i]}
@@ -343,7 +338,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   kbTotal += kbFileCount + kbDirCount;
   dbTotal += dbFileCount + dbDirCount;
   totalJobCount += jobCount;
-  return su.Ok(`Directory indexed : ${Url}`);
+  return Ok(`Directory indexed : ${Url}`);
 }
 
 async function processDeleteJobs() {
@@ -362,12 +357,12 @@ async function processDeleteJobs() {
       }
     }
     if (deleteJobComplete == false) {
-      return su.logAndErr(`Error (processDeleteJobs) :
+      return logAndErr(`Error (processDeleteJobs) :
                 Failed to complete indexJob after 3 attempts
                 indexJob : ${deleteJobsReadable[i]}
             `);
     }
   }
   totalJobCount += deleteJobCount;
-  return su.Ok('Delete Jobs Completed');
+  return Ok('Delete Jobs Completed');
 }

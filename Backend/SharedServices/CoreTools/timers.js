@@ -1,7 +1,9 @@
-import * as su from '../Utils/index.js';
 import dotenv from 'dotenv';
 let allTimers = []; // Array of Timer Class
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/misc.js';
 dotenv.config({ path: ".env" });
+
 
 class timerClass {
   constructor(timerName, callbackFn, options = {}) {
@@ -81,7 +83,7 @@ class timerClass {
 export function addNewTimer(timerName, callbackFn, config = {}) {
   // Check for duplicates
   if (allTimers.some(t => t.timerName === timerName)) {
-    return su.Err(`Error(addNewTimer) - ${timerName} already exists!`);
+    return Err(`Error(addNewTimer) - ${timerName} already exists!`);
   }
 
   // Calculate delay if a Date object was provided
@@ -100,14 +102,14 @@ export function addNewTimer(timerName, callbackFn, config = {}) {
   tmr.startTimer();
 
   allTimers.push(tmr);
-  return su.Ok(timerName);
+  return Ok(timerName);
 }
 
 export function removeTimer(optTimerName, optTimerID) {
   let allTimerLen = allTimers.length ?? 0;
   // catch empty allTimers array
   if (allTimerLen == 0) {
-    return su.Ok('allTimers array is already empty');
+    return Ok('allTimers array is already empty');
   }
   // loop and remove matches
   for (let i = allTimerLen - 1; i >= 0; i--) {
@@ -119,12 +121,12 @@ export function removeTimer(optTimerName, optTimerID) {
       allTimers.splice(i, 1);
     }
   }
-  return su.Ok(`All matching timers have been removed`);
+  return Ok(`All matching timers have been removed`);
 }
 
 export function getAllTimersAsString() {
   // JSON.stringify will automatically call .toJSON() on every timerClass instance in the array
-  return su.Ok(JSON.stringify(allTimers));
+  return Ok(JSON.stringify(allTimers));
 }
 
 export function stopAndClearAllTimers() {
@@ -191,8 +193,8 @@ export function getDateTime(params = {}) {
             year,
             timezone: timezoneName
         };
-        return su.Ok(op);
+        return Ok(op);
     } catch (error) {
-        return su.Err(`Error (getDateTimeContext) : ${error.message}`);
+        return Err(`Error (getDateTimeContext) : ${error.message}`);
     }
 }

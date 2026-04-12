@@ -4,11 +4,15 @@ import {
   namespaceName,
   databaseName
 } from '../constants.js';
-import { Surreal } from 'surrealdb';
 import dotenv from 'dotenv';
-import * as su from '../Utils/index.js';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+import { Ok, Err } from '../Utils/helperFunctions.js';
+dotenv.config({ path: '.env' });
 
 let DATABASE_AGENT = null;
+// Safely extract the constructor depending on how Node resolved the module
+
 
 /** Create Database Agent
  * @param {boolean} offline                       - Offline = true for no when there is no docker environment / doing testing.
@@ -17,8 +21,8 @@ let DATABASE_AGENT = null;
  * @returns {Result{ ok: bool, value: object } }  -  object = SurrealDB object
  */
 async function createDbAgent(offline = false, options = {}) {
+  const { Surreal } = await import('surrealdb');
   let db = new Surreal();
-  dotenv.config({ path: '.env' });
   // use regular user not root! 
   const dbUser = process.env.dbRegularUser;
   const dbPass = process.env.dbRegularPass;
@@ -38,7 +42,7 @@ async function createDbAgent(offline = false, options = {}) {
       });
     await db.use({ namespace: namespaceName, database: databaseName });
     DATABASE_AGENT = db; // update global dbAgent var;
-    return su.Ok(db);
+    return Ok(db);
   } catch (error) {
     // Try fallback DB URL - once!
     const { optAttemptNumber } = options;
@@ -49,7 +53,7 @@ async function createDbAgent(offline = false, options = {}) {
       }
     }
     // else return the original error
-    return su.logAndErr(`Error (createDbAgent) - ${error}`);
+    return Err(`Error (createDbAgent) - ${error}`);
   }
 }
 
@@ -66,14 +70,14 @@ export async function initDatabaseConnection(offline = false) {
 
 export async function getDbAgent() {
   if (DATABASE_AGENT != null) {
-    return su.Ok(DATABASE_AGENT);
+    return Ok(DATABASE_AGENT);
   } else {
     // dbAgent not created yet
     let outcome = await createDbAgent();
     if (outcome.isOk()) {
       return outcome;
     } else {
-      return su.logAndErr(`Error (getDbAgent -> createDbAgent) : ${outcome.value}`);
+      return Err(`Error (getDbAgent -> createDbAgent) : ${outcome.value}`);
     }
   }
 }

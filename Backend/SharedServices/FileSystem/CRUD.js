@@ -1,10 +1,12 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
-import * as su from '../Utils/index.js';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { containerVolumeRoot } from '../constants.js';
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/index.js';
+
 
 // [][] ---- CREATE ---- [][]
 /**
@@ -39,7 +41,7 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
       const jsonString = JSON.stringify(fileContent, null, 2);
       sourceStream = Readable.from(jsonString);
     } else {
-      return su.Err('Error - (saveFile) : Unsupported content type.');
+      return Err('Error - (saveFile) : Unsupported content type.');
     }
 
     // Ensure directory exists
@@ -51,9 +53,9 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
     // pipeline automatically handles errors and closes streams properly
     await pipeline(sourceStream, writeStream);
 
-    return su.Ok(`File created in ${folderPath} called ${fileNameIncExt}`);
+    return Ok(`File created in ${folderPath} called ${fileNameIncExt}`);
   } catch (error) {
-    return su.Err(`Error - (saveFile) : ${error.message}`);
+    return Err(`Error - (saveFile) : ${error.message}`);
   }
 }
 
@@ -67,24 +69,24 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
 export async function readFileContent(filePath, asBuffer = false, options) {
-  if(!filePath) return su.Err(`Error (readFileContent) : No file path provided.`)
+  if(!filePath) return Err(`Error (readFileContent) : No file path provided.`)
   const stats = await fsp.lstat(filePath);
   if (!stats.isFile()) {
-    return su.Err(`Error: Path is not a file: ${filePath}`);
+    return Err(`Error: Path is not a file: ${filePath}`);
   }
   const encoding = options?.encoding || 'utf8';
   try {
     if (asBuffer) {
       // Read as a binary Buffer
       const bufferContent = await fsp.readFile(filePath);
-      return su.Ok(bufferContent);
+      return Ok(bufferContent);
     } else {
       // Read as UTF-8 text or user specified encoding
       const textContent = await fsp.readFile(filePath, encoding);
-      return su.Ok(textContent);
+      return Ok(textContent);
     }
   } catch (error) {
-    return su.Err(`Error (readFileContent) : ${error}`);
+    return Err(`Error (readFileContent) : ${error}`);
   }
 }
 
@@ -106,9 +108,9 @@ export async function getUpdateStatsFromUrl(url) {
       ctimeMs: Math.round(stats.ctimeMs),//The last time the file's status was changed (e.g., permissions, ownership).
       birthtimeMs: Math.round(stats.birthtimeMs),//The timestamp of when the file was created
     };
-    return su.Ok(data);
+    return Ok(data);
   } catch (error) {
-    return su.Err(error);
+    return Err(error);
   }
 }
 
@@ -132,7 +134,7 @@ export async function getFilesAndDirectoriesFromDir(url) {
         const dirStats = await getUpdateStatsFromUrl(fullPath);
         // catch error
         if (dirStats.isErr()) {
-          return su.Err(
+          return Err(
             `Error - getFilesAndDirectoriesFromDir -> getUpdateStatsFromUrl(1) : ${dirStats.value}`
           );
         }
@@ -144,7 +146,7 @@ export async function getFilesAndDirectoriesFromDir(url) {
         const fileUrl = path.resolve(fullPath);
         const fileStats = await getUpdateStatsFromUrl(fileUrl);
         if (fileStats.isErr()) {
-          return su.Err(
+          return Err(
             `Error - getFilesAndDirectoriesFromDir -> getUpdateStatsFromUrl(2) : ${fileStats.value}`
           );
         }
@@ -157,11 +159,11 @@ export async function getFilesAndDirectoriesFromDir(url) {
       }
     }
   } catch (error) {
-    return su.Err(`Error (getFilesAndDirectoriesFromUrl) : ${error}`);
+    return Err(`Error (getFilesAndDirectoriesFromUrl) : ${error}`);
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
-  return su.Ok({ directoryList, fileList });
+  return Ok({ directoryList, fileList });
 }
 
 /**
@@ -196,26 +198,26 @@ export function getFileExtensionAndSize(filePath) {
   try {
     // 1. Check if it exists at all before stating
     if (!fs.existsSync(filePath)) {
-        return su.Err(`File does not exist at path: ${filePath}`);
+        return Err(`File does not exist at path: ${filePath}`);
     }
 
     const stats = fs.statSync(filePath);
     
     if (!stats.isFile()) {
-        return su.Err(`Target is a directory, not a file: ${filePath}`);
+        return Err(`Target is a directory, not a file: ${filePath}`);
     }
 
     const sizeBytes = stats.size;
     const ext = path.extname(filePath);
     const extension = ext ? ext.toLowerCase().substring(1) : ''; // Empty string for no extension
     
-    return su.Ok({
+    return Ok({
       extension: extension,
       sizeBytes: sizeBytes,
-      sizeFormatted: su.formatBytes(sizeBytes),
+      sizeFormatted: formatBytes(sizeBytes),
     });
   } catch (error) {
-    return su.Err(`OS Error accessing file: ${error.message}`);
+    return Err(`OS Error accessing file: ${error.message}`);
   }
 }
 
@@ -244,7 +246,7 @@ export async function scanFolderRecursively(relativeFolderPath) {
         directorySet.add(fullPath); // Add the current directory to the Set
         let recCall = await scanFolderRecursively(fullPath);
         if (recCall.isErr()) {
-          return su.Err(
+          return Err(
             `Error (scanFolderRecursively) : Error scanning directory (recursive) ${fullPath} `
           );
         }
@@ -261,13 +263,13 @@ export async function scanFolderRecursively(relativeFolderPath) {
       }
     }
   } catch (error) {
-    return su.Err(
+    return Err(
       `Error (scanFolderRecursively) : Error scanning directory ${relativeFolderPath} : ${error} `
     );
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
-  return su.Ok({ directoryList, fileList }); // Ok({ directoryList, fileList }) =  [String], [String]
+  return Ok({ directoryList, fileList }); // Ok({ directoryList, fileList }) =  [String], [String]
 }
 
 function removeAppPrefix(str) {

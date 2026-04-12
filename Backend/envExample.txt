@@ -23,6 +23,8 @@ GEM_KEY=
 ANT_KEY=
 # Perplexity
 PXY_KEY=
+# Inception
+ICPTN_KEY=
 
 # Google Calendar API KEYS
 G_CLIENT_EMAIL=

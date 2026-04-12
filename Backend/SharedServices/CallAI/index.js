@@ -1,4 +1,3 @@
-import * as su from '../Utils/index.js';
 import {
   ModelTypes,
   AiQuality,
@@ -7,6 +6,8 @@ import {
   PROVIDER_DISPATCH,
   DEFAULT_PROVIDER,
 } from '../constants.js';
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/misc.js';
 /*
 Function flow for AiCall
 AiCall Method -> EstimateTokens -> dispatch -> resolveModel -> ProviderFunctions -> AI PROVIDER
@@ -201,7 +202,7 @@ export class AiCall {
     if (model !== null && typeof model == 'string') {
       const entry = this.#models.find((m) => m.model === model);
       if (!entry) {
-        return su.Err(
+        return Err(
           `Error ( resolveModel ) : Unknown Model : ${model}`
         );
       }
@@ -209,11 +210,11 @@ export class AiCall {
         (c) => !entry.capabilities.includes(c)
       );
       if (missing.length) {
-        return su.Err(
+        return Err(
           `Error ( resolveModel ) : ${model} does not support ${missing.join(', ')}`
         );
       }
-      return su.Ok(entry);
+      return Ok(entry);
     }
 
     // Filter models for other paths (filter capabilities & context size)
@@ -222,7 +223,7 @@ export class AiCall {
     );
     // catch no models available for task
     if (capableCandidates.length === 0) {
-      return su.Err(
+      return Err(
         `Error ( resolveModel ) : No model found supporting requested capabilities : ${[...requiredCaps].join(', ')}.`
       );
     }
@@ -232,7 +233,7 @@ export class AiCall {
       (m) => m.maxContext >= ctxRequired && m.quality == requestQuality
     );
     if (contextSizeAndQualityApproved.length === 0) {
-      su.Err(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
+      Err(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
             Capabilities : [${[...requiredCaps].join(', ')}]. Context Size: ${ctxRequired}. Quality ${requestQuality}`);
     }
 
@@ -241,7 +242,7 @@ export class AiCall {
       let randomNum = Math.floor(
         Math.random() * contextSizeAndQualityApproved.length
       );
-      return su.Ok(contextSizeAndQualityApproved[randomNum]);
+      return Ok(contextSizeAndQualityApproved[randomNum]);
     }
 
     // Path 3: Go with default provider (unless user specifies one) and closest model to quality
@@ -256,20 +257,20 @@ export class AiCall {
           (m) => m.maxContext >= contextSize
         );
         if (contextFit.length > 0) {
-          return su.Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
+          return Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
         }
         // No model from this provider fits the context — warn and fall through
-        su.log(
+        log(
           `WARN: ( AiCall -> resolveModel ) :  Provider "${resolvedProvider}" has no models with maxContext >= ${contextSize}.` +
             `Falling through to cross-provider selection.`
         );
       } else {
         // No context constraint — just pick by quality proximity within provider
-        return su.Ok(providerCandidates.sort(byQualityProximity)[0]);
+        return Ok(providerCandidates.sort(byQualityProximity)[0]);
       }
     } else if (provider) {
       // Caller explicitly named a provider that has no capable models — hard fail
-      su.log(
+      log(
         `WARN: ( resolveModel ) : Provider "${provider}" has no models supporting: ` +
           `[${[...requiredCaps].join(', ')}]. Falling back to any suitable model available.`
       );
@@ -288,12 +289,12 @@ export class AiCall {
       if (contextFit.length > 0) {
         fallbackCandidates = contextFit;
       } else {
-        return su.Err(
+        return Err(
           `Error ( resolveModel ) : No model across any provider has maxContext >= ${contextSize}. Unable to progress`
         );
       }
     }
-    return su.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
+    return Ok(fallbackCandidates.sort(byQualityProximity)[0]);
   }
 
   /**
@@ -307,11 +308,11 @@ export class AiCall {
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
-      return su.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
+      return Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
     }
     const callFn = this.#ProviderFunctions[entry.value.provider];
     if (!callFn) {
-      return su.Err(
+      return Err(
         `Error : ( #dispatch ) No dispatch function registered for provider. ${entry.value.provider}`
       );
     }

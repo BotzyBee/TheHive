@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import * as su from '../Utils/index.js';
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/misc.js';
 
 /**
  * Unified Perplexity AI call handler (Synchronous only).
@@ -18,7 +19,7 @@ export async function callPerplexity(
   model,
   options = {}
 ) {
-  su.log(`Calling Perplexity : ${model}`);
+  log(`Calling Perplexity : ${model}`);
   dotenv.config({ path: '.env' });
   const ppxAPI = process.env.PXY_KEY;
 
@@ -26,7 +27,7 @@ export async function callPerplexity(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return su.logAndErr(
+    return logAndErr(
       'Error (callPerplexity): No model provided in options.'
     );
   }
@@ -67,13 +68,13 @@ export async function callPerplexity(
       try {
         content = JSON.parse(content);
       } catch (e) {
-        return su.logAndErr(
+        return logAndErr(
           'Error (callPerplexity): Could not parse response to JSON.'
         );
       }
     }
 
-    return su.Ok({
+    return Ok({
       searchResult: content,
       citations: data.citations || [],
     });
@@ -81,6 +82,6 @@ export async function callPerplexity(
     // Return detailed error if possible, otherwise generic message
     const errorMsg =
       error.response?.data?.error?.message || error.message || error;
-    return su.logAndErr(`Error (callPerplexity): ${errorMsg}`);
+    return logAndErr(`Error (callPerplexity): ${errorMsg}`);
   }
 }

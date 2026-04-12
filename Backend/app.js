@@ -6,8 +6,10 @@ import {
   initDatabaseConnection,
   closeDatabaseConnection,
 } from './SharedServices/Database/index.js';
-import { setupPool, pool } from './Engine/workers.js';
-import { Services } from './SharedServices/index.js';
+import { setupPool, pool, indexTimerActive } from './Engine/workers.js';
+import * as Timers from './SharedServices/CoreTools/timers.js';
+import * as Classes from './SharedServices/Classes/index.js';
+import * as Utils from './SharedServices/Utils/misc.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getConfigForFrontend } from './Engine/routes/index.js';
 import { initToolIndex } from './Engine/toolIndex.js';
@@ -15,10 +17,13 @@ import { initGuideIndex } from './Engine/guideIndex.js';
 import { handleQAMessage } from './Engine/routes/quickAsk.js';
 import { handleTAMessage } from './Engine/routes/taskAgent.js';
 import { JOBS } from './Engine/jobManager.js';
-import { indexKnowledgebase, indexTimerActive } from './Engine/buildKbIndex.js';
+import { indexKnowledgebase,  } from './Engine/buildKbIndex.js';
+import { getFormattedModelRegistry } from './SharedServices/CallAI/utils.js';
+import { getDbAgent } from './SharedServices/Database/utils.js';
+import { isMainThread } from 'node:worker_threads';
 import { testDrive, rustActionState } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
 
-export let dbAgent = null;
+let dbAgent; // Global variable to hold the database agent instance
 let servicesStarted = false;
 
 // [][] -------------------------------------- [][]
@@ -26,56 +31,61 @@ let servicesStarted = false;
 //        setup db connections/ timers etc
 // [][] -------------------------------------- [][]
 const initServices = async () => {
+  if (!isMainThread) return;
+
   // only call once
   if (!servicesStarted) {
+    console.log(`Services status: ${servicesStarted} . DB Agent: ${dbAgent} `);
     // init Surreal DB agent
     console.log('Initializing database connection...');
     let dbTools = await initDatabaseConnection(false);
     if (dbTools.isErr()) {
-      Services.Utils.log(`Error (initServices -> initDatabaseConnection ) : ${dbTools.value}`);
+      Utils.log(`Error (initServices -> initDatabaseConnection ) : ${dbTools.value}`);
       process.exit(1);
     }
+    dbAgent = dbTools.value;
     // Setup Piscina Pool
-    // setupPool(); // Picina is broken at the moment (doesn't play well with ESM modules / SurrealDB)
+    setupPool(); // Picina is broken at the moment (doesn't play well with ESM modules / SurrealDB)
     // Load Tools
     console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
-    Services.Utils.log("Loading Tools...");
+    Utils.log("Loading Tools...");
     let tools = await initToolIndex();
     if(tools.isErr()){
-      Services.Utils.log(`Error (initServices -> initToolIndex ) : ${tools.value}`);
+      Utils.log(`Error (initServices -> initToolIndex ) : ${tools.value}`);
       process.exit(1);
     }
-    Services.Utils.log(`${tools.value.tools} Tools loaded. \n`+
+    Utils.log(`${tools.value.tools} Tools loaded. \n`+
       `${tools.value.added} new. \n`+
       `${tools.value.updated} updated \n`+
       `${tools.value.removed} removed.`)
 
     // Load Guides
     console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
-    Services.Utils.log("Loading Guides...");
+    Utils.log("Loading Guides...");
     let guides = await initGuideIndex();
     if(guides.isErr()){
-      Services.Utils.log(`Error (initServices -> initGuideIndex ) : ${guides.value}`);
+      Utils.log(`Error (initServices -> initGuideIndex ) : ${guides.value}`);
       process.exit(1);
     }
-    Services.Utils.log(`${guides.value.guides} Guides loaded. \n`+
+    Utils.log(`${guides.value.guides} Guides loaded. \n`+
       `${guides.value.added} new. \n`+
       `${guides.value.updated} updated \n`+
       `${guides.value.removed} removed.`)
 
     //Knowledgebase re-indexing timer (every 60 seconds)
-    Services.CoreTools.Timers.addNewTimer(
+    Timers.addNewTimer(
       'KB_Indexing_Timer',
       async () => {
         if (!indexTimerActive) {
-          await indexKnowledgebase()
+          console.log("Running KB Indexing...");
+          let poolCall = await pool.run({}, {name: 'poolIndexKnowledgebase'})
         }
       },
       { delay: 0, intervalMs: 60000, isOneOff : false }
     );
 
     //New Job Scheduler (every 5 seconds)
-    Services.CoreTools.Timers.addNewTimer("New_Job_Scheduler", async () => {
+    Timers.addNewTimer("New_Job_Scheduler", async () => {
         // Only call if not already busy
         if (JOBS.isAllocatorActive() == false) {
             await JOBS.checkNonAllocated();
@@ -83,12 +93,12 @@ const initServices = async () => {
     }, { delay: 0, intervalMs: 5000, isOneOff : false });
 
     // Prune completed jobs every 10 mins
-    Services.CoreTools.Timers.addNewTimer("Prune_Completed_Jobs", async () => {
+    Timers.addNewTimer("Prune_Completed_Jobs", async () => {
       await JOBS.jobListManager({ prune: true });
     }, { delay: 0, intervalMs: 600000, isOneOff : false });
 
     // Write logs to file every 2 mins
-    Services.CoreTools.Timers.addNewTimer("Write_Logs_To_File", async () => {
+    Timers.addNewTimer("Write_Logs_To_File", async () => {
       await writeLogsToFile();
     }, { delay: 0, intervalMs: 120000, isOneOff : false });
     servicesStarted = true;
@@ -157,12 +167,12 @@ app.get("/stopJob", async (req, res) => {
   let msg = await JOBS.jobListManager({stopJob: jobID});
   if(msg.isErr()){ return res.status(400).json({error: msg.value}) }
   // format as Frontend Message Format. 
-  let rtnMsg = new Services.Classes.FrontendMessageFormat({
+  let rtnMsg = new Classes.FrontendMessageFormat({
     aiJobId: jobID,
-    status: Services.Classes.Status.Stopped,
+    status: Classes.Status.Stopped,
     isRunning: false,
-    messages: [ new Services.Classes.TextMessage(
-      { role: Services.Classes.Roles.Agent, 
+    messages: [ new Classes.TextMessage(
+      { role: Classes.Roles.Agent, 
         textData: `Job ${jobID} has been stopped.` })
       ],
     metadata: {}
@@ -172,6 +182,11 @@ app.get("/stopJob", async (req, res) => {
 
 app.get("/getConfig", async (req, res) => {
   let msg = getConfigForFrontend();
+  res.status(200).json(msg);
+});
+
+app.get("/getModels", async (req, res) => {
+  let msg = getFormattedModelRegistry();
   res.status(200).json(msg);
 });
 
@@ -200,13 +215,13 @@ export const emitToSocket = (socketId, event, data) => {
   if (socket) {
     socket.emit(event, data);
   } else {
-    Services.Utils.log(`Warning: Socket ${socketId} not found for event "${event}"`);
+    Utils.log(`Warning: Socket ${socketId} not found for event "${event}"`);
   }
 };
 
 //Handle Socket.io connections
 io.on('connection', (socket) => {
-    Services.Utils.log(`User joined: ${socket.id}`);
+    Utils.log(`User joined: ${socket.id}`);
 
     // --- 1. SUBMIT TASK (Task Agent) ---
     socket.on('submit_task', async (data, callback) => {
@@ -247,12 +262,12 @@ io.on('connection', (socket) => {
         let msg = await JOBS.jobListManager({ stopJob: jobID });
         if (msg.isErr()) return callback({ error: msg.value });
 
-        const rtnMsg = new Services.Classes.FrontendMessageFormat({
+        const rtnMsg = new Classes.FrontendMessageFormat({
             aiJobId: jobID,
-            status: Services.Classes.Status.Stopped,
+            status: Classes.Status.Stopped,
             isRunning: false,
-            messages: [new Services.Classes.TextMessage({ 
-                role: Services.Classes.Roles.Agent, 
+            messages: [new Classes.TextMessage({ 
+                role: Classes.Roles.Agent, 
                 textData: `Job ${jobID} has been stopped.` 
             })]
         });
@@ -266,7 +281,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        Services.Utils.log(`User left: ${socket.id}`);
+        Utils.log(`User left: ${socket.id}`);
     });
 });
 
@@ -278,33 +293,33 @@ io.on('connection', (socket) => {
 let server;
 const startServer = () => {
   server = httpServer.listen(port, () => {
-    Services.Utils.log(`Server running on port ${port} (HTTP + WS)`);
+    Utils.log(`Server running on port ${port} (HTTP + WS)`);
   });
 };
 
 // [][] --- Graceful Sutdown --- [][]
 const gracefulShutdown = async (signal) => {
-  Services.Utils.log('Graceful Shutdown Started');
+  Utils.log('Graceful Shutdown Started');
   
   if (io) {
     await io.close(); // Close all websocket connections
-    Services.Utils.log('Socket.io closed');
+    Utils.log('Socket.io closed');
   }
 
   if (server) {
     server.close(() => {
-      Services.Utils.log('HTTP Server closed');
+      Utils.log('HTTP Server closed');
     });
   }
   // Clear all active timers
-  Services.CoreTools.Timers.stopAndClearAllTimers();
+  CoreTools.Timers.stopAndClearAllTimers();
   // Print logs to file
   await writeLogsToFile();
   // Terminate the Piscina worker pool gracefully
   if (pool) { await pool.destroy();}
   // Close database connection
   await closeDatabaseConnection();
-  Services.Utils.log('Graceful shutdown complete. Exiting process.');
+  Utils.log('Graceful shutdown complete. Exiting process.');
   process.exit(0); // Exit the process once all cleanup is done
 };
 // Listen for termination signals from Docker (SIGTERM) and Ctrl+C (SIGINT)
@@ -314,9 +329,10 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // [][] -- Init & Trigger Start -- [][]
 initServices()
   .then(() => {
+    if (!isMainThread) return;
     startServer();
   })
   .catch((err) => {
-    Services.Utils.log(`Failed to start application: ${err.message}`);
+    Utils.log(`Failed to start application: ${err.message}`);
     process.exit(1); // Exit if init
   });

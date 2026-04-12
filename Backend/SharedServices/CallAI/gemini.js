@@ -1,10 +1,11 @@
-import * as su from '../Utils/index.js';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { makeSchemaStrict } from './index.js';
 import { ModelTypes } from '../constants.js';
 import { ImageMessage, AudioMessage } from '../Classes/aiMessages.js';
 import { Services } from '../index.js';
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/misc.js';
 dotenv.config({ path: '.env' });
 // Uses Google API not Langchain interface
 // https://ai.google.dev/gemini-api/docs#javascript
@@ -28,10 +29,10 @@ export async function callGemini(
   model,
   options = {}
 ) {
-  su.log(`Calling Gemini : ${model}`);
+  log(`Calling Gemini : ${model}`);
   const { capability } = options;
   if(!capability){
-    return su.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
+    return Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
   }
 
   // Match Capabilities
@@ -49,28 +50,28 @@ export async function callGemini(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.deepResearch:
-      return su.Err('Error (callGemini) : Gemini does not have deep research capability.');
+      return Err('Error (callGemini) : Gemini does not have deep research capability.');
 
     case ModelTypes.websearch:
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.embedding:
-      return su.Err('Error (callGemini) : Gemini does not have embedding capability.');
+      return Err('Error (callGemini) : Gemini does not have embedding capability.');
 
     case ModelTypes.textToSpeech:
       return await generateAudio(contentMessage, model, options);
 
     case ModelTypes.speechToText:
-      return su.Err('Error (callGemini) : Gemini does not have speech to text capability.');
+      return Err('Error (callGemini) : Gemini does not have speech to text capability.');
 
     case ModelTypes.maps:
-      return su.Err('Error (callGemini) : Gemini does not have maps capability.');
+      return Err('Error (callGemini) : Gemini does not have maps capability.');
 
     case ModelTypes.local:
-      return su.Err('Error (callGemini) : Gemini does not have local capability.');
+      return Err('Error (callGemini) : Gemini does not have local capability.');
 
     default:
-      su.Err(`Error (callGemini) "${capability}" not specifically handled.`);
+      Err(`Error (callGemini) "${capability}" not specifically handled.`);
   }
 }
 
@@ -145,7 +146,7 @@ export async function generateText(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return su.logAndErr('Error (callGemini -> generateText): No model provided in options.');
+    return logAndErr('Error (callGemini -> generateText): No model provided in options.');
   }
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
@@ -182,7 +183,7 @@ export async function generateText(
         },
       });
 
-      return su.Ok(JSON.parse(secondResponse.text));
+      return Ok(JSON.parse(secondResponse.text));
     }
 
     // ------------------------------------------------------------------
@@ -233,19 +234,19 @@ export async function generateText(
       };
       
       const groundedResponse = processGrounding(mockApiResponse);
-      return su.Ok(groundedResponse);
+      return Ok(groundedResponse);
     }
 
     // Parse JSON if Structured Output
     if (structuredOutput) {
-      return su.Ok(JSON.parse(fullText));
+      return Ok(JSON.parse(fullText));
     }
 
     // Standard text completion
-    return su.Ok(fullText);
+    return Ok(fullText);
 
   } catch (error) {
-    return su.logAndErr(`Error (callGemini -> generateText): ${error}`);
+    return logAndErr(`Error (callGemini -> generateText): ${error}`);
   }
 }
 
@@ -268,7 +269,7 @@ async function generateImage(
   options = {}
 ){
   if (!model) {
-    return su.Err('Error (callGemini -> generateImage): No model provided in options.');
+    return Err('Error (callGemini -> generateImage): No model provided in options.');
   }
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
@@ -311,9 +312,9 @@ async function generateImage(
         responseMessages.push(msg);
       }
     }
-    return su.Ok(responseMessages);
+    return Ok(responseMessages);
   } catch (error) {
-    return su.Err(`Error (callGemini -> generateImage) : ${error}`)
+    return Err(`Error (callGemini -> generateImage) : ${error}`)
   }
 }
 
@@ -334,7 +335,7 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
   options = {}
 ) {
   if (contentMessage == null) {
-    return su.Err('Error (callGemini -> generateAudio): No contentMessage provided.');
+    return Err('Error (callGemini -> generateAudio): No contentMessage provided.');
   }
 
   const gemiKey = process.env.GEM_KEY;
@@ -406,8 +407,8 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
       }
     }
 
-    return su.Ok(responseMessages);
+    return Ok(responseMessages);
   } catch (error) {
-    return su.Err(`Error (callGemini -> generateAudio) : ${error.message || error}`);
+    return Err(`Error (callGemini -> generateAudio) : ${error.message || error}`);
   }
 }

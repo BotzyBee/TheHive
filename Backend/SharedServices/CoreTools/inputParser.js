@@ -200,19 +200,42 @@ Check you are providing params for all inputs specified in the schema - do not m
 If there are any errors from previous steps, they will be provided here: <errors> ${errors} </errors>
 Your output must be an array of { key: string, type: string, value: any } objects`;
     },
-    schema: {
+        schema: {
         "type": "object",
-        "description": "An object containing a 'params' property, where 'params' is an array of any type",
         "properties": {
             "params": {
-                "type": "array",
-                "items": {
-                    "additionalProperties": true,
-                    "default": null
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                "key": { "type": "string" },
+                "type": { "type": "string" },
+                "value": {
+                    "description": "The value associated with the key.",
+                    "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" },
+                    { 
+                        "type": "object", 
+                        "properties": {}, 
+                        "additionalProperties": false 
+                    },
+                    { 
+                        "type": "array", 
+                        "items": { "type": "string" } 
+                    }
+                    ]
                 }
+                },
+                "required": ["key", "type", "value"],
+                "additionalProperties": false
+            }
             }
         },
-        "required": ["params"]
+        "required": ["params"],
+        "additionalProperties": false
         },
     },
     }

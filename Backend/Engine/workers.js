@@ -5,15 +5,16 @@ Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
 import { Piscina } from 'piscina';
-// import { getDbAgent } from '../SharedServices/Database/index.js';
-// import { indexKnowledgebase } from './buildKbIndex.js'; 
-import * as su from '../SharedServices/Utils/index.js';
+import { getDbAgent } from '../SharedServices/Database/utils.js';
+import { indexKnowledgebase } from './buildKbIndex.js'; 
 import { AiJob } from '../SharedServices/Classes/index.js';
 import { QuickAskAgent } from '../SharedServices/Agents/QuickAsk/index.js';
+import { Ok, Err } from '../SharedServices/Utils/helperFunctions.js';
 
 
 /**@type {Piscina} */
 export let pool; // Piscina worker pool (multi-thread)
+export let indexTimerActive = false;
 
 export function setupPool() {
   pool = new Piscina({
@@ -23,27 +24,27 @@ export function setupPool() {
   });
 }
 
-// export async function poolIndexKnowledgebase(){
-//     indexTimerActive = true;
-//     let dbAgent = await getDbAgent();
-//     if(dbAgent.isOk()){
-//         let call = await indexKnowledgebase(dbAgent.value);
-//         indexTimerActive = false;
-//         return call;
-//     } else {
-//         indexTimerActive = false;
-//         return su.Err(`ERROR - (poolIndexKnowledgebase -> getDbAgentdbAgent) : ${dbAgent.value}`);
-//     }
-// }
+export async function poolIndexKnowledgebase(){
+    indexTimerActive = true;
+    let dbAgent = await getDbAgent();
+    if(dbAgent.isErr()){
+        indexTimerActive = false;
+        console.log(`Error getting DB Agent in poolIndexKnowledgebase: ${dbAgent.value}`);
+        return; 
+    }
+    let call = await indexKnowledgebase(dbAgent.value);
+    indexTimerActive = false;
+    return call;
+}
 
 // Process AI JOB
 export async function poolRunAiJob({jobClassObject}){
     let job = processObjectToClass(jobClassObject); 
-    if(job == null){ return su.Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
+    if(job == null){ return Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
     // Run the Job
     let call = await job.run();
-    if(call.isErr()){ return su.Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
-    return su.Ok(job); // return class
+    if(call.isErr()){ return Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
+    return Ok(job); // return class
 }
 
 /**

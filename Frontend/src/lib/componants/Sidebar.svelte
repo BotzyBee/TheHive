@@ -35,6 +35,7 @@
     <ul>
         <li><a href="/">Home</a></li>
         <li><a href="/agents">Agents</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
     </ul>
 </aside>
 {/if}

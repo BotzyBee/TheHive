@@ -56,7 +56,7 @@ export async function run(Shared, params = {}, agent = {}) {
         "required": ["mode"]
     };
     safeEmit(agent, "Coding Tool: Determining user intent (Create, Edit, Review)...");
-    const routerCall = await aiCall.generateCode(routerSys, `Task: ${taskDescription}\nContext Provided: ${context.trim() ? 'Yes' : 'No'}`, { structuredOutput: routerSchema });
+    const routerCall = await aiCall.generateCode(routerSys, `Task: ${taskDescription}`, { structuredOutput: routerSchema });
     if (routerCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Router phase) : ${routerCall.value}`);
 
     const mode = routerCall.value.mode;
@@ -87,7 +87,7 @@ export async function run(Shared, params = {}, agent = {}) {
 if (mode === "EDIT") {
         safeEmit(agent, "Coding Tool: Creating a list of specific edits...");
         // --- MODE: EDIT (Modify Existing Code) ---
-        if (!context || context.trim() === "") {
+        if (!context || context === "") {
              return Shared.Utils.Err("Error: EDIT mode selected by router, but no existing code was provided in the context.");
         }
 
@@ -190,7 +190,7 @@ if (mode === "EDIT") {
 
         // Generate & Inject Loop
         for (const [index, order] of orders.entries()) {
-            safeEmit(agent, `Coding Tool: Generating code for marker ${order.marker} (${index + 1} of ${orders.length})...`);
+            safeEmit(agent, `Coding Tool: Generating code for marker (${index + 1} of ${orders.length})...`);
             const devSys = `You are a Senior Developer. Write ONLY the code required for ${order.marker}. ` +
                            `Requirement: ${order.description}. ` +
                            `Context: You are working within this file skeleton:\n${currentFileState}\n`+

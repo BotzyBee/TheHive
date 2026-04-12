@@ -44,6 +44,7 @@ export class QuickAskAgent extends AiJob {
           this.emitUpdateStatus("Quick Ask Agent has failed :(");
           this.isRunning = false; 
           this.errors.push(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`);
+          this.emitFailed();
           return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
         this.task = taskCall.value;
         this.addAiCount(1);
@@ -57,6 +58,7 @@ export class QuickAskAgent extends AiJob {
         this.isRunning = false;
         this.emitUpdateStatus("Quick Ask Agent has failed :(");
         this.errors.push(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
+        this.emitFailed();
         return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
       }
 
@@ -74,6 +76,7 @@ export class QuickAskAgent extends AiJob {
         this.setFailed();
         this.isRunning = false;
         this.errors.push(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
+        this.emitFailed();
         return Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
       }
       // catch no-suitable tool Or clarify task
@@ -102,6 +105,7 @@ export class QuickAskAgent extends AiJob {
         this.setFailed();
         this.isRunning = false;
         this.errors.push(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`);
+        this.emitFailed();
         return Err(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`)
       };
       
@@ -190,6 +194,7 @@ export class QuickAskAgent extends AiJob {
             this.isRunning = false;
             this.emitUpdateStatus("Quick Ask Agent has failed :(");
             this.errors.push(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);
+            this.emitFailed();
             return Err(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);   
           }
           // Add data to tool context;
@@ -213,6 +218,7 @@ export class QuickAskAgent extends AiJob {
         this.isRunning = false;
         this.emitUpdateStatus("Quick Ask Agent has failed :(");
         this.errors.push(`Error (Quick Task Agent -> startTask -> finialiseOutput ) : ${formattedOP.value}`);
+        this.emitFailed();
         return formattedOP; // already has Result Class
       }
 
@@ -237,6 +243,7 @@ export class QuickAskAgent extends AiJob {
         this.isRunning = false;
         this.emitUpdateStatus("Quick Ask Agent has mega-failed :(");
         this.errors.push(`Unexpected error: ${e}`);
+        this.emitFailed();
         return Err(`Unexpected error: ${e}`);
     }
   }

@@ -1,7 +1,8 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import * as su from '../Utils/index.js';
 import { makeSchemaStrict } from './index.js';
+import { Ok, Err, logAndErr } from '../Utils/helperFunctions.js';
+import { log } from '../Utils/misc.js';
 import dotenv from 'dotenv';
 
 /**
@@ -22,7 +23,7 @@ export async function callOpenAI(
   model,
   options = {}
 ) {
-  su.log(`Calling Open AI : ${model}`);
+  log(`Calling Open AI : ${model}`);
   dotenv.config({ path: '.env' });
   const apiKey = process.env.OAI_KEY;
 
@@ -30,7 +31,7 @@ export async function callOpenAI(
   if (options.embeddingsMode) {
     const { inputDataVec, dimensionSize } = options;
     if (!Array.isArray(inputDataVec)) {
-      return su.logAndErr('Error: inputDataVec must be an array of strings.');
+      return logAndErr('Error: inputDataVec must be an array of strings.');
     }
     try {
       const embeddings = new OpenAIEmbeddings({
@@ -39,9 +40,9 @@ export async function callOpenAI(
         openAIApiKey: apiKey,
       });
       const vectors = await embeddings.embedDocuments(inputDataVec);
-      return su.Ok(vectors);
+      return Ok(vectors);
     } catch (error) {
-      return su.logAndErr(`Error (callOpenAI - embeddings): ${error}`);
+      return logAndErr(`Error (callOpenAI - embeddings): ${error}`);
     }
   }
 
@@ -49,7 +50,7 @@ export async function callOpenAI(
   const { structuredOutput } = options;
   // Validation: Ensure a model is provided
   if (!model) {
-    return su.logAndErr('Error (callOpenAI): No model provided in options.');
+    return logAndErr('Error (callOpenAI): No model provided in options.');
   }
   const hasImage = contentMessage?.imageUrl != null;
   const modelChoice = model;
@@ -81,12 +82,12 @@ export async function callOpenAI(
       const schemaWithStrictness = makeSchemaStrict(structuredOutput);
       const structured = chatModel.withStructuredOutput(schemaWithStrictness);
       const res = await structured.invoke(messages);
-      return su.Ok(res);
+      return Ok(res);
     } else {
       const res = await chatModel.invoke(messages);
-      return su.Ok(res.content);
+      return Ok(res.content);
     }
   } catch (error) {
-    return su.logAndErr(`Error (callOpenAI): ${error}`);
+    return logAndErr(`Error (callOpenAI): ${error}`);
   }
 }

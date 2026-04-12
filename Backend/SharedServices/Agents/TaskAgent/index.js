@@ -159,13 +159,14 @@ export class TaskAgent extends AiJob {
 
     async #getSuitableGuides(task, maxGuides = 10){
         // Get guides by vector lookup
-        let matchingGuides = await getToolsOrGuidesForTask(task, maxGuides, false);
+        let matchingGuides = await getToolsOrGuidesForTask(task, maxGuides, false); // false = search guides not tools
         if(matchingGuides.isErr()){
             return Err(`Erorr (getSuitableGuides -> getToolsOrGuidesForTask) : ${matchingGuides.value}`);
         }
         // Use AI to select the most suitable
         let call = await this.#generateText(
-            "Your task is to review the provided guide text and return the file path for any guides that could be useful for the user task.",
+            "Your task is to review the provided guide text and return the file path for any guides that could be useful for the user task. " +
+            "If none are relevant return an empty array. This is better than adding irrelevant guides to the plan. ",
             `Here is the user task : ${task} and here are the guides : ${JSON.stringify(matchingGuides.value)}`,
             { ...this.aiSettings, 
                 structuredOutput: {
@@ -592,6 +593,7 @@ export class TaskAgent extends AiJob {
                 this.messageHistory.addMessage(msg);
                 this.taskOutput.push(msg);
                 this.phaseMessage = `I couldn't process the last user message. ${processUserMessage.value.instruction}`;
+                this.emitFinalResult();
                 return Ok("Last user message needs clarification.")
             }
             this.errors.push("Error: reviewAndReturn -> Catch new message from User : User message could not be parsed into a known output.");
@@ -623,6 +625,7 @@ export class TaskAgent extends AiJob {
             this.messageHistory.addMessage(msg);
             this.taskOutput.push(msg);
             this.phaseMessage = "";
+            this.emitFinalResult();
             return Ok("Agent has crafted message to user.");
         }
 
@@ -804,6 +807,7 @@ export class TaskAgent extends AiJob {
                         console.log(e);
                         this.status.setFailed();
                         this.isRunning = false;
+                        this.emitFailed();
                         return Err(`Error (Run -> plan) : ${plan.value}`);
                     }
                 }
@@ -817,6 +821,7 @@ export class TaskAgent extends AiJob {
                         this.errors.push(e);
                         console.log(e);
                         this.status.setFailed(); // sets isRunning to false
+                        this.emitFailed();
                         return Err(`Error (Run -> action) : ${action.value}`);
                     }
                 }
@@ -831,6 +836,7 @@ export class TaskAgent extends AiJob {
                         this.errors.push(e);
                         console.log(e);
                         this.status.setFailed(); // sets isRunning to false
+                        this.emitFailed();
                         return Err(`Error (Run -> review) : ${review.value}`);
                     }
                 }
@@ -841,6 +847,7 @@ export class TaskAgent extends AiJob {
                     this.errors.push(e);
                     console.log(e);
                     this.status.setMaxLoopsHit()
+                    this.emitFailed();
                     this.nextPhase = TaskPhases.Review;
                 }
                 this.addLoopCount(1);
@@ -857,10 +864,10 @@ export class TaskAgent extends AiJob {
             return Ok("Task Agent has stopped or completed");
             }
         catch(e){
-
                 this.errors.push(`Unexpected error: ${e}`);
                 this.status.setFailed();
                 this.isRunning = false;
+                this.emitFailed();
                 return Err(`Unexpected error: ${e}`);   
         }
     }
@@ -1027,18 +1034,41 @@ Do not repeat any actions that are in the context. It is important not to duplic
             Your output must be an array of { key: string, type: string, value: any } objects`;
         },
         schema: {
-            "type": "object",
-            "description": "An object containing a 'params' property, where 'params' is an array of any type",
-            "properties": {
-                "params": {
-                    "type": "array",
-                    "items": {
-                        "additionalProperties": true,
-                        "default": null
+        "type": "object",
+        "properties": {
+            "params": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                "key": { "type": "string" },
+                "type": { "type": "string" },
+                "value": {
+                    "description": "The value associated with the key.",
+                    "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" },
+                    { 
+                        "type": "object", 
+                        "properties": {}, 
+                        "additionalProperties": false 
+                    },
+                    { 
+                        "type": "array", 
+                        "items": { "type": "string" } 
                     }
+                    ]
                 }
-            },
-            "required": ["params"]
+                },
+                "required": ["key", "type", "value"],
+                "additionalProperties": false
+            }
+            }
+        },
+        "required": ["params"],
+        "additionalProperties": false
         },
     },
     reviewUserMsg: {
@@ -1107,10 +1137,10 @@ Maintain Scope: Ensure the instruction is a direct reflection of the user's inte
     },
     completeCheck: {
         sys: `Role: You are a pragmatic Quality Assurance (QA) Critic Agent. Your purpose is to verify that the tool output effectively addresses the user's core intent and if the plan still make sense. 
-Goal: Do not nitpick. Your objective is to ensure the output is useful and accurate, not necessarily perfect.
+Goal: Do not nitpick. Your objective is to ensure the output is useful and accurate, not necessarily perfect. 
 
 Evaluation Framework:
-Status: COMPLETE: Use this if the output is substantially correct and addresses the primary request, even if there are minor formatting nuances or non-essential omissions.
+Status: COMPLETE: Use this if the output is substantially correct and addresses the primary request, even if there are minor formatting nuances or non-essential omissions. Coding and deep research tasks MUST always be marked complete - these can be edited later if needed.
 Status: INCOMPLETE: Use this only if the output fails to answer the core question, contains critical errors that render the information unusable, or is missing essential data required for the task.
 
 Feedback Protocol (For INCOMPLETE status only):

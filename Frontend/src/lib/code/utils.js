@@ -67,5 +67,39 @@ export async function getConfig() {
     return error.response
       ? `Server Error: ${error.response.status} - ${error.response.data.error}`
       : `Request Error: ${error.message || 'Unknown error'} - Check if docker server is running.`;
+  }
+}
+
+/**
+ * Retrieves full details of the available models. 
+ * @returns {Promise} - A promise resolving to the API response or an error object.
+ *  Output example:
+    {
+    openAI: [
+        {
+        model: 'gpt-5-nano',
+        provider: 'OpenAI',
+        capabilities: ['text', 'structuredOutputs', 'websearch'],
+        maxContext: 400000,
+        quality: 'Base',
+        },
+        // More models...
+    ],
+    gemini: [
+        // Models...
+    ],
+    // Other providers...
+    }
+ */
+export async function getModels() {
+  const domain = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
+  const url = `${domain}/getModels`;
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    return error.response
+      ? `Server Error: ${error.response.status} - ${error.response.data.error}`
+      : `Request Error: ${error.message || 'Unknown error'} - Check if docker server is running.`;
     }
   }
