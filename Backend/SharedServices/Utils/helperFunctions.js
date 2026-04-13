@@ -1,11 +1,10 @@
 // See Helper functions below Ok, Err
-import { log } from "./misc.js";
+import { log } from './misc.js';
 import { Result } from "../Classes/result.js";
 import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 import { evaluate } from 'mathjs';
-import { JOBS } from "../../Engine/jobManager.js";
 import { createTaskAgentJob } from "../../Engine/routes/taskAgent.js";
 import { FrontendMessageFormat, TextMessage, Roles } from "../Classes/aiMessages.js";
 import { parseISO, differenceInMilliseconds, isValid} from 'date-fns';
@@ -47,18 +46,6 @@ export const parseISOHelper = parseISO;
 export const differenceInMillisecondsHelper = differenceInMilliseconds;
 export const isValidHelper = isValid;
 export const axiosHelper = axios;
-
-/**
- * 
- * @param {strting} jobID- the ID of the job to update 
- * @param {string} statusText - the custom status text to set for the job. 
- */
-export function updateCustomTaskStatus(jobID, statusText){
-  let job = JOBS.jobListManager({getJob: jobID});
-  if(job) {
-    job.status.setCustomStatus(statusText);
-  }
-}
 
 
 /** 

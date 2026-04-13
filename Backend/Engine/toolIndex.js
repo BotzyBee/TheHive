@@ -1,7 +1,11 @@
-import { Services } from '../SharedServices/index.js';
 import * as coreToolCollection from '../SharedServices/CoreTools/AgentCompatible/index.js';
 import { pluginDir, containerVolumeRoot, toolTableName, vectorEmbedSize, builtInFilePath } from '../SharedServices/constants.js';
 import path from 'path';
+import { Ok, Err } from '../SharedServices/Utils/helperFunctions.js';
+import { scanFolderRecursively } from '../SharedServices/FileSystem/CRUD.js';
+import { AiCall } from '../SharedServices/_CallAI/index.js';
+import { getDbAgent } from '../SharedServices/Database/utils.js';
+import { getRecords, addVectorToolToDB, deleteRecordsByField, getAllRecordsFromTable} from '../SharedServices/Database/CRUD.js';
 
 function fetchCoreAgentTools() {
     const results = []; 
@@ -22,18 +26,18 @@ function fetchCoreAgentTools() {
             );
         }
     }
-    return Services.Utils.Ok(results);
+    return Ok(results);
 }
 
 export async function fetchPluginAgentTools(){
-    let tool = Services.FileSystem.scanFolderRecursively;
+    let tool = scanFolderRecursively;
     let call = await tool(`${pluginDir}/Tools`);
-    if(call.isErr()){ return Services.Utils.Err(
+    if(call.isErr()){ return Err(
         `Error (fetchPluginAgentTools -> scanFolderRecursively ) : ${call.value}`
     )}
     let allFiles = call.value.fileList ?? [];
     let allFilesLen = allFiles.length ?? 0;
-    if( allFilesLen == 0 ){ return Services.Utils.Ok([])}
+    if( allFilesLen == 0 ){ return Ok([])}
 
     //Fetch Tools
     let results = [];
@@ -52,39 +56,39 @@ export async function fetchPluginAgentTools(){
             }
         }
     }
-    return Services.Utils.Ok(results);
+    return Ok(results);
 }
 
 export async function initToolIndex(){
     // Find all tools and extract details (Plugin & Core)
     let builtIn = fetchCoreAgentTools(); // doesn't need Err catch! 
     let plugIn = await fetchPluginAgentTools();
-    if(plugIn.isErr()){ return Services.Utils.Err(`Error ( initToolIndex -> fetchPluginAgentTools ) : ${plugIn.value}`) }
+    if(plugIn.isErr()){ return Err(`Error ( initToolIndex -> fetchPluginAgentTools ) : ${plugIn.value}`) }
     let merge = [...builtIn.value, ...plugIn.value];
     let combined = deduplicateByToolName(merge);
     // Process them into the DB (check if exist, check new version, add if needed);
     const cLen = combined.length ?? 0;
-    let getDB = await Services.Database.getDbAgent();
+    let getDB = await getDbAgent();
     if(getDB.isErr()){
-        return Services.Utils.Err(`Error ( initToolIndex -> getDbAgent ) : ${getDB.value}`);
+        return Err(`Error ( initToolIndex -> getDbAgent ) : ${getDB.value}`);
     }
     const db = getDB.value;
     let stats = { tools: 0, added: 0, updated: 0, removed: 0 }
     for( let i=0; i<cLen; i++ ){
         console.log("Checking : ", combined[i].toolName);
         // check if exists
-        let check = await Services.Database.getRecords( db, toolTableName, "ToolName", combined[i].toolName );
-        if(check.isErr()){ return Services.Utils.Err(`Error ( initToolIndex -> getRecords ) : ${getDB.value}`); }
+        let check = await getRecords( db, toolTableName, "ToolName", combined[i].toolName );
+        if(check.isErr()){ return Err(`Error ( initToolIndex -> getRecords ) : ${getDB.value}`); }
         // if exists - check if needs updated
         if(check.value[0].length != 0 ){ 
             if(check.value[0][0].ToolName == combined[i].toolName && check.value[0][0].Version != combined[i].version){
                 let dCall = await removeToolFromDB(db, combined[i].toolName);
                 if(dCall.isErr()){
-                    return Services.Utils.Err(`Error ( initToolIndex -> removeToolFromDB ) : ${dCall.value}`);
+                    return Err(`Error ( initToolIndex -> removeToolFromDB ) : ${dCall.value}`);
                 }
                 let aCall = await addToolToDB(db, combined[i]);
                 if(aCall.isErr()){
-                    return Services.Utils.Err(`Error ( initToolIndex -> addToolToDB ) : ${aCall.value}`);
+                    return Err(`Error ( initToolIndex -> addToolToDB ) : ${aCall.value}`);
                 }
                 stats.updated++;
             }
@@ -92,7 +96,7 @@ export async function initToolIndex(){
             // Doesn't exist - add it
             let aCall = await addToolToDB(db, combined[i]);
             if(aCall.isErr()){
-                return Services.Utils.Err(`Error ( initToolIndex -> addToolToDB ) : ${aCall.value}`);
+                return Err(`Error ( initToolIndex -> addToolToDB ) : ${aCall.value}`);
             }
             stats.added++;
         }
@@ -102,10 +106,10 @@ export async function initToolIndex(){
     // Check for deleted tools 
     let checkDeleted = await checkForDeletedTools(db, combined);
     if(checkDeleted.isErr()){
-        return Services.Utils.Err(`Error ( initToolIndex -> checkForDeletedTools ) : ${checkDeleted.value}`);
+        return Err(`Error ( initToolIndex -> checkForDeletedTools ) : ${checkDeleted.value}`);
     }
     stats.removed = checkDeleted.value;
-    return Services.Utils.Ok(stats);
+    return Ok(stats);
 }
 
 
@@ -115,10 +119,10 @@ export async function initToolIndex(){
  * @param {object} toolObject - { toolName: string, overview: string, version: string, filePath: string } 
  */
 async function addToolToDB(dbObject, toolObject){
-    let vec = await new Services.AiCall.AiCall().generateEmbeddings(
+    let vec = await new AiCall.AiCall().generateEmbeddings(
         {inputDataVec: [toolObject.overview], dimensionSize: vectorEmbedSize, quality: 1 });
-    if( vec.isErr() ){ return Services.Utils.Err(`Error ( addToolToDB -> generateEmbeddings ) : ${vec.value}`); }
-    let dbCall = await Services.Database.addVectorToolToDB(
+    if( vec.isErr() ){ return Err(`Error ( addToolToDB -> generateEmbeddings ) : ${vec.value}`); }
+    let dbCall = await addVectorToolToDB(
         dbObject,
         toolTableName,
         toolObject.toolName,
@@ -128,9 +132,9 @@ async function addToolToDB(dbObject, toolObject){
         vec.value[0]
     );
     if(dbCall.isErr()){
-        return Services.Utils.Err(`Error ( addToolToDB -> addVectorToolToDB ) : ${dbCall.value}`);
+        return Err(`Error ( addToolToDB -> addVectorToolToDB ) : ${dbCall.value}`);
     }
-    return Services.Utils.Ok(null);
+    return Ok(null);
 }
 
 /**
@@ -140,16 +144,16 @@ async function addToolToDB(dbObject, toolObject){
  * @returns {Result}
  */
 async function removeToolFromDB(dbObject, toolName){
-    let dbCall = await Services.Database.deleteRecordsByField(
+    let dbCall = await deleteRecordsByField(
         dbObject,
         toolTableName,
         "ToolName",
         toolName
     );
     if(dbCall.isErr()){
-        return Services.Utils.Err(`Error ( removeTool -> deleteRecordsByField ) : ${dbCall.value}`);
+        return Err(`Error ( removeTool -> deleteRecordsByField ) : ${dbCall.value}`);
     }
-    return Services.Utils.Ok(null);
+    return Ok(null);
 }
 
 /**
@@ -171,9 +175,9 @@ function deduplicateByToolName(input) {
  * @returns {Result(number)} - the number of tools removed. 
  */
 async function checkForDeletedTools(dbObject, liveTools){
-    let dbCall = await Services.Database.getAllRecordsFromTable(dbObject, toolTableName );
+    let dbCall = await getAllRecordsFromTable(dbObject, toolTableName );
     if( dbCall.isErr()){
-        return Services.Utils.Err(`Error ( initToolIndex -> checkForDeletedTools ) : ${dbCall.value}`);
+        return Err(`Error ( initToolIndex -> checkForDeletedTools ) : ${dbCall.value}`);
     }
     // Check DB list against the 'live' tools found in folders.
     let tLen = dbCall.value.length ?? 0;
@@ -198,9 +202,9 @@ async function checkForDeletedTools(dbObject, liveTools){
     for(let i=0; i<dLen; i++){
         let call = await removeToolFromDB(dbObject, deleteList[i]);
         if( call.isErr()){
-            return Services.Utils.Err(`Error ( initToolIndex -> checkForDeletedTools 2 ) : ${call.value}`);
+            return Err(`Error ( initToolIndex -> checkForDeletedTools 2 ) : ${call.value}`);
         }
         removed++;
     }
-    return Services.Utils.Ok(removed) 
+    return Ok(removed) 
 }

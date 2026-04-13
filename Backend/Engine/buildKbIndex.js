@@ -3,8 +3,8 @@ import { dirTableName } from '../SharedServices/constants.js';
 import dotenv from 'dotenv';
 import { Ok, Err, logAndErr } from '../SharedServices/Utils/helperFunctions.js';
 import { log } from '../SharedServices/Utils/misc.js';
-import * as Database from '../SharedServices/Database/index.js';
-import * as FileSystem from '../SharedServices/FileSystem/index.js';
+import { updateMgmtData, getRecords, getDirsAndFilesFromUrl } from '../SharedServices/Database/CRUD.js';
+import { getFilesAndDirectoriesFromDir } from '../SharedServices/FileSystem/CRUD.js';
 
 let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
@@ -17,11 +17,6 @@ let dbTotal = 0; // database checks
 let totalJobCount = 0; // total number of jobs completed
 
 export async function indexKnowledgebase(dbAgent) {
-  // let fetchDbAgent = await Database.getDbAgent();
-  // if (fetchDbAgent.isErr()) {
-  //   return Err(`Error (indexKnowledgebase -> getDbAgent) : ${fetchDbAgent.value}`);
-  // }
-  //let dbAgent = fetchDbAgent.value;
 
   // reset Index Stats
   kbTotal = 0;
@@ -72,7 +67,7 @@ export async function indexKnowledgebase(dbAgent) {
   }
 
   // Update mgmt record with last change time for root directory
-  let updateMgmtRec = await Database.updateMgmtData(dbAgent, {
+  let updateMgmtRec = await updateMgmtData(dbAgent, {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
@@ -103,7 +98,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let kbFiles = [];
 
   // Get this Url's Dir Ref
-  let getRec = await Database.getRecords(dbAgent, dirTableName, 'Url', Url);
+  let getRec = await getRecords(dbAgent, dirTableName, 'Url', Url);
   if (getRec.isErr()) {
     return logAndErr(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : ${getRec.value}`
@@ -117,7 +112,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   }
   let thisDirRef = getRec.value[0][0].DirRef;
   // Get data from database
-  let subDirsFiles = await Database.getDirsAndFilesFromUrl(dbAgent, Url);
+  let subDirsFiles = await getDirsAndFilesFromUrl(dbAgent, Url);
   // catch error
   if (subDirsFiles.isErr()) {
     return logAndErr(
@@ -129,7 +124,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await FileSystem.getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir = await getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
     return logAndErr(

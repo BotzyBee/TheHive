@@ -1,9 +1,20 @@
-import { Services } from "../index.js";
 import { saveFile } from "../FileSystem/index.js";
 import { MIME_MAP } from "../FileSystem/supportedFiles.js";
 import path from 'path';
-import { typeOf } from "mathjs";
+import { builtInFilePath } from "../constants.js";
+import * as CoreTools from '../CoreTools/index.js';
+import { Err } from '../Utils/helperFunctions.js';
+import { Services } from "../index.js";
+import { containerVolumeRoot } from "../constants.js";
 
+let injectedDependencies = {
+  ...Services,
+};
+injectedDependencies.Helpers = {
+    saveMessageContent,
+    processBase64Audio_ToWavBuffer,
+    callAgentTool
+};
 /**
  * 
  * @param {string} toolName - The name of the tool to call.
@@ -14,18 +25,18 @@ import { typeOf } from "mathjs";
  */
 export async function callAgentTool(toolName, filePath, params, agentDependencies = {}){
     if(toolName == null || filePath == null){
-        return Services.Utils.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
+        return Err(`Error ( callTool ) : toolName or filePath missing or null.`)
     }
-    if (filePath == Services.Constants.builtInFilePath){
+    if (filePath == builtInFilePath){
         // built-in tool
-        return Services.CoreTools.AgentCompatible[toolName].run(Services, params, agentDependencies); // tools must return Ok/ Err.
+        return CoreTools.AgentCompatible[toolName].run(injectedDependencies, params, agentDependencies); // tools must return Ok/ Err.
     } else {
         // plug-in tool
         let readFile = await import(/* @vite-ignore */ filePath);
         if(readFile){
-            return readFile.run(Services, params, agentDependencies);
+            return readFile.run(injectedDependencies, params, agentDependencies);
         } else {
-           return Services.Utils.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
+           return Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
         }
     }
 }
@@ -39,7 +50,7 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
   if(!message || !folderPath){
-    return Services.Utils.Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
+    return Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
   }
   try {
     let contentToSave;
@@ -52,7 +63,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
 
     let options = { encoding: fileInfo.encoding };
 
-    const targetDirectoryInContainer = path.join( Services.Constants.containerVolumeRoot, folderPath);
+    const targetDirectoryInContainer = path.join( containerVolumeRoot, folderPath);
     // Extract content based on message type
     // We prioritise raw data/base64 over metadata
     switch (message.type) {
@@ -66,7 +77,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
           contentToSave = message.base64;
           options.encoding = 'base64'; 
         } else if (message.url) {
-          return Services.Utils.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
+          return Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
       case 'audio':
         // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
@@ -74,7 +85,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
           // Can only handle audio/L16;codec=pcm;rate=24000 at the moment! 
             contentToSave = processBase64Audio_ToWavBuffer(message.base64, message.mime); 
         } else if (message.url) {
-          return Services.Utils.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
+          return Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
         break;
 
@@ -89,14 +100,14 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
     }
     await saveFile(targetDirectoryInContainer, `Contenxt to save ${message}`, finalFileName, options);
     if (!contentToSave) {
-        return Services.Utils.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
+        return Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
     }
 
     // Delegate to the optimized saveFile function
     return await saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);
 
   } catch (error) {
-    return Services.Utils.Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
+    return Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
   }
 }
 

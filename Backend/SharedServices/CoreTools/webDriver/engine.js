@@ -1,8 +1,11 @@
 import { initWebDriver, getCurrentPageContent  } from "./socket.js";
 import { Ok, Err } from '../../Utils/helperFunctions.js';
-import { connectedSockets } from "../../../app.js";
-import { Services } from '../../index.js';
+import { connectedSockets } from "../../../ApiHelpers/socketHelpers.js";
 import { cleanHtmlString, smartExtractData } from './utils.js';
+import { AiCall } from "../../_CallAI/index.js";
+import { containerVolumeRoot } from "../../constants.js";
+import { saveFile } from "../../FileSystem/CRUD.js";
+import path from 'path';
 
 let maxLoops = 3;
 export let rustActionState = {
@@ -13,7 +16,7 @@ let extractedData = [];
 export async function testDrive(task, webUrl){
     let jobID = "test-job-123";
 
-    let agent = new Services.AiCall.AiCall();
+    let agent = new AiCall.AiCall();
     let socket = connectedSockets[0];
     if(!socket){ return Err("No connected sockets available for WebDriver communication.") }
 
@@ -41,9 +44,9 @@ export async function testDrive(task, webUrl){
         const strippedContent = cleanedResult.value;
 
         // SAVE FILE - TEMPORARY - REMOVE LATER
-        const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-        const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/WebAgent/');
-        Services.FileSystem.saveFile(targetDirectoryInContainer, JSON.stringify(strippedContent, null, 2), `WebAgent_${Date.now()}.txt`);
+ 
+        const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/WebAgent/');
+        saveFile(targetDirectoryInContainer, JSON.stringify(strippedContent, null, 2), `WebAgent_${Date.now()}.txt`);
         
         // TASK REVIEW AND ROUTING 
         // Decide whether to extract data from the current page and whether the task is complete based on the current page content and task progress.

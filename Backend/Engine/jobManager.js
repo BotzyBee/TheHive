@@ -1,8 +1,10 @@
 import { AiJob } from "../SharedServices/Classes/index.js";
-import { Services } from "../SharedServices/index.js";
 import { useMultipleThreads } from "../SharedServices/constants.js";
 import { pool, processObjectToClass } from "./workers.js";
-import { FrontendMessageFormat } from "../SharedServices/Classes/aiMessages.js";
+import { Ok, Err, logAndErr } from '../SharedServices/Utils/helperFunctions.js';
+import { log } from '../SharedServices/Utils/misc.js';
+import { containerVolumeRoot } from "../SharedServices/constants.js";
+import path from 'path';
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -25,9 +27,9 @@ class AI_JOB_MANAGER{
         if(aiJobClass instanceof AiJob){
             this.AI_JOBS.push(aiJobClass);
             this.NON_ALLOCATED.push(aiJobClass.id);
-            Services.Utils.Ok('Job Added');
+            Ok('Job Added');
         } 
-        return Services.Utils.Err('Error (AI_JOB_MANAGER -> addNewJob) : input must be an instance of AiJob or SubClass of it.')
+        return Err('Error (AI_JOB_MANAGER -> addNewJob) : input must be an instance of AiJob or SubClass of it.')
     }
 
     /**
@@ -36,7 +38,7 @@ class AI_JOB_MANAGER{
      */
     async checkNonAllocated(){
         let jobsAwaiting = this.NON_ALLOCATED.length;
-        if(jobsAwaiting == 0) { return Services.Utils.Ok('No Jobs To Allocate'); }
+        if(jobsAwaiting == 0) { return Ok('No Jobs To Allocate'); }
         this.#allocatingJobs = true;
         // take all outstanding jobs
         let tempJobs = this.NON_ALLOCATED; // Job IDs
@@ -47,7 +49,7 @@ class AI_JOB_MANAGER{
                 this.allocateAndProgress(this.#workerThreads, tempJobs[i])
             );
         }
-        Services.Utils.log(`Allocating ${jobsAwaiting} new Jobs`);
+        log(`Allocating ${jobsAwaiting} new Jobs`);
         let resultArray = await Promise.all(jobArray);
         // Update main thread
         let errorList = []; // hopefully nothing in here!
@@ -58,10 +60,10 @@ class AI_JOB_MANAGER{
         }
         if(errorList.length != 0 ){
             this.#allocatingJobs = false;
-            return Services.Utils.Err(`Error (checkNonAllocated -> allocateAndProgress ) : ${JSON.stringify(errorList)}`)
+            return Err(`Error (checkNonAllocated -> allocateAndProgress ) : ${JSON.stringify(errorList)}`)
         }
         this.#allocatingJobs = false;
-        return Services.Utils.Ok('All Non-allocated jobs progressed');
+        return Ok('All Non-allocated jobs progressed');
     }
 
     /**
@@ -75,37 +77,35 @@ class AI_JOB_MANAGER{
         if(jobID == undefined){ return Err("Error (allocateAndProgress) - JobID missing from input params") }
         // Fetch job object from this.AI_JOBS
         let fetchCall = this.jobListManager( { getJob: jobID } )
-        if(fetchCall.isErr()){ return Services.Utils.Err(`Error (allocateAndProgress -> jobListManager) : ${fetchCall.value}`)}
+        if(fetchCall.isErr()){ return Err(`Error (allocateAndProgress -> jobListManager) : ${fetchCall.value}`)}
         /**@type {AiJob} */
         let jobClassObject = fetchCall.value;
         let processCall;
-        Services.Utils.log(`Progressing ${jobClassObject.agentType} - ${jobID}`);
+        log(`Progressing ${jobClassObject.agentType} - ${jobID}`);
         if(workerThreads == false){
             // process on main thread
             processCall = await jobClassObject.run();
             if(processCall.isErr()){
-                const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-                const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
-                Services.FileSystem.saveFile(
+                const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
+                FileSystem.saveFile(
                     targetDirectoryInContainer, 
                     JSON.stringify(jobClassObject, null, 2), 
                     `${jobClassObject.id}_Failed.txt`
                 );
-                return Services.Utils.logAndErr(`Error (allocateAndProgress -> run( ${jobClassObject.id} ) ) ${processCall.value}`)
+                return logAndErr(`Error (allocateAndProgress -> run( ${jobClassObject.id} ) ) ${processCall.value}`)
             }   
         } else {
         // Offload to own thread
             // Check pool is active
             if(pool.threads?.length == 0 || pool.closed){
-                return Services.Utils.logAndErr('Error (allocateAndProgress) : Worker Pool is offline!')
+                return logAndErr('Error (allocateAndProgress) : Worker Pool is offline!')
             }
             processCall = await pool.run({ jobClassObject }, { name: 'poolRunAiJob' }); 
             //processCall ERROR
             if(processCall.outcome == 'Error'){ // cant use .isErr() as pool is stringifying the result!
                 // NOTE - Non-standard error {errorText: string, jobObject: object }
-                const containerVolumeRoot = Services.Constants.containerVolumeRoot; 
-                const targetDirectoryInContainer = Services.Utils.pathHelper.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
-                Services.FileSystem.saveFile(
+                const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
+                FileSystem.saveFile(
                     targetDirectoryInContainer, 
                     JSON.stringify(processCall.value.jobObject, null, 2), 
                     `${processCall.value.jobObject.id}_Failed.txt`
@@ -117,11 +117,11 @@ class AI_JOB_MANAGER{
             // Push update to job (doesn't update directly due to handoff to thread)
             let update = this.jobListManager({ replaceJob: jobOutcome })
             if(update.isErr()){
-                return Services.Utils.logAndErr(`Error (allocateAndProgress -> jobListManager(replace) ) ${update.value}`);
+                return logAndErr(`Error (allocateAndProgress -> jobListManager(replace) ) ${update.value}`);
             }
         }// end else
-        Services.Utils.log(`Job Complete - ${jobID}`);  
-        return Services.Utils.Ok(jobID);
+        log(`Job Complete - ${jobID}`);  
+        return Ok(jobID);
     }
 
     /**
@@ -142,10 +142,10 @@ class AI_JOB_MANAGER{
         // INSERT
         if (insertJob) {
             if (this.AI_JOBS.some(job => job.id === insertJob.id)) {
-                return Services.Utils.Err(`Error (jobListManager): Record ${insertJob.id} already exists.`);
+                return Err(`Error (jobListManager): Record ${insertJob.id} already exists.`);
             }
             this.AI_JOBS.push(insertJob);
-            return Services.Utils.Ok(`ID ${insertJob.id} added.`);
+            return Ok(`ID ${insertJob.id} added.`);
         }
 
         // DELETE
@@ -153,9 +153,9 @@ class AI_JOB_MANAGER{
             const index = this.AI_JOBS.findIndex(job => job.id === deleteJob);
             if (index !== -1) {
                 this.AI_JOBS.splice(index, 1);
-                return Services.Utils.Ok(`ID ${deleteJob} removed.`);
+                return Ok(`ID ${deleteJob} removed.`);
             }
-            return Services.Utils.Ok(`Ref not found.`);
+            return Ok(`Ref not found.`);
         }
 
         // STOP
@@ -166,15 +166,15 @@ class AI_JOB_MANAGER{
                 job.status.setStoppedByUser();
                 job.isRunning = false; // ensure job stops
                 console.log(`Job ID: ${stopJob} has been stopped.`);
-                return Services.Utils.Ok(`ID ${stopJob} Stopped`);
+                return Ok(`ID ${stopJob} Stopped`);
             }
-            return Services.Utils.Err(`Error (jobListManager): Could not find ID: ${stopJob}`);
+            return Err(`Error (jobListManager): Could not find ID: ${stopJob}`);
         }
 
         // GET
         if (getJob) {
             const job = this.AI_JOBS.find(job => job.id === getJob);
-            return job ? Services.Utils.Ok(job) : Services.Utils.Err(`Error (jobListManager): Could not find ID: ${getJob}`);
+            return job ? Ok(job) : Err(`Error (jobListManager): Could not find ID: ${getJob}`);
         }
 
         // REPLACE
@@ -185,7 +185,7 @@ class AI_JOB_MANAGER{
             } else {
                 this.AI_JOBS.push(replaceJob);
             }
-            return Services.Utils.Ok(`ID ${replaceJob.id} has been replaced/added`);
+            return Ok(`ID ${replaceJob.id} has been replaced/added`);
         }
 
         // PRUNE - removes any completed jobs that are over 1hr old. Called on each getUpdateOrResult call to keep list clean.
@@ -193,39 +193,15 @@ class AI_JOB_MANAGER{
             const oneHourAgo = Date.now() - (60 * 60 * 1000);
             this.AI_JOBS = this.AI_JOBS.filter(
                 job => {
-                if(job.status == Services.Classes.Status.Complete && job.endEpochMs < oneHourAgo){
-                    Services.Utils.log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
+                if(job.status == Classes.Status.Complete && job.endEpochMs < oneHourAgo){
+                    log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
                     return false; // Remove from list
                 }
                 return true; // Keep in list
             });
         }
-        return Services.Utils.Err("Error (jobListManager): No valid operation provided.");
+        return Err("Error (jobListManager): No valid operation provided.");
     }
-
-    // /**
-    //  * Main method for getting the result of a job or an update on status.
-    //  * @param {string} jobID - Which job to lookup. 
-    //  * @returns {Result<FrontendMessageFormat>} - Returns Result(FrontendMessageFormat)
-    //  */
-    // getUpdateOrResult(jobID){
-    //     if(jobID == null){
-    //         return Services.Utils.Err('Error (getUpdateOrResult) : JobID Missing or null');
-    //     }
-    //     let data = this.jobListManager({getJob: jobID});
-    //     if(data.isErr()){
-    //       return Services.Utils.Err(`Error (getUpdateOrResult -> jobListManager) : ${data.value}`);  
-    //     }
-    //     let msg = new FrontendMessageFormat({ 
-    //         aiJobId: jobID, 
-    //         status: data.value.status, 
-    //         isRunning: data.value.isRunning,
-    //         messages: data.value.taskOutput, 
-    //         metadata: data.value.stats
-    //         });
-
-    //     return Services.Utils.Ok(msg);
-    // }
 
     isAllocatorActive(){
         return this.#allocatingJobs;

@@ -1,7 +1,15 @@
-import* as su from '../SharedServices/Utils/index.js';
-import * as db from '../SharedServices/Database/index.js';
+
+
 import { fileTableName, dirTableName } from '../SharedServices/constants.js';
-import { BaseMessage } from '../SharedServices/Classes/index.js';
+import { log } from '../SharedServices/Utils/misc.js';
+import { 
+  addFileToDB, 
+  addDirectoryToDB, 
+  updateRecords, 
+  deleteRecordsByField, 
+  getDirsAndFilesRecursive 
+} from '../SharedServices/Database/CRUD.js';
+
 
 // [][] -- Change Job - Used to update DB with file/ Dir changes -- [][]
 export class indexJob {
@@ -13,7 +21,7 @@ export class indexJob {
   }
 
   async addFileToDB(dbAgent, dirRef, fileType, updateMillis, metaObj) {
-    let res = await db.addFileToDB(
+    let res = await addFileToDB(
       dbAgent,
       dirRef,
       this.url,
@@ -22,7 +30,7 @@ export class indexJob {
       metaObj
     );
     if (res.isErr()) {
-      su.log(`Error indexJob (addFileToDB) : 
+      log(`Error indexJob (addFileToDB) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -35,7 +43,7 @@ export class indexJob {
   }
 
   async addDirToDB(dbAgent, parentDirRef, updateMillis, metaObj) {
-    let res = await db.addDirectoryToDB(
+    let res = await addDirectoryToDB(
       dbAgent,
       this.url,
       parentDirRef,
@@ -43,7 +51,7 @@ export class indexJob {
       metaObj
     );
     if (res.isErr()) {
-      su.log(`Error indexJob (addDirToDB) : 
+      log(`Error indexJob (addDirToDB) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -57,7 +65,7 @@ export class indexJob {
   async updateDbFile(dbAgent, updateData) {
     // upadate data = object of keys/ values to be updated
     // eg {LastUpdate: 123, Meta: { tags: ["cheese", "potato"] } }
-    let res = await db.updateRecords(
+    let res = await updateRecords(
       dbAgent,
       fileTableName,
       'Url',
@@ -66,7 +74,7 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      su.log(`Error indexJob (updateDbFile -> updateRecords) : 
+      log(`Error indexJob (updateDbFile -> updateRecords) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -79,7 +87,7 @@ export class indexJob {
   async updateDbDir(dbAgent, updateData) {
     // upadate data = object of keys/ values to be updated
     // eg {LastUpdate: 123, Meta: { tags: ["cheese", "potato"] } }
-    let res = await db.updateRecords(
+    let res = await updateRecords(
       dbAgent,
       dirTableName,
       'Url',
@@ -88,7 +96,7 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      su.log(`Error indexJob (updateDbDir -> updateRecords) : 
+      log(`Error indexJob (updateDbDir -> updateRecords) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -99,7 +107,7 @@ export class indexJob {
   }
 
   async removeFileFromDB(dbAgent) {
-    let res = await db.deleteRecordsByField(
+    let res = await deleteRecordsByField(
       dbAgent,
       fileTableName,
       'Url',
@@ -107,7 +115,7 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      su.log(`Error indexJob (removeFileFromDB -> deleteRecordsByField) : 
+      log(`Error indexJob (removeFileFromDB -> deleteRecordsByField) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -119,10 +127,10 @@ export class indexJob {
 
   async removeDirFromDB(dbAgent) {
     // Get any sub-dirs or sub-files which also should be removed
-    let allSubs = await db.getDirsAndFilesRecursive(dbAgent, this.url);
+    let allSubs = await getDirsAndFilesRecursive(dbAgent, this.url);
     if (allSubs.isErr()) {
       this.attemptNumber += 1;
-      su.log(`Error indexJob (removeDirFromDB -> getDirsAndFilesRecursive) : 
+      log(`Error indexJob (removeDirFromDB -> getDirsAndFilesRecursive) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${allSubs.value}`);
@@ -134,7 +142,7 @@ export class indexJob {
     const allFileLen = allSubs.value.fileList.length ?? 0;
     // iterate over Dirs
     for (i = 0; i < allDirsLen; i++) {
-      let allDirRes = await db.deleteRecordsByField(
+      let allDirRes = await deleteRecordsByField(
         dbAgent,
         dirTableName,
         'Url',
@@ -142,7 +150,7 @@ export class indexJob {
       );
       if (allDirRes.isErr()) {
         this.attemptNumber += 1;
-        su.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField ${i}) : 
+        log(`Error indexJob (removeDirFromDB -> deleteRecordsByField ${i}) : 
                     attempt: ${this.attemptNumber}
                     url: ${this.url} 
                     error text : ${allDirRes.value}`);
@@ -153,7 +161,7 @@ export class indexJob {
 
     // iterate over Files
     for (i = 0; i < allFileLen; i++) {
-      let allFileRes = await db.deleteRecordsByField(
+      let allFileRes = await deleteRecordsByField(
         dbAgent,
         fileTableName,
         'Url',
@@ -161,7 +169,7 @@ export class indexJob {
       );
       if (allFileRes.isErr()) {
         this.attemptNumber += 1;
-        su.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField(2) ${i}) : 
+        log(`Error indexJob (removeDirFromDB -> deleteRecordsByField(2) ${i}) : 
                     attempt: ${this.attemptNumber}
                     url: ${this.url} 
                     error text : ${allFileRes.value}`);
@@ -171,7 +179,7 @@ export class indexJob {
     }
 
     // Delete Root Dir
-    let res = await db.deleteRecordsByField(
+    let res = await deleteRecordsByField(
       dbAgent,
       dirTableName,
       'Url',
@@ -179,7 +187,7 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      su.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField) : 
+      log(`Error indexJob (removeDirFromDB -> deleteRecordsByField) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
