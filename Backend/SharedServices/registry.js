@@ -1,4 +1,4 @@
-class ServiceRegistry {
+export class ServiceRegistry {
   constructor() {
     this.services = new Map();
   }

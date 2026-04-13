@@ -1,5 +1,5 @@
 import { Services } from "../../index.js";
-
+import { emitToSocket } from '../../../ApiHelpers/socketHelpers.js';
 /**
  * Main Holder of Messages from user, agent and tools. 
  */
@@ -333,14 +333,14 @@ export class ContextTemplate {
 // Base Class for all AI Jobs / Agents 
 // NOTE emitToSocketFunction can be found here - "../../ApiHelpers/socketHelpers.js";
 export class AiJob {
-  constructor({ idPrefix = "AI", aiSettings, socketId, emitToSocketFunction } = {}){ 
+  constructor({ idPrefix = "AI", aiSettings, socketId } = {}){ 
     /**@type {string} */
     this.id = Services.v2Core.Utils.generateLongID(idPrefix);
 
     /**@type {string | null} - Socket ID for linking to the correct user for updates */
     this.socketId = socketId || null; 
 
-    this.emitToSocket = emitToSocketFunction;
+    this.emitToSocket = emitToSocket;
 
     /**@type {string} - used to differentiate between base class and classes that extend AiJob*/
     this.agentType = "AiJob";
@@ -427,6 +427,7 @@ export class AiJob {
             messages: this.taskOutput, 
             metadata: this.stats
         });
+        console.error("Job failed:", this.errors);
         this.emitToSocket(this.socketId, 'job_error', res);
     }
   }

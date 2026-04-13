@@ -4,7 +4,17 @@ Functions in this file should be prefixed 'pool' and simply call their normal co
 Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
+
+/*
+METRICS: 
+pool.threads.length	The current number of physical worker threads spawned.
+pool.queueSize	Number of tasks waiting for an available thread.
+pool.utilization	A value between 0 and 1 representing how busy the pool is.
+pool.waitTime	Performance metrics on how long tasks sit in the queue.
+*/
+
 import { Piscina } from 'piscina';
+import { initRegistry } from '../../../ApiHelpers/buildRegistry.js';
 import { Services } from '../../index.js';
 
 /**@type {Piscina} */
@@ -13,14 +23,12 @@ export let indexTimerActive = false;
 
 // Bootstrap the Services in the worker thread.
 let isInitialized = false;
-async function bootstrap() {
+function bootstrapServices() {
   if (isInitialized) return;
-  
-  // Call your existing registration/init logic here
-  // This gives the worker its own 'database' service
-  await Services.init(); 
+  initRegistry(true);
   isInitialized = true;
 }
+
 
 export function setupPool() {
   pool = new Piscina({
@@ -31,6 +39,7 @@ export function setupPool() {
 }
 
 export async function poolIndexKnowledgebase(){
+    bootstrapServices();
     indexTimerActive = true;
     let dbAgent = await Services.database.ManageDb.getDbAgent();
     if(dbAgent.isErr()){

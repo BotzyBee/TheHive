@@ -87,7 +87,7 @@ class AI_JOB_MANAGER{
             processCall = await jobClassObject.run();
             if(processCall.isErr()){
                 const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/FailedJobs/');
-                FileSystem.saveFile(
+                Services.fileSystem.CRUD.saveFile(
                     targetDirectoryInContainer, 
                     JSON.stringify(jobClassObject, null, 2), 
                     `${jobClassObject.id}_Failed.txt`

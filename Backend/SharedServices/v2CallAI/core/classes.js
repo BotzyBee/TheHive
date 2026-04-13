@@ -46,7 +46,7 @@ export class AiCall {
     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
     options.contextSize = tkns;
     return this.#dispatch(
-      ModelTypes.text,
+      Services.callAI.Constants.ModelTypes.text,
       systemMessage,
       contentMessage,
       options
@@ -69,7 +69,7 @@ export class AiCall {
     options.contextSize = tkns;
     options.useWeb = true;
     return this.#dispatch(
-      ModelTypes.websearch,
+      Services.callAI.Constants.ModelTypes.websearch,
       systemMessage,
       contentMessage,
       options
@@ -88,7 +88,7 @@ export class AiCall {
   async generateEmbeddings(options = {}) {
     options.contextSize = 0;
     options.embeddingsMode = true;
-    return this.#dispatch(ModelTypes.embedding, '', '', options);
+    return this.#dispatch(Services.callAI.Constants.ModelTypes.embedding, '', '', options);
   }
 
   /**
@@ -108,7 +108,7 @@ export class AiCall {
       const sys = "N/A";
       const tkns = this.#estimateTokens(contentMessage);
       options.contextSize = tkns;
-      return this.#dispatch(ModelTypes.image, sys, contentMessage, options);
+      return this.#dispatch(Services.callAI.Constants.ModelTypes.image, sys, contentMessage, options);
   }
 
     /** Generate Text (model only - no tools)
@@ -124,7 +124,7 @@ export class AiCall {
   async generateCode(systemMessage, contentMessage, options = {}) {
       const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
       options.contextSize = tkns;
-      return this.#dispatch(ModelTypes.code, systemMessage, contentMessage, options);
+      return this.#dispatch(Services.callAI.Constants.ModelTypes.code, systemMessage, contentMessage, options);
   }
 
   // async mapSearch(systemMessage, contentMessage, options = {}) {
@@ -149,13 +149,13 @@ export class AiCall {
       const tkns = this.#estimateTokens(contentMessage);
       const sys = "N/A";
       options.contextSize = tkns;
-      return this.#dispatch(ModelTypes.textToSpeech, sys, contentMessage, options);
+      return this.#dispatch(Services.callAI.Constants.ModelTypes.textToSpeech, sys, contentMessage, options);
   }
 
   // async speechToText(systemMessage, contentMessage, options = {}) {
   //     const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
   //     options.contextSize = tkns;
-  //     return this.#dispatch(ModelTypes.speechToText, systemMessage, contentMessage, options);
+  //     return this.#dispatch(Services.callAI.Constants.ModelTypes.speechToText, systemMessage, contentMessage, options);
   // }
 
   // ── Private Functions ───────────────────────────────────────────

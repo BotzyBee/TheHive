@@ -1,3 +1,5 @@
+import { log } from "../SharedServices/v2Core/core/helperFunctions.js";
+
 export let connectedSockets = [];
 
 export let io = { value: null}; // Declare io here to be initialized later in app.js
