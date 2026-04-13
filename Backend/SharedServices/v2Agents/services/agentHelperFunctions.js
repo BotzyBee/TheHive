@@ -1,20 +1,7 @@
-// import { saveFile } from "../FileSystem/index.js";
-// import { MIME_MAP } from "../../v2FileSystem/services/supportedFiles.js";
-// import path from 'path';
-// import { builtInFilePath } from "../constants.js";
-// import * as CoreTools from '../../CoreTools/index.js';
-// import { Err } from '../Utils/helperFunctions.js';
-// import { Services } from "../../index.js";
-// import { containerVolumeRoot } from "../constants.js";
+import { Services } from "../../index.js";
+import path from 'path';
+import * as CoreTools from '../tools/AgentCompatible/index.js';
 
-let injectedDependencies = {
-  ...Services,
-};
-injectedDependencies.Helpers = {
-    saveMessageContent,
-    processBase64Audio_ToWavBuffer,
-    callAgentTool
-};
 /**
  * 
  * @param {string} toolName - The name of the tool to call.
@@ -25,10 +12,19 @@ injectedDependencies.Helpers = {
  */
 export async function callAgentTool(toolName, filePath, params, agentDependencies = {}){
     if(toolName == null || filePath == null){
-        return Err(`Error ( callTool ) : toolName or filePath missing or null.`)
+        return Services.v2Core.Helpers.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
     }
-    if (filePath == builtInFilePath){
+    if (filePath == Services.fileSystem.Constants.builtInFilePath){
         // built-in tool
+        let injectedDependencies = {
+          ...Services,
+        };
+        // Not sure if this is needed anymore ??
+        injectedDependencies.Helpers = {
+            saveMessageContent,
+            processBase64Audio_ToWavBuffer,
+            callAgentTool
+        };
         return CoreTools.AgentCompatible[toolName].run(injectedDependencies, params, agentDependencies); // tools must return Ok/ Err.
     } else {
         // plug-in tool
@@ -36,7 +32,7 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
         if(readFile){
             return readFile.run(injectedDependencies, params, agentDependencies);
         } else {
-           return Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
+           return Services.v2Core.Helpers.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
         }
     }
 }
@@ -50,12 +46,12 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
   if(!message || !folderPath){
-    return Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
+    return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
   }
   try {
     let contentToSave;
     // Resolve Extension and Config
-    let fileInfo = MIME_MAP.get(message.mime);
+    let fileInfo = Services.fileSystem.MIME_MAP.get(message.mime);
     if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8' };
     const finalFileName = fileName 
       ? `${fileName}.${fileInfo.extension}` 
@@ -63,7 +59,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
 
     let options = { encoding: fileInfo.encoding };
 
-    const targetDirectoryInContainer = path.join( containerVolumeRoot, folderPath);
+    const targetDirectoryInContainer = path.join( Services.fileSystem.Constants.containerVolumeRoot, folderPath);
     // Extract content based on message type
     // We prioritise raw data/base64 over metadata
     switch (message.type) {
@@ -77,7 +73,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
           contentToSave = message.base64;
           options.encoding = 'base64'; 
         } else if (message.url) {
-          return Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
+          return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
       case 'audio':
         // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
@@ -85,7 +81,7 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
           // Can only handle audio/L16;codec=pcm;rate=24000 at the moment! 
             contentToSave = processBase64Audio_ToWavBuffer(message.base64, message.mime); 
         } else if (message.url) {
-          return Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
+          return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
         }
         break;
 
@@ -96,18 +92,18 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
       default:
         // Fallback: Save the whole message object as JSON if type is unknown
         contentToSave = message.toJSON();
-        return await saveFile(targetDirectoryInContainer, contentToSave, `${message.id}.json`);
+        return await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, contentToSave, `${message.id}.json`);
     }
-    await saveFile(targetDirectoryInContainer, `Contenxt to save ${message}`, finalFileName, options);
+    await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, `Contenxt to save ${message}`, finalFileName, options);
     if (!contentToSave) {
-        return Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
+        return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
     }
 
     // Delegate to the optimized saveFile function
-    return await saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);
+    return await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);
 
   } catch (error) {
-    return Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
+    return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
   }
 }
 

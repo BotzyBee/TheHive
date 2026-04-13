@@ -1,7 +1,6 @@
 /**
  * 🐝 TheHive Plugin Tool Standard - Mermaid Diagram Generator
  */
-
 const MERMAID_GUIDE = `
 Use Quoted Labels for All Nodes
 Wrap node contents in double quotes to avoid issues with special characters or line breaks. Example: A["Initialize process"]. Quoted strings safely contain spaces, symbols, and line breaks (\n), preventing parse errors.
@@ -98,19 +97,19 @@ export async function run(Shared, params = {}) {
     const { prompt } = params;
 
     if (!prompt || typeof prompt !== 'string') {
-        return Shared.Utils.Err("Error (createMermaidDiagram): 'prompt' parameter is strictly required and must be a string.");
+        return Shared.v2Core.Helpers.Err("Error (createMermaidDiagram): 'prompt' parameter is strictly required and must be a string.");
     }
 
     try {
         // Instantiate the standard AI Caller service
-        const aiCall = new Shared.AiCall.AiCall();
+        const aiCall = Shared.callAI.aiFactory();
 
         // Step 1: Generate initial diagram
         const userPrompt = `Here are your instructions: <prompt>${prompt}</prompt>\nReturn only the Mermaid code.`;
         
         const generationResponse = await aiCall.generateText(userPrompt, GENERATION_SYSTEM_PROMPT, { quality: 3 });
         if (generationResponse.isErr()) {
-            return Shared.Utils.Err(`AI Call failed during Mermaid generation step: ${generationResponse.value}`);
+            return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid generation step: ${generationResponse.value}`);
         }
 
         const rawGeneratedCode = extractCodeBlock(generationResponse.value);
@@ -120,7 +119,7 @@ export async function run(Shared, params = {}) {
         
         const reviewResponse = await aiCall.generateText(reviewPrompt, REVIEW_SYSTEM_PROMPT, { quality: 3 });
         if (reviewResponse.isErr()) {
-            return Shared.Utils.Err(`AI Call failed during Mermaid review step: ${reviewResponse.value}`);
+            return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid review step: ${reviewResponse.value}`);
         }
 
         const finalMermaidCode = extractCodeBlock(reviewResponse.value);
@@ -131,18 +130,18 @@ export async function run(Shared, params = {}) {
             mermaidCode: finalMermaidCode,
             timestamp: new Date().toISOString()
         };
-
-        const message = new Shared.Classes.DataMessage({
-            role: Shared.Classes.Roles.Tool,
+        const message = new Shared.aiAgents.Classes.DataMessage({
+            
+            role: Shared.aiAgents.Constants.Roles.Tool,
             data: resultData,
             toolName: details.toolName,
             instructions: "Present the generated Mermaid code to the user or process it for rendering."
         });
 
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
 
     } catch (error) {
-        return Shared.Utils.Err(`Critical execution error in ${details.toolName}: ${error.message}`);
+        return Shared.v2Core.Helpers.Err(`Critical execution error in ${details.toolName}: ${error.message}`);
     }
 }
 

@@ -44,21 +44,21 @@ export async function run(
 
     // catch bad params
     if (expression == null || typeof expression !== 'string' || expression.trim() === '') {
-        return Shared.Utils.Err(`Error (calculatorTool): Missing or invalid 'expression' parameter.`);
+        return Shared.v2Core.Helpers.Err(`Error (calculatorTool): Missing or invalid 'expression' parameter.`);
     }
 
     try {
         // Evaluate using mathjs
-        const result = Shared.Utils.evaluateHelper(expression);
-        let message = new Shared.Classes.TextMessage({
-            role: Shared.Classes.Roles.Tool, 
+        const result = Shared.aiAgents.ToolHelpers.evaluateHelper(expression);
+        let message = new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool, 
             mimeType: "text/plain", 
             textData: `The result of '${expression}' is ${result}`,
             toolName: "calculatorTool",
             instructions: `Calculate ${expression}`
         });
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
     } catch (error) {
-        return Shared.Utils.Err(`Error (calculatorTool -> mathjs.evaluate): ${error.message || error}`);
+        return Shared.v2Core.Helpers.Err(`Error (calculatorTool -> mathjs.evaluate): ${error.message || error}`);
     }
 }

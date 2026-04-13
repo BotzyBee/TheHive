@@ -69,7 +69,7 @@ export async function run(
     const { taskDescription, context } = params;
     // Catch bad params
     if(taskDescription == null){
-        return Shared.Utils.Err(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
+        return Shared.v2Core.Helpers.Err(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
     }
     // Prepare any context / reference text
     let ref = context ? context : "";
@@ -78,20 +78,20 @@ export async function run(
     }
     // Make the call
     safeEmit(agent, `Crafting text using AI - 🤖🐝`);
-    const aiCall = new Shared.AiCall.AiCall();
+    const aiCall =  Shared.callAI.aiFactory();
     const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
     let call = await aiCall.generateText(usrText, sysText, params );
     if(call.isErr()){
-        return Shared.Utils.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
+        return Shared.v2Core.Helpers.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
     }
-    let message = new Shared.Classes.TextMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new  Shared.aiAgents.Classes.TextMessage({
+        role: Shared.aiAgents.Classes.Roles.Tool, 
         mimeType: "text/plain", 
         textData: call.value,
         toolName: "AiTextAction",
         instructions: taskDescription
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }
 

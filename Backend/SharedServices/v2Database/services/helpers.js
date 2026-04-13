@@ -1,11 +1,9 @@
 
-import { vectorEmbedSize, toolTableName, guideTableName, builtInFilePath } from "../core/constants.js";
+import { vectorEmbedSize, toolTableName, guideTableName } from "../core/constants.js";
 import { searchVectorRecords, getRecords } from "./CRUD.js";
 import { Services } from "../../index.js";
 import { getDbAgent } from "./manageDb.js";
-
-// import * as CoreTools from <-- *  NEEDING TO SORT THIS !!
-
+import * as CoreTools from '../../v2Agents/tools/AgentCompatible/index.js';
 
 /**
  * Performs a vector search on the DB to get tools that match the task. 
@@ -60,9 +58,9 @@ export async function getToolDetails(toolName){
     // Get tool object
     const fp = search.value[0][0].FilePath;
     let toolObj; 
-    if(fp == builtInFilePath){
+    if(fp == Services.fileSystem.Constants.builtInFilePath){
         // Built in tool
-        toolObj = v2Core.AgentCompatible[toolName].details;
+        toolObj = CoreTools[toolName].details;
     } else {
         // Plugin tool
         let decodedFP = decodeURIComponent(fp);

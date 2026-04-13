@@ -1,15 +1,6 @@
 import path from 'path';
 import { Services } from '../../../index.js';
-
-// import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
-// import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
-// import { callAgentTool } from '../../CoreTools/helperFunctions.js';
-// import { TextMessage, Roles } from '../../Classes/index.js';
-// import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
-// import { AiJob } from '../../Classes/aiJob.js';
-// import { containerVolumeRoot } from '../../constants.js';
-// import { saveFile } from '../../FileSystem/CRUD.js';
-
+import { AiJob } from '../../core/classes.js'; 
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -20,7 +11,8 @@ export class QuickAskAgent extends AiJob {
   constructor({ task = "", aiSettings = {}, socketId = null } = {}){
     console.log("Socket ID in QuickAskAgent constructor: ", socketId);
     super({aiSettings, socketId}) // setup parent class
-    this.messageHistory.addMessage(new TextMessage({ role: Roles.User, textData: task}));
+    this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ 
+      role: Services.aiAgents.Constants.Roles.User, textData: task }));
     this.task = task;
     this.agentType = "QuickAsk";  
     this.debugParams = [];
@@ -56,7 +48,7 @@ export class QuickAskAgent extends AiJob {
 
       // Get tool list
       this.status.setCustomStatus('Determining best tool to use for the task...');
-      let tools = await getToolsOrGuidesForTask(this.task, 7, true);
+      let tools = await Services.database.Helpers.getToolsOrGuidesForTask(this.task, 7, true);
       if(tools.isErr()){ 
         this.setFailed();
         this.isRunning = false;
@@ -95,8 +87,8 @@ export class QuickAskAgent extends AiJob {
           this.emitUpdateStatus("Awaiting user input...");
         }
         this.isRunning = false;
-        let msg = new TextMessage({ 
-          role: Roles.Agent, textData: routingCall.value.message});
+        let msg = new Services.aiAgents.Classes.TextMessage({ 
+          role: Services.aiAgents.Constants.Roles.Agent, textData: routingCall.value.message});
         this.messageHistory.addMessage(msg);
         this.taskOutput.push(msg);
         return Services.coreTools.Helpers.Ok("Agent has messaged the user.");
@@ -124,15 +116,15 @@ export class QuickAskAgent extends AiJob {
       for(let i=0; i<this.toolRetryCount; i++){
         if (!this.isRunning) return Services.coreTools.Helpers.Ok("Job stopped by user."); 
         let paramsCall = await this.aiCall.generateText(
-          parserPrompts.craftParams.sys,
-          parserPrompts.craftParams.usr(
+          Services.aiAgents.InputParse.parserPrompts.craftParams.sys,
+          Services.aiAgents.InputParse.parserPrompts.craftParams.usr(
             this.task, 
             this.getAllContextSummaryString(),
             JSON.stringify(toolDetails.value.details.inputSchema),
             toolDetails.value.details.guide || "no guide provided",
             paramsError
           ),
-          { ...this.aiSettings, structuredOutput: parserPrompts.craftParams.schema } 
+          { ...this.aiSettings, structuredOutput: Services.aiAgents.InputParse.parserPrompts.craftParams.schema } 
         ); 
         this.addAiCount(1);
 
@@ -146,7 +138,7 @@ export class QuickAskAgent extends AiJob {
 
         // Build params into object (injecting data if needed)
         let fullContext = this.getAllContextRaw();
-        let paramObject = parseNunjucksTemplate(paramsCall.value.params, fullContext );
+        let paramObject = Services.aiAgents.InputParse.parseNunjucksTemplate(paramsCall.value.params, fullContext );
         if(paramObject.isErr()){ 
           failedCount += 1;
           paramsError = `Attempt ${failedCount} : ${paramObject.value}`;
@@ -162,7 +154,7 @@ export class QuickAskAgent extends AiJob {
         })
         console.log(`Calling ${toolDetails.value.details.toolName} ...`);
         this.status.setCustomStatus(`Calling ${toolDetails.value.details.toolName} ...`);
-        toolCall = await callAgentTool(
+        toolCall = await Services.aiAgents.AgentHelpers.callAgentTool(
           toolDetails.value.details.toolName,
           toolDetails.value.filePath,
           paramObject.value,
@@ -190,9 +182,9 @@ export class QuickAskAgent extends AiJob {
       let newMessageLen = toolCall.value?.length ?? 0;
       for(let i=0; i<newMessageLen; i++){
         // Shorten & add to context
-        if(toolCall.value[i].role === Roles.Tool){
+        if(toolCall.value[i].role === Services.aiAgents.Constants.Roles.Tool){
           console.log("Processing Tool Message... ");
-          let processed = await processMessageForContext(toolCall.value[i], 500, this.aiSettings, this );
+          let processed = await Services.aiAgents.AgentSharedServices.processMessageForContext(toolCall.value[i], 500, this.aiSettings, this );
           if(processed.isErr()){
             this.setFailed();
             this.isRunning = false;
@@ -216,7 +208,7 @@ export class QuickAskAgent extends AiJob {
 
       // Finalise output
       this.emitUpdateStatus('Task Completed - Finalising Output...');
-      let formattedOP = await finialiseOutput(this, 'UserFiles/QuickAskOutputs');
+      let formattedOP = await Services.aiAgents.AgentSharedServices.finialiseOutput(this, 'UserFiles/QuickAskOutputs');
       if( formattedOP.isErr()){
         this.setFailed();
         this.isRunning = false;
@@ -233,8 +225,8 @@ export class QuickAskAgent extends AiJob {
       // Write output for debugging.
       this.debugParams = []; // reset debug params
       this.stats.loopNumber += 1;
-      const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/TestJobs/');
-      await saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
+      const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
+      await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
       
       // Emit final message with output and stats
       this.emitUpdateStatus("Done 🐝");

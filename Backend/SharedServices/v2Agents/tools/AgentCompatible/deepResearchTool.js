@@ -79,28 +79,29 @@ export class ResearchChunk {
   
     async getInitialResearch(domains = []){
         // Use the aiWebSearch tool to get an initial response to the question, along with sources.
-        let call = await this.Shared.CoreTools.AgentCompatible.aiWebSearch.run(
+        
+        let call = await this.Shared.aiAgents.AgentTools.aiWebSearch.run(
             this.Shared, 
             { taskDescription: this.question, domains: domains }
         );
-        if (call.isErr()){ return this.Shared.Utils.Err(`Error in ResearchChunk -> getInitialResearch : ${call.value}`)}
+        if (call.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> getInitialResearch : ${call.value}`)}
         stats.aiCount += 1; 
         // Returns DataMessage with data: { result: string , sources: [ref, url] }
         this.firstResponse = call.value[0].data.result;
         this.references = call.value[0].data.sources;
-        return this.Shared.Utils.Ok();
+        return this.Shared.v2Core.Helpers.Ok();
     }
 
     async factCheckClaims(domains = []){
         console.log("Starting fact-checking of claims.");
         // Create a list of claims or 'claimed facts' from the firstResponse to be fact-checked. This is a critical step to ensure we are building on accurate information.
-        let aiCall = new this.Shared.AiCall.AiCall();
+        let aiCall = this.Shared.callAI.aiFactory()
         let call = await aiCall.generateText(
             PromptsAndSchemas.factCheck.sys,
             PromptsAndSchemas.factCheck.usr(this.firstResponse),
             { structuredOutput: PromptsAndSchemas.factCheck.schema }
         ); // Returns { claims: [ 'claim1', 'claim2', ... ] }
-        if (call.isErr()){ return this.Shared.Utils.Err(`Error in ResearchChunk -> factCheckClaims : ${call.value}`)};
+        if (call.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> factCheckClaims : ${call.value}`)};
         stats.aiCount += 1;
         let claims = call.value.claims;
         // for each claim we add it to a FactCheck object for progression. 
@@ -114,7 +115,7 @@ export class ResearchChunk {
                 this.Shared,
                 { taskDescription: prompt, domains: domains }
             ); // Returns DataMessage with data: { result: string , sources: [ref, url] }
-            if (searchCall.isErr()){ return this.Shared.Utils.Err(`Error in ResearchChunk -> factCheckClaims -> aiWebSearch : ${searchCall.value}`)};
+            if (searchCall.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> factCheckClaims -> aiWebSearch : ${searchCall.value}`)};
             stats.aiCount += 1;
             // Evaluate the claim based on the evidence found. Return a confidence score and clarification. 
             let evidence = searchCall.value[0].data.result;
@@ -124,16 +125,17 @@ export class ResearchChunk {
                 PromptsAndSchemas.factCheck2.usr(fact.claim, evidence),
                 { structuredOutput: PromptsAndSchemas.factCheck2.schema }
             ); // Returns { confidenceScore: 0-1, clarification: string }
-            if (scoring.isErr()){ return this.Shared.Utils.Err(`Error in ResearchChunk -> factCheckClaims -> generateText : ${scoring.value}`)};
+            if (scoring.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> factCheckClaims -> generateText : ${scoring.value}`)};
             stats.aiCount += 1;
             fact.confidence = scoring.value.confidenceScore;
             fact.clarification = scoring.value.clarification;
         }
-        return this.Shared.Utils.Ok();
+        return this.Shared.v2Core.Helpers.Ok();
     }
 
     async finaliseResearchChunk(){
-        let aiCall = new this.Shared.AiCall.AiCall();
+        
+        let aiCall = this.Shared.callAI.aiFactory();
         let clarifications = this.factsOrAssumptions.map(f => f.getSummary()).join(`\n \n`);
         // use the initial result and all fact checking results to generate a final output.
         let prompt = `
@@ -143,10 +145,10 @@ Focus on factual accuracy, actionable information, and clarity. Keep all referen
             `Your task is to finalise a research output based on an initial response and detailed fact-checking of its claims. Focus on factual accuracy, actionable information, and clarity. Do not add any of your own thoughts - solely use the initial response and the fact-checking details to produce the final output.
             Use UK English when responding. This is only one chunk of a broader reseach process. You do not need to introductions or conclusions. Focus on the information itself.`,
             prompt);
-        if (finalCall.isErr()){ return this.Shared.Utils.Err(`Error in ResearchChunk -> finaliseResearchChunk -> generateText : ${finalCall.value}`)};
+        if (finalCall.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> finaliseResearchChunk -> generateText : ${finalCall.value}`)};
         stats.aiCount += 1;
         this.output = finalCall.value; 
-        return this.Shared.Utils.Ok();
+        return this.Shared.v2Core.Helpers.Ok();
     }
 
     mergeAllReferences() {
@@ -178,7 +180,7 @@ Focus on factual accuracy, actionable information, and clarity. Keep all referen
 }
 
 export async function scopeTopic(Shared, topic, breadth = 5){
-    const callAI = new Shared.AiCall.AiCall();
+    const callAI = Shared.callAI.aiFactory();
     console.log("Scoping Research Task.")
     // Resolve any terms or acronyms in the topic.
     let termscall = await callAI.webSearch(
@@ -186,7 +188,7 @@ export async function scopeTopic(Shared, topic, breadth = 5){
         PromptsAndSchemas.initTerms.usr(topic),
         {  structuredOutput: PromptsAndSchemas.initTerms.schema}
     ); // learnings: [ { term: '', definition: ''} ]
-    if (termscall.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> initTerms : ${termscall.value}`)}
+    if (termscall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> initTerms : ${termscall.value}`)}
     // Merge learnings into a single string to pass to the next prompt
     let defs = termscall.value.learnings.map(l => `${l.term} : ${l.definition}`).join(`\n \n`);
     
@@ -196,7 +198,7 @@ export async function scopeTopic(Shared, topic, breadth = 5){
         PromptsAndSchemas.explore.usr(topic, defs),
         { structuredOutput: PromptsAndSchemas.explore.schema }
     ); // questions: [ 'question1', 'question2', ... ]
-    if (questionCall.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> explore : ${questionCall.value}`)}
+    if (questionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> explore : ${questionCall.value}`)}
 
     // Rank the questions to prioritise the most relevant and explorative ones.
     let rankedCall = await callAI.generateText(
@@ -204,7 +206,7 @@ export async function scopeTopic(Shared, topic, breadth = 5){
         PromptsAndSchemas.rankQuestions.usr(topic, questionCall.value.questions),
         { structuredOutput: PromptsAndSchemas.rankQuestions.schema }
     ); // ratings: [ 0-100, 0-100, ... ]
-    if (rankedCall.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> rankQuestions : ${rankedCall.value}`)}
+    if (rankedCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> rankQuestions : ${rankedCall.value}`)}
 
     // Combine questions and ratings to select the top questions for research.
     let combined = questionCall.value.questions.map((q, i) => ({ question: q, rating: rankedCall.value.ratings[i] }));
@@ -217,7 +219,7 @@ export async function scopeTopic(Shared, topic, breadth = 5){
         PromptsAndSchemas.getSources.usr(topic, topQuestions, JSON.stringify(INGORE_DOMAINS)),
         { structuredOutput: PromptsAndSchemas.getSources.schema }
     ); // domains: [ 'domain1.com', 'domain2.com', ... ]
-    if (sourcesCall.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> getSources : ${sourcesCall.value}`)}
+    if (sourcesCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall.value}`)}
 
     // 2nd Run at sources (get widest range of sources)
     let sourcesCall2 = await callAI.webSearch(
@@ -225,10 +227,10 @@ export async function scopeTopic(Shared, topic, breadth = 5){
         PromptsAndSchemas.getSources.usr(topic, topQuestions, sourcesCall.value.domains.join(", ")),
         { structuredOutput: PromptsAndSchemas.getSources.schema }
     ); // domains: [ 'domain1.com', 'domain2.com', ... ]
-    if (sourcesCall2.isErr()){ return Shared.Utils.Err(`Error in scopeTopic -> getSources : ${sourcesCall2.value}`)}
+    if (sourcesCall2.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall2.value}`)}
 
     stats.aiCount += 5; // Increment AI call count for this function
-    return Shared.Utils.Ok({ terms: defs, questions: topQuestions, sources: sourcesCall2.value.domains });
+    return Shared.v2Core.Helpers.Ok({ terms: defs, questions: topQuestions, sources: sourcesCall2.value.domains });
 }
 
 let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the entire research process. Each chunk represents a question, its response, and related data.
@@ -242,21 +244,21 @@ let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the en
  * @param {number} params.breadth - Number of top questions to consider for research. Defaults to 1.
  * @param {string} params.savePath - Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/'.
  * @param {string} params.jobID - The ID of the agent job for passing updates.
- * @returns {Promise<object>} Shared.Utils.Ok or Shared.Utils.Err.
+ * @returns {Promise<object>} 
  */
 export async function run(Shared, params = {}, agent = {}) {
     stats.aiCount = 0; // Reset AI call count at the start of each run.
     const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID } = params;
     
     if (!topic || typeof topic !== 'string') {
-        return Shared.Utils.Err("Error (deepResearchTool) requires a valid 'topic' string.");
+        return Shared.v2Core.Helpers.Err("Error (deepResearchTool) requires a valid 'topic' string.");
     }
 
     // [][] ----- RESEARCH PHASE ------ [][]
     // Scope the topic, find best questions and sources to research.
     safeEmit(agent, `Scoping research task and gathering sources - 🤖🐝`);
     let scoping = await scopeTopic(Shared, topic, breadth); 
-    if (scoping.isErr()){ return Shared.Utils.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
+    if (scoping.isErr()){ return Shared.v2Core.Helpers.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
     let firstChunk = new ResearchChunk();
     firstChunk.output = scoping.value.terms;
     RESEARCH_CHUNKS.push(firstChunk); // Store scoped terms as the first research chunk.
@@ -278,7 +280,7 @@ export async function run(Shared, params = {}, agent = {}) {
 
     // [][] ----- WRITING PHASE - CREATE REPORT PLAN ------ [][]
     // Create a final report plan (layout, sections, structure) based on the research chunks and user task.
-    let callAI = new Shared.AiCall.AiCall();
+    let callAI = Shared.callAI.aiFactory();
     let chunkLength = RESEARCH_CHUNKS.length ?? 0;
     // reverse order as first chunk is just definitions and terms.
     let latestPlan = ""; 
@@ -289,7 +291,7 @@ export async function run(Shared, params = {}, agent = {}) {
             PromptsAndSchemas.reportPlan.sys,
             PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
         );
-        if (planCall.isErr()){ return Shared.Utils.Err(`Error in run -> reportPlan : ${planCall.value}`)}
+        if (planCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> reportPlan : ${planCall.value}`)}
         stats.aiCount += 1;
         latestPlan = planCall.value; // Update the latest plan with the current plan call result
     }
@@ -300,7 +302,7 @@ export async function run(Shared, params = {}, agent = {}) {
         PromptsAndSchemas.planArray.usr(latestPlan),
         { structuredOutput: PromptsAndSchemas.planArray.schema }
     );
-    if (planArrayCall.isErr()){ return Shared.Utils.Err(`Error in run -> planArray : ${planArrayCall.value}`)}
+    if (planArrayCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> planArray : ${planArrayCall.value}`)}
     planArray = planArrayCall.value.sections;
      
     // [][] ----- WRITING PHASE - CREATE EACH SECTION ------ [][]
@@ -315,7 +317,7 @@ export async function run(Shared, params = {}, agent = {}) {
             PromptsAndSchemas.writeSection.sys,
             PromptsAndSchemas.writeSection.usr(planArray[i], combinedResearch, latestReport)
         ); // Returns the text for this section of the report.
-        if (sectionCall.isErr()){ return Shared.Utils.Err(`Error in run -> writeSection : ${sectionCall.value}`)}
+        if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> writeSection : ${sectionCall.value}`)}
         stats.aiCount += 1;
         latestReport += `\n \n ${sectionCall.value}`; // Append each section to build the full report.
     }
@@ -329,7 +331,7 @@ export async function run(Shared, params = {}, agent = {}) {
             PromptsAndSchemas.finalCheck.usr(latestReport),
             { structuredOutput: PromptsAndSchemas.finalCheck.schema }
         ); // Returns a prompt for final edits and polishing.
-        if (sectionCall.isErr()){ return Shared.Utils.Err(`Error in run -> finalCheck : ${sectionCall.value}`)}
+        if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> finalCheck : ${sectionCall.value}`)}
         stats.aiCount += 1;
         let editLen = sectionCall.value.edits.length ?? 0;
         if (editLen === 0) break;
@@ -337,13 +339,13 @@ export async function run(Shared, params = {}, agent = {}) {
 
         // Conduct Edits (2)
         for(let j=0; j<editLen; j++){
-            let polishPrompt = sectionCall.value.edits[j];     
-            let editAgent = await Shared.CoreTools.AgentCompatible.superEditor.run(
+            let polishPrompt = sectionCall.value.edits[j];    
+            let editAgent = await Shared.aiAgents.AgentTools.superEditor.run(
                 Shared,
                 { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" },
                 agent
             ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
-            if (editAgent.isErr()){ return Shared.Utils.Err(`Error in run -> superEditor : ${editAgent.value}`)}
+            if (editAgent.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> superEditor : ${editAgent.value}`)}
             latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
             stats.aiCount += 1; // add ai calls from edit agent.
         }// j
@@ -364,19 +366,20 @@ export async function run(Shared, params = {}, agent = {}) {
         processedReferences.referenceList
     );
 
-    const containerVolumeRoot = Shared.Constants.containerVolumeRoot; 
+    const containerVolumeRoot = Shared.fileSystem.Constants.containerVolumeRoot; 
     //Construct the full path and save the content
-    const targetDirectoryInContainer = Shared.Utils.pathHelper.join(containerVolumeRoot, savePath);
-    await Shared.FileSystem.saveFile(targetDirectoryInContainer, finalReport, `Final_Report_${jobID || Date.now()}.txt`);
 
-    let message = new Shared.Classes.TextMessage({
-        role: Shared.Classes.Roles.Tool, 
+    const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, savePath);
+    await Shared.fileSystem.CRUD.saveFile(targetDirectoryInContainer, finalReport, `Final_Report_${jobID || Date.now()}.txt`);
+
+    let message = new Shared.aiAgents.Classes.TextMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: "text/plain", 
         textData: finalReport,
         toolName: "deepResearchTool",
         instructions: `Deep research has completed on the topic: "${topic}". The final report has been saved to ${savePath} with the filename "Final_Report_${jobID || Date.now()}.txt". The report includes detailed research findings, structured sections, and a reference list.`
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }
 
 function processReferences(text, referencesArray) {

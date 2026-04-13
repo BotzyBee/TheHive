@@ -1,5 +1,5 @@
-// import nunjucks from 'nunjucks';
-// import { Ok, Err } from '../Utils/helperFunctions.js';
+import nunjucks from 'nunjucks';
+import { Services } from '../../index.js';
 
 const nunEnv = nunjucks.configure({
     autoescape: false, // Auto-escape HTML by default for security
@@ -50,9 +50,9 @@ export function parseNunjucksTemplate(templateArray, dataObject) {
 
         const rendered = nunEnv.renderString(templateString, dataObject);
         
-        return Ok(JSON.parse(rendered));
+        return Services.v2Core.Helpers.Ok(JSON.parse(rendered));
     } catch (error) {
-        return Err({
+        return Services.v2Core.Helpers.Err({
             message: "Template parsing failed",
             detail: error.message,
             context: templateArray
@@ -90,25 +90,25 @@ export function addAnyDirectData(inputString, dataObject) {
     let templateString = inputString;
 
     if (typeof templateString !== 'string') {
-        return Err(`Error (addAnyDirectData) : templateString must be a string`);
+        return Services.v2Core.Helpers.Err(`Error (addAnyDirectData) : templateString must be a string`);
     }
     if (typeof dataObject !== 'object' || dataObject === null || Array.isArray(dataObject)) {
-        return Err(`Error (addAnyDirectData) : dataObject must be an object`);
+        return Services.v2Core.Helpers.Err(`Error (addAnyDirectData) : dataObject must be an object`);
     }
 
     // Check for standard Nunjucks braces
     if (templateString.includes("{{")) {
         templateString = swapPlaceholders(templateString, false);
     } else {
-        return Ok(inputString);
+        return Services.v2Core.Helpers.Ok(inputString);
     }
 
     try {
         // Note: Using 'nunjucks' or your 'nunEnv' instance consistently
         let renderedText = nunjucks.renderString(templateString, dataObject);
-        return Ok(renderedText);
+        return Services.v2Core.Helpers.Ok(renderedText);
     } catch (error) {
-        return Err(`Error (addAnyDirectData) : ${error.message}`);
+        return Services.v2Core.Helpers.Err(`Error (addAnyDirectData) : ${error.message}`);
     }
 }
 

@@ -1,10 +1,9 @@
-import { indexJob } from '../services/fileIndexing.js';
-import { dirTableName } from '../SharedServices/constants.js';
+import { indexJob } from "../services/fileIndexing.js";
+import { dirTableName } from "../core/constants.js";
 import dotenv from 'dotenv';
-import { Ok, Err, logAndErr } from '../SharedServices/Utils/helperFunctions.js';
-import { log } from '../SharedServices/Utils/misc.js';
-import { updateMgmtData, getRecords, getDirsAndFilesFromUrl } from '../services/CRUD.js';
-import { getFilesAndDirectoriesFromDir } from '../../v2FileSystem/services/CRUD.js';
+dotenv.config({ path: '.env' });
+import { Services } from "../../index.js";
+import { updateMgmtData, getRecords, getDirsAndFilesFromUrl } from "../services/CRUD.js";
 
 let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
@@ -30,15 +29,15 @@ export async function indexKnowledgebase(dbAgent) {
   // Check update millis
   let MsNow = new Date().getTime(); // for updating mgmt record when done. \
   // Begin index from root
-  dotenv.config({ path: '.env' });
+  
   const kbURL = process.env.knowledgebaseURL;
   let rootUpdates = await checkAndUpdateDirAndFiles(dbAgent, kbURL);
   if (rootUpdates.isErr()) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(Root) ${rootUpdates.value}`
     );
   }
-  log(rootUpdates.value);
+  Services.v2Core.Helpers.log(rootUpdates.value);
 
   // Complete furtherChecks
   let furtherChecksNeeded = furtherChecks.length ?? 0;
@@ -49,19 +48,19 @@ export async function indexKnowledgebase(dbAgent) {
       furtherChecks[i]
     );
     if (nextUpdateDir.isErr()) {
-      return logAndErr(
+      return Services.v2Core.Helpers.Err(
         `Error indexKnowledgebase -> checkAndUpdateDirAndFiles(index ${i}) ${nextUpdateDir.value}`
       );
     }
     furtherChecksNeeded = furtherChecks.length ?? 0; // update len with any new dirs found
-    log(nextUpdateDir.value);
+    Services.v2Core.Helpers.log(nextUpdateDir.value);
     i++;
   }
 
   // Process delete actions
   let deleteActions = await processDeleteJobs();
   if (deleteActions.isErr()) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error (indexKnowledgebase -> processDeleteJobs) : ${deleteActions}`
     );
   }
@@ -71,17 +70,17 @@ export async function indexKnowledgebase(dbAgent) {
     lastIndexCheckMs: MsNow,
   });
   if (updateMgmtRec.isErr()) {
-    logAndErr(
+    Services.v2Core.Helpers.Err(
       `Error (indexKnowledgebase) - Could not update Mgmt Record : ${updateMgmtRec.value}`
     );
   }
 
   // set indexing Active false
-  log(`Indexing Complete: 
+  Services.v2Core.Helpers.log(`Indexing Complete: 
         Filesystem hits: ${kbTotal}
         Database hits: ${dbTotal}
         Changes made: ${totalJobCount}`);
-  return Ok('All files/ Directories Indexed');
+  return Services.v2Core.Helpers.Ok('All files/ Directories Indexed');
 }
 
 async function checkAndUpdateDirAndFiles(dbAgent, Url) {
@@ -100,13 +99,13 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   // Get this Url's Dir Ref
   let getRec = await getRecords(dbAgent, dirTableName, 'Url', Url);
   if (getRec.isErr()) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : ${getRec.value}`
     );
   }
   let getRecLen = getRec.value[0].length ?? 0;
   if (getRecLen == 0) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error (checkAndUpdateDirAndFiles -> getRecords ) : No record found for Url ${Url}. Unable to progress!`
     );
   }
@@ -115,7 +114,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   let subDirsFiles = await getDirsAndFilesFromUrl(dbAgent, Url);
   // catch error
   if (subDirsFiles.isErr()) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error (checkAndUpdateDirAndFiles -> getDirsAndFilesFromUrl ) : ${subDirsFiles.value}`
     );
   }
@@ -124,10 +123,10 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir = await Services.fileSystem.CRUD.getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
-    return logAndErr(
+    return Services.v2Core.Helpers.Err(
       `Error (checkAndUpdateDirAndFiles -> getFilesAndDirectoriesFromDir) : ${kbFilDir.value}`
     );
   }
@@ -322,7 +321,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
       }
     }
     if (jobComplete == false) {
-      return logAndErr(`Error (checkAndUpdateDirAndFiles) :
+      return Services.v2Core.Helpers.Err(`Error (checkAndUpdateDirAndFiles) :
                 Failed to complete indexJob after 3 attempts
                 Dir Url : ${Url}
                 indexJob : ${changeListReadable[i]}
@@ -333,7 +332,7 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   kbTotal += kbFileCount + kbDirCount;
   dbTotal += dbFileCount + dbDirCount;
   totalJobCount += jobCount;
-  return Ok(`Directory indexed : ${Url}`);
+  return Services.v2Core.Helpers.Ok(`Directory indexed : ${Url}`);
 }
 
 async function processDeleteJobs() {
@@ -352,12 +351,12 @@ async function processDeleteJobs() {
       }
     }
     if (deleteJobComplete == false) {
-      return logAndErr(`Error (processDeleteJobs) :
+      return Services.v2Core.Helpers.Err(`Error (processDeleteJobs) :
                 Failed to complete indexJob after 3 attempts
                 indexJob : ${deleteJobsReadable[i]}
             `);
     }
   }
   totalJobCount += deleteJobCount;
-  return Ok('Delete Jobs Completed');
+  return Services.v2Core.Helpers.Ok('Delete Jobs Completed');
 }

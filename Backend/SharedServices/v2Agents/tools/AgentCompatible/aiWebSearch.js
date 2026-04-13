@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "aiWebSearch",
     version:    "2026.0.3",
@@ -54,7 +55,7 @@ export async function run(
     let { taskDescription, referenceText, targetURL } = params;
     // Catch bad params
     if( taskDescription == null ){
-        return Shared.Utils.logAndErr(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);
+        return Shared.v2Core.Helpers.Err(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);
     }
     // Create prompt
     let addText = 'Focus on reliable sources and verify information where possible. Use UK English when responding.';
@@ -76,14 +77,15 @@ export async function run(
     let usrText = `Here are your instructions <task>${taskDescription}</task>. ${addText}. ${context}`;
     
     safeEmit(agent, `Performing web-search via Gemini and Perplexity - 🐝🔍`);
-    let providers = Shared.Constants.AiProviders;
+    let providers = Shared.callAI.Constants.AiProviders;
+    let ai = Shared.callAI.aiFactory();
     let allCalls = [
-        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { provider: providers.gemini }),
-        new Shared.AiCall.AiCall().webSearch(sysText, usrText, { provider: providers.perplexity }),
+        ai.webSearch(sysText, usrText, { provider: providers.gemini }),
+        ai.webSearch(sysText, usrText, { provider: providers.perplexity }),
     ];
     let res = await Promise.all(allCalls);
-    if (res[0].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
-    if (res[1].isErr()){ return Shared.Utils.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
+    if (res[0].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
+    if (res[1].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
     
     const GemiProcessed = transformReferences(Shared, res[0].value.text, res[0].value.references);
     const PxltyProcessed = transformReferences(Shared, res[1].value.searchResult, res[1].value.citations);
@@ -92,13 +94,14 @@ export async function run(
     let combined = { result: `Gemini_Result - ${GemiProcessed.text} `+
         `Perplexity Result - ${PxltyProcessed.text}`, sources: mergedRefs };
 
-    let message = new Shared.Classes.DataMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new Shared.aiAgents.Classes.DataMessage({
+        role: Shared.aiAgents.Constants.Roles, 
         data: combined,
         toolName: "aiWebSearch",
         instructions: taskDescription
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
+    
 }
 
 /**
@@ -113,7 +116,7 @@ function transformReferences(Shared, inputText, linksArray) {
   // We do this first so we have a lookup table for the text replacement
   const updatedReferences = linksArray.map((url) => {
     return {
-      ref: Shared.Utils.generateSimpleRef(4),
+      ref: Shared.v2Core.Utils.generateSimpleRefgenerateSimpleRef(4),
       url: url
     };
   });

@@ -5,16 +5,22 @@ Worker.js is a proxy or middleware;
 REMEMBER - Threads cannot access the global vars on the main thread... they have their own copy which needs populated and merged back.
 */
 import { Piscina } from 'piscina';
-import { getDbAgent } from '../SharedServices/Database/utils.js';
-import { indexKnowledgebase } from '../../v2Database/engine/buildKbIndex.js'; 
-import { AiJob } from '../SharedServices/Classes/index.js';
-import { QuickAskAgent } from '../SharedServices/Agents/QuickAsk/index.js';
-import { Ok, Err } from '../SharedServices/Utils/helperFunctions.js';
-
+import { Services } from '../../index.js';
 
 /**@type {Piscina} */
 export let pool; // Piscina worker pool (multi-thread)
 export let indexTimerActive = false;
+
+// Bootstrap the Services in the worker thread.
+let isInitialized = false;
+async function bootstrap() {
+  if (isInitialized) return;
+  
+  // Call your existing registration/init logic here
+  // This gives the worker its own 'database' service
+  await Services.init(); 
+  isInitialized = true;
+}
 
 export function setupPool() {
   pool = new Piscina({
@@ -26,42 +32,45 @@ export function setupPool() {
 
 export async function poolIndexKnowledgebase(){
     indexTimerActive = true;
-    let dbAgent = await getDbAgent();
+    let dbAgent = await Services.database.ManageDb.getDbAgent();
     if(dbAgent.isErr()){
         indexTimerActive = false;
         console.log(`Error getting DB Agent in poolIndexKnowledgebase: ${dbAgent.value}`);
         return; 
     }
-    let call = await indexKnowledgebase(dbAgent.value);
+    let call = await Services.database.indexKnowledgebase(dbAgent.value);
     indexTimerActive = false;
     return call;
 }
 
-// Process AI JOB
-export async function poolRunAiJob({jobClassObject}){
-    let job = processObjectToClass(jobClassObject); 
-    if(job == null){ return Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
-    // Run the Job
-    let call = await job.run();
-    if(call.isErr()){ return Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
-    return Ok(job); // return class
-}
+// // Process AI JOB
+// export async function poolRunAiJob({jobClassObject}){
+//     let job = processObjectToClass(jobClassObject); 
+//     if(job == null){ return Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
+//     // Run the Job
+//     let call = await job.run();
+//     if(call.isErr()){ return Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
+//     return Ok(job); // return class
+// }
 
-/**
- * Re-instantiate class after thread hand-off
- * @param {object} jobClassObject - Instance of AiJob or sub-class.
- * @returns - the associated class object.
- */
-export function processObjectToClass(jobClassObject){
-    let rtn = null;
-    switch (jobClassObject.agentType) {
-        case "AiJob": // Base Class
-            rtn = new AiJob().import(jobClassObject);
-        case "QuickAsk":
-            rtn = new QuickAskAgent().import(jobClassObject);
-    }
-    return rtn;
-}
+// /**
+//  * Re-instantiate class after thread hand-off
+//  * @param {object} jobClassObject - Instance of AiJob or sub-class.
+//  * @returns - the associated class object.
+//  */
+// export function processObjectToClass(jobClassObject){
+//     let rtn = null;
+//     switch (jobClassObject.agentType) {
+//         case "AiJob": // Base Class
+//             let ai = new Services.aiAgents.Classes.AiJob(
+//                 // THIS NEEDS WORK !
+//             );
+//             rtn = new AiJob().import(jobClassObject);
+//         case "QuickAsk":
+//             rtn = new QuickAskAgent().import(jobClassObject);
+//     }
+//     return rtn;
+// }
 
 // [][] -------------------------------------------------------------------------- [][]
 // Example functions in worker.js

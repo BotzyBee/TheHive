@@ -1,5 +1,6 @@
 import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
+dotenv.config({ path: ".env" });
 import {
   namespaceName,
   databaseName,
@@ -16,7 +17,7 @@ import { addDirectoryToDB } from '../SharedServices/v2Database/services/CRUD.js'
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
     const db = new Surreal();
-    dotenv.config({ path: ".env" });
+    
     const dbUser = process.env.dbRootUser;
     const dbPass = process.env.dbRootPass;
     const dbUserRegular = process.env.dbRegularUser;

@@ -1,4 +1,4 @@
-import { AiQuality, MODEL_REGISTRY } from "./constants";
+import { AiQuality, MODEL_REGISTRY } from "./constants.js";
 
 /**
  * Recursively adds additionalProperties: false to all object nodes in a JSON schema,

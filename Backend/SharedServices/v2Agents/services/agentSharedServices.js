@@ -1,9 +1,7 @@
-// import { saveMessageContent } from "../../CoreTools/helperFunctions.js";
-// import { TextMessage, Roles, ImageMessage, AudioMessage, DataMessage, AiJob } from "../Classes/index.js";
-// import { addAnyDirectData } from "../../CoreTools/inputParser.js";
-// import { Ok, Err } from "../../Utils/helperFunctions.js";
-// import { BaseMessage } from '../Classes/aiMessages.js';
-// import { AiCall } from "../../_CallAI/index.js";
+import { Services } from '../../index.js';
+import { TextMessage, ImageMessage, AudioMessage, DataMessage, AiJob, BaseMessage } from '../core/classes.js';
+import { Roles } from '../core/constants.js';
+import { addAnyDirectData } from './inputParser.js';
 
 // Curated data object
 /**
@@ -16,7 +14,7 @@
  */
 export async function processMessageForContext( messageObject, summaryDataSizeThreshold = 500, aiOptions = {}, jobObject ) {
     if (!(messageObject instanceof BaseMessage)) {
-            return Err(
+            return Services.v2Core.Helpers.Err(
             'Error (processMessageForContext) : messageObject must be an instance of BaseMessage or a class that extends it.');
         }
 
@@ -32,21 +30,21 @@ export async function processMessageForContext( messageObject, summaryDataSizeTh
     let summary = await shortenLargeValues(messageObject, summaryDataSizeThreshold,  aiOptions = {}) 
     // Returns a shortened version if needed.. if not returns initial value.
     if(summary.isErr()){
-        return Err(`Error (processMessageForContext -> shortenLargeValues) : ${summary.value}`)
+        return Services.v2Core.Helpers.Err(`Error (processMessageForContext -> shortenLargeValues) : ${summary.value}`)
     }
     returnData[messageObject.id] = summary.value;
   }
-  return Ok(returnData);
+  return Services.v2Core.Helpers.Ok(returnData);
 }
 
 async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new WeakSet()) {
     // 1. Immediate Primitives
     if (data === null || ["undefined", "boolean", "symbol", "bigint", "function"].includes(typeof data)) {
-        return Ok(data);
+        return Services.v2Core.Helpers.Ok(data);
     }
     // 2. Prevent Infinite Recursion
     if (typeof data === 'object') {
-        if (visited.has(data)) return Ok("[Circular Reference]");
+        if (visited.has(data)) return Services.v2Core.Helpers.Ok("[Circular Reference]");
         visited.add(data);
     }
 
@@ -57,26 +55,26 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
             // Catch Base64 data
             let base64Check = isBase64(data);
             if(base64Check === true ){ 
-                return Ok(`[ Base64 data. Length: ${strVal.length} ]`);
+                return Services.v2Core.Helpers.Ok(`[ Base64 data. Length: ${strVal.length} ]`);
             }
             // Else create summary
             const summary = await createSummary(data,  aiOptions = {});
-            return summary.isErr() ? summary : Ok(summary.value);
+            return summary.isErr() ? summary : Services.v2Core.Helpers.Ok(summary.value);
         }
-        return Ok(data);
+        return Services.v2Core.Helpers.Ok(data);
     }
 
     // 4. Binary Data
     if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
         return data.byteLength > maxSize 
-            ? Ok(`[Large Binary Data: ${data.byteLength} bytes]`) 
-            : Ok(data);
+            ? Services.v2Core.Helpers.Ok(`[Large Binary Data: ${data.byteLength} bytes]`) 
+            : Services.v2Core.Helpers.Ok(data);
     }
 
     // 4.5 Handle Dates
     if (data instanceof Date) {
         // Return as ISO string for consistency, or return 'data' to keep it as a Date object
-        return Ok(data.toISOString()); 
+        return Services.v2Core.Helpers.Ok(data.toISOString()); 
     }
 
     // 5. Recursion (Objects/Arrays)
@@ -84,7 +82,7 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
         // Use Promise.all for speed.
         const results = await Promise.all(data.map(item => shortenLargeValues(item, maxSize, aiOptions = {}, visited)));
         for (const res of results) if (res.isErr()) return res;
-        return Ok(results.map(r => r.value));
+        return Services.v2Core.Helpers.Ok(results.map(r => r.value));
     }
 
     if (typeof data === 'object') {
@@ -94,20 +92,21 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
             if (res.isErr()) return res;
             newObject[key] = res.value;
         }
-        return Ok(newObject);
+        return Services.v2Core.Helpers.Ok(newObject);
     }
-    return Ok(data);
+    return Services.v2Core.Helpers.Ok(data);
 }
 
 export async function createSummary(stringRes, aiOptions = {}){
     // summarise data
-    let dataSummary = await new AiCall.AiCall().generateText(
+    let ai = Services.callAI.aiFactory();
+    let dataSummary = await ai.generateText(
         PromptsAndSchemas.summarySysPrompt,
         PromptsAndSchemas.summaryUsrPrompt(stringRes),
         aiOptions
     );
     if(dataSummary.isErr()){ ;
-        return Err(`Error (curateToolData) : ${dataSummary.value}`)
+        return Services.v2Core.Helpers.Err(`Error (curateToolData) : ${dataSummary.value}`)
     }
     // handle if object or not
     let summary;
@@ -118,7 +117,7 @@ export async function createSummary(stringRes, aiOptions = {}){
         // parse fails - treat as string
         summary = dataSummary.value;
     }
-    return Ok(summary);
+    return Services.v2Core.Helpers.Ok(summary);
 }
 
 function isBase64(str) {
@@ -154,7 +153,7 @@ export async function finialiseOutput(agentObject, saveFolder){
     if(!saveFolder) saveFolder = 'UserFiles/aiOutputs';
     console.log("Finalising Output...");
     // Create OP Plan -> Process each message (auto adds to messageHistory ) -> add to taskOutput
-    if(agentObject == null){ return Err(`Error (finialiseOutput) : agentObject is missing or null`)}
+    if(agentObject == null){ return Services.v2Core.Helpers.Err(`Error (finialiseOutput) : agentObject is missing or null`)}
     // Craft output array (overview)
     let outputOverview = await agentObject.aiCall.generateText(
       PromptsAndSchemas.outputOverview.sys,
@@ -168,13 +167,13 @@ export async function finialiseOutput(agentObject, saveFolder){
     if(outputOverview.isErr()){
       agentObject.setFailed();
       agentObject.isRunning = false;
-      return Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
+      return Services.v2Core.Helpers.Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
     } 
 
     agentObject.addAiCount(1);
     let outputPlan = outputOverview.value.outputPlan || [];
     if(outputPlan.length == 0){
-      return Err(`Error (finialiseOutput -> outputOverview ) : Returned empty output plan!`); 
+      return Services.v2Core.Helpers.Err(`Error (finialiseOutput -> outputOverview ) : Returned empty output plan!`); 
     }
 
     // Process Output Plan
@@ -208,9 +207,9 @@ export async function finialiseOutput(agentObject, saveFolder){
       if(outputPlan[i].type === "Save"){
         let check = agentObject.messageHistory.getMessagesById(outputPlan[i]?.contextKey);
         if(check == null){
-          return Err(`Error: (finialiseOutput -> save) - Could not located any data for ${outputPlan[i]?.contextKey}`);
+          return Services.v2Core.Helpers.Err(`Error: (finialiseOutput -> save) - Could not located any data for ${outputPlan[i]?.contextKey}`);
         }
-        let save = await saveMessageContent(check, saveFolder, null);
+        let save = await Services.aiAgents.AgentHelpers.saveMessageContent(check, saveFolder, null);
         if( save.isErr()){ return save }
         let msg = new TextMessage({
           role: Roles.Agent,
@@ -220,7 +219,7 @@ export async function finialiseOutput(agentObject, saveFolder){
         opMessages.push(msg);
       }      
     }
-    return Ok(opMessages);
+    return Services.v2Core.Helpers.Ok(opMessages);
   }
 
   /**
@@ -244,13 +243,13 @@ export async function finialiseOutput(agentObject, saveFolder){
       { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 
     ); // { output: [enum "Text_Output", "Quote_Text" ], data: string }
     if(formatCall.isErr()){
-      return Err(`Error ( processText ) : ${formatCall.value}`)    
+      return Services.v2Core.Helpers.Err(`Error ( processText ) : ${formatCall.value}`)    
     }
     agentObject.addAiCount(1);
 
     // Catch AI doesn't return output key
     if(formatCall.value?.output === undefined || formatCall.value?.data === undefined){
-        return Err(`Error: (processText) - AI agent has not returned 'output' and/or 'data' key. Unable to progress.`);
+        return Services.v2Core.Helpers.Err(`Error: (processText) - AI agent has not returned 'output' and/or 'data' key. Unable to progress.`);
     }
     // Return standard message
     let opText = "";
@@ -264,14 +263,14 @@ export async function finialiseOutput(agentObject, saveFolder){
           agentObject.messageHistory.getToolMessagesAsObject();
         let augmentedTextOutput = addAnyDirectData(formatCall.value.data, { context: contextObj }); 
         if(augmentedTextOutput.isErr()){
-            return Err(`Error: (processText) : ${augmentedTextOutput.value}`);
+            return Services.v2Core.Helpers.Err(`Error: (processText) : ${augmentedTextOutput.value}`);
         }
         opText =augmentedTextOutput.value;
     }
     // Full Output
     let msg = new TextMessage({ role: Roles.Agent, textData: opText, mimeType: contextObj?.mime || "text/plain" });
     agentObject.messageHistory.addMessage(msg);
-    return Ok(msg);
+    return Services.v2Core.Helpers.Ok(msg);
   }
 
   /**
@@ -281,11 +280,11 @@ export async function finialiseOutput(agentObject, saveFolder){
    */
   async function processImage(agentObject, contextKey){
     if(contextKey == null){
-      return Err(`Error: (processImage) - contextKey is missing`);
+      return Services.v2Core.Helpers.Err(`Error: (processImage) - contextKey is missing`);
     }
     let check = agentObject.messageHistory.getMessagesById(contextKey);
     if(check == null){
-      return Err(`Error: (processImage) - Could not located any data for ${contextKey}`);
+      return Services.v2Core.Helpers.Err(`Error: (processImage) - Could not located any data for ${contextKey}`);
     }
     // Clone & strip out unnessessary data. 
     let img = structuredClone(check); // clone of the message
@@ -303,7 +302,7 @@ export async function finialiseOutput(agentObject, saveFolder){
     img.instructions = "";
     // Push summary message to chat, return full message.
     agentObject.messageHistory.addMessage(summaryMessage);
-    return Ok(img);
+    return Services.v2Core.Helpers.Ok(img);
   }
 
   /**
@@ -313,11 +312,11 @@ export async function finialiseOutput(agentObject, saveFolder){
    */
   async function processAudio(agentObject, contextKey){
     if(contextKey == null){
-       return Err(`Error: (processAudio) - contextKey is missing`);
+       return Services.v2Core.Helpers.Err(`Error: (processAudio) - contextKey is missing`);
     }
     let check = agentObject.messageHistory.getMessagesById(contextKey);
     if(check == null){
-      return Err(`Error: (processAudio) - Could not located any data for ${contextKey}`);
+      return Services.v2Core.Helpers.Err(`Error: (processAudio) - Could not located any data for ${contextKey}`);
     }
     // Clone & strip out unnessessary data. 
     let aud = structuredClone(check); // clone of the message
@@ -335,7 +334,7 @@ export async function finialiseOutput(agentObject, saveFolder){
     aud.instructions = "";
     // Push summary message to chat, return full message.
     agentObject.messageHistory.addMessage(summaryMessage);
-    return Ok(aud);
+    return Services.v2Core.Helpers.Ok(aud);
   }
 
  /**
@@ -345,12 +344,12 @@ export async function finialiseOutput(agentObject, saveFolder){
    */
  async function processData(agentObject, contextKey ){ 
   if (contextKey == null) {
-    return Err(`Error: (processData) - contextKey is missing`);
+    return Services.v2Core.Helpers.Err(`Error: (processData) - contextKey is missing`);
   }
 
   let check = agentObject.messageHistory.getMessagesById(contextKey);
   if (check == null) {
-    return Err(`Error: (processData) - Could not locate any data for ${contextKey}`);
+    return Services.v2Core.Helpers.Err(`Error: (processData) - Could not locate any data for ${contextKey}`);
   }
 
   // Clone the message
@@ -380,7 +379,7 @@ export async function finialiseOutput(agentObject, saveFolder){
 
   // Push summary to history
   agentObject.messageHistory.addMessage(summaryMessage);
-  return Ok(dta);
+  return Services.v2Core.Helpers.Ok(dta);
 }
 
   /**
@@ -392,7 +391,7 @@ export async function finialiseOutput(agentObject, saveFolder){
 export function stripOutAudioAndImageData(messageArray){
   //catch non array or empty array
   if(!Array.isArray(messageArray) || messageArray.length == 0){
-    return Err(`Error: (stripOutAudioAndImageData) - messageArray is not an array or is empty!`);
+    return Services.v2Core.Helpers.Err(`Error: (stripOutAudioAndImageData) - messageArray is not an array or is empty!`);
   }
   let opMessages = structuredClone(messageArray); 
   for(let i=0; i<opMessages.length; i++){
@@ -400,7 +399,7 @@ export function stripOutAudioAndImageData(messageArray){
       opMessages[i].base64 = `[ Base 64 data removed due to size - Full data can be found in message ${messageArray[i].id} ]`;
     }
   }
-  return Ok(opMessages);
+  return Services.v2Core.Helpers.Ok(opMessages);
 }
 
 const PromptsAndSchemas = {

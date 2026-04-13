@@ -4,11 +4,11 @@ If a file provides a "service" (database, logger, config), it should be a standa
 
 
 Layer   	            Content     	                                    Rule
-1. Constants	        Env vars, hardcoded strings, TS interfaces.	        Can be imported by anything. Imports nothing.
+1. Constants	        Env vars, hardcoded strings, TS interfaces.	      Can be imported by anything. Imports nothing.
 2. Utils        	    Pure functions (math, string formatting).	        Can be imported by Layers 3-5. Imports only Layer 1.
-3. Service	            Database CRUD, API wrappers, Base Classes.	        Can be imported by Layers 4-5. Imports Layers 1-2.
+3. Service	          Database CRUD, API wrappers, Base Classes.	      Can be imported by Layers 4-5. Imports Layers 1-2.
 4. Engine       	    Job managers, Agents, Business logic.	            Can be imported by Layer 5. Imports Layers 1-3.
-5. API                  app.js, Cron jobs.	                                Imports anything. Imported by nothing.
+5. API                app.js, Cron jobs.	                              Imports anything. Imported by nothing.
 
 
 // [][] ------------------------------ [][]
@@ -109,3 +109,7 @@ Bad (Inheritance): class TaskManager extends Database
 Good (Composition): class TaskManager { constructor(db) { this.db = db; } }
 
 If you must have a base class - then aim to have zero imports from other parts of the app. If it needs utilities, pass them in as arguments or get them from the registry inside a method, not at the top of the file
+
+
+// [][] ---- COME BACK TO ---- [][]
+setup2.js

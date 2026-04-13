@@ -229,8 +229,6 @@ export class FrontendMessageFormat{
 // [][] -- Base constants / classes for AI Jobs -- [][]
 // [][] ------------------------------------------ [][]
 
-import { Services } from "../../index.js"; 
-
 /*
 * NOTE - Context handling. All messages (text, image, data, audio etc) are added to the message history.
 * Summerised versions of tool output is added to toolContext - for planning. 

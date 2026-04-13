@@ -1,9 +1,8 @@
-import { FrontendMessageFormat, TextMessage, Roles } from "../../SharedServices/Classes/aiMessages.js";
+import { FrontendMessageFormat, TextMessage, Status } from "../core/classes.js";
 import { JOBS } from "./jobManager.js";
-import { processApiMessagesToClasses } from '../../../Engine/routes/index.js';
-import { Ok, Err } from '../../SharedServices/Utils/helperFunctions.js';
-import { Status } from "../../SharedServices/Classes/aiJob.js";
-import { TaskAgent, TaskPhases } from "../../SharedServices/Agents/TaskAgent/index.js";
+import { Roles } from "../core/constants.js";
+import { processApiMessagesToClasses } from "../services/processMessages.js";
+import { TaskAgent, TaskPhases } from "../services/TaskAgent/index.js";
 
 /**
  * Creates a new QuickAsk Agent and adds it to non-allocated jobs.
@@ -13,14 +12,14 @@ import { TaskAgent, TaskPhases } from "../../SharedServices/Agents/TaskAgent/ind
  */
 export async function createTaskAgentJob(frontendMessage, socketId){
     if(!frontendMessage instanceof FrontendMessageFormat){
-        return Err(
+        return Services.v2Core.Helpers.Err(
             'Error (createTaskAgentJob) : frontendMessage is not a FrontendMessageFormat class message.'
         );
     }
     // To Do - Handle multiple frontend messages - IE Task message and data context. 
     let message = frontendMessage.messages[0]?.textData || null;
     if(message == null){
-        return Err(
+        return Services.v2Core.Helpers.Err(
             'Error (createTaskAgentJob) : frontendMessage.messages[0] is not a TextMessage Class'
         );
     }
@@ -44,7 +43,7 @@ export async function createTaskAgentJob(frontendMessage, socketId){
         textData: `Task-Agent Job has been created and is awaiting allocation. \n Ref: ${job.id}`
     });
     rtnMessage.addMessages([msg]);
-    return Ok(rtnMessage);
+    return Services.v2Core.Helpers.Ok(rtnMessage);
 }
 
 export async function handleTAMessage(frontendMessage, socketId = null){
@@ -58,13 +57,13 @@ export async function handleTAMessage(frontendMessage, socketId = null){
             status: Status.NotStarted
         });
         let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
-        if( processedMsg.isErr() ){ 
-        return Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
+        if( processedMsg.isServices.v2Core.Helpers.Err() ){ 
+        return Services.v2Core.Helpers.Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
         }
         rtnMsg.addMessages(processedMsg.value);
         let newJob = await createTaskAgentJob(rtnMsg, socketId);
         if(newJob.isErr()){
-            return Err(`Error : (handleTAMessage) - ${newJob.value}`);
+            return Services.v2Core.Helpers.Err(`Error : (handleTAMessage) - ${newJob.value}`);
         }
         return newJob; // has Result already
     } else {
@@ -77,11 +76,11 @@ export async function handleTAMessage(frontendMessage, socketId = null){
         // Get JOB Object
         let job = await JOBS.jobListManager({getJob: id});
         if(job.isErr()){
-            return Err(`Error : (handleTAMessage) - ${job.value}`);
+            return Services.v2Core.Helpers.Err(`Error : (handleTAMessage) - ${job.value}`);
         } 
         let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
         if( processedMsg.isErr() ){ 
-            return Err(`Error (handleTAMessage 2) : could not process the messages into classes. ${processedMsg.value}`);
+            return Services.v2Core.Helpers.Err(`Error (handleTAMessage 2) : could not process the messages into classes. ${processedMsg.value}`);
         }
         // Handle Stop
         if(frontendMessage.status == Status.Stopped){
@@ -94,12 +93,12 @@ export async function handleTAMessage(frontendMessage, socketId = null){
                     textData: `Job ${id} has been stopped`
                 })
             )
-            return Ok(rtnMsg);
+            return Services.v2Core.Helpers.Ok(rtnMsg);
         }
 
         // Catch still running
         if(job.value.isRunning == true){
-            return Err(`Job ${id} is still running. Cannot add new instructions unless stopped or complete.`)
+            return Services.v2Core.Helpers.Err(`Job ${id} is still running. Cannot add new instructions unless stopped or complete.`)
         }
 
         // add new messages to messageHistory
@@ -121,6 +120,6 @@ export async function handleTAMessage(frontendMessage, socketId = null){
                 textData: `New information has been added to Job ${id} and is awaiting allocation.`
             })
         )
-        return Ok(rtnMsg);
+        return Services.v2Core.Helpers.Ok(rtnMsg);
     }
 }

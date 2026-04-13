@@ -1,10 +1,10 @@
-import { AiJob } from "../SharedServices/Classes/index.js";
-import { useMultipleThreads } from "../SharedServices/constants.js";
-import { pool, processObjectToClass } from "../../v2Core/engine/workers.js";
-import { Ok, Err, logAndErr } from '../SharedServices/Utils/helperFunctions.js';
-import { log } from '../SharedServices/Utils/misc.js';
-import { containerVolumeRoot } from "../SharedServices/constants.js";
+
+// import { pool, processObjectToClass } from "../../v2Core/engine/workers.js";
+
 import path from 'path';
+import { AiJob } from '../core/classes.js';
+import { useMultipleThreads } from '../core/constants.js';
+import { Services } from '../../index.js';
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -27,9 +27,9 @@ class AI_JOB_MANAGER{
         if(aiJobClass instanceof AiJob){
             this.AI_JOBS.push(aiJobClass);
             this.NON_ALLOCATED.push(aiJobClass.id);
-            Ok('Job Added');
+            Services.v2Core.Helpers.Ok('Job Added');
         } 
-        return Err('Error (AI_JOB_MANAGER -> addNewJob) : input must be an instance of AiJob or SubClass of it.')
+        return Services.v2Core.Helpers.Err('Error (AI_JOB_MANAGER -> addNewJob) : input must be an instance of AiJob or SubClass of it.')
     }
 
     /**
@@ -38,7 +38,7 @@ class AI_JOB_MANAGER{
      */
     async checkNonAllocated(){
         let jobsAwaiting = this.NON_ALLOCATED.length;
-        if(jobsAwaiting == 0) { return Ok('No Jobs To Allocate'); }
+        if(jobsAwaiting == 0) { return Services.v2Core.Helpers.Ok('No Jobs To Allocate'); }
         this.#allocatingJobs = true;
         // take all outstanding jobs
         let tempJobs = this.NON_ALLOCATED; // Job IDs
@@ -49,7 +49,7 @@ class AI_JOB_MANAGER{
                 this.allocateAndProgress(this.#workerThreads, tempJobs[i])
             );
         }
-        log(`Allocating ${jobsAwaiting} new Jobs`);
+        Services.v2Core.Helpers.log(`Allocating ${jobsAwaiting} new Jobs`);
         let resultArray = await Promise.all(jobArray);
         // Update main thread
         let errorList = []; // hopefully nothing in here!
@@ -60,10 +60,10 @@ class AI_JOB_MANAGER{
         }
         if(errorList.length != 0 ){
             this.#allocatingJobs = false;
-            return Err(`Error (checkNonAllocated -> allocateAndProgress ) : ${JSON.stringify(errorList)}`)
+            return Services.v2Core.Helpers.Err(`Error (checkNonAllocated -> allocateAndProgress ) : ${JSON.stringify(errorList)}`)
         }
         this.#allocatingJobs = false;
-        return Ok('All Non-allocated jobs progressed');
+        return Services.v2Core.Helpers.Ok('All Non-allocated jobs progressed');
     }
 
     /**
@@ -74,54 +74,54 @@ class AI_JOB_MANAGER{
      */
     async allocateAndProgress(workerThreads = false, jobID){
         // Catch input param issues
-        if(jobID == undefined){ return Err("Error (allocateAndProgress) - JobID missing from input params") }
+        if(jobID == undefined){ return Services.v2Core.Helpers.Err("Error (allocateAndProgress) - JobID missing from input params") }
         // Fetch job object from this.AI_JOBS
         let fetchCall = this.jobListManager( { getJob: jobID } )
-        if(fetchCall.isErr()){ return Err(`Error (allocateAndProgress -> jobListManager) : ${fetchCall.value}`)}
+        if(fetchCall.isErr()){ return Services.v2Core.Helpers.Err(`Error (allocateAndProgress -> jobListManager) : ${fetchCall.value}`)}
         /**@type {AiJob} */
         let jobClassObject = fetchCall.value;
         let processCall;
-        log(`Progressing ${jobClassObject.agentType} - ${jobID}`);
+        Services.v2Core.Helpers.log(`Progressing ${jobClassObject.agentType} - ${jobID}`);
         if(workerThreads == false){
             // process on main thread
             processCall = await jobClassObject.run();
             if(processCall.isErr()){
-                const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
+                const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/FailedJobs/');
                 FileSystem.saveFile(
                     targetDirectoryInContainer, 
                     JSON.stringify(jobClassObject, null, 2), 
                     `${jobClassObject.id}_Failed.txt`
                 );
-                return logAndErr(`Error (allocateAndProgress -> run( ${jobClassObject.id} ) ) ${processCall.value}`)
+                return Services.v2Core.Helpers.Err(`Error (allocateAndProgress -> run( ${jobClassObject.id} ) ) ${processCall.value}`)
             }   
         } else {
         // Offload to own thread
-            // Check pool is active
-            if(pool.threads?.length == 0 || pool.closed){
-                return logAndErr('Error (allocateAndProgress) : Worker Pool is offline!')
-            }
-            processCall = await pool.run({ jobClassObject }, { name: 'poolRunAiJob' }); 
-            //processCall ERROR
-            if(processCall.outcome == 'Error'){ // cant use .isErr() as pool is stringifying the result!
-                // NOTE - Non-standard error {errorText: string, jobObject: object }
-                const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
-                FileSystem.saveFile(
-                    targetDirectoryInContainer, 
-                    JSON.stringify(processCall.value.jobObject, null, 2), 
-                    `${processCall.value.jobObject.id}_Failed.txt`
-                );
-                return Err(`Error (allocateAndProgress -> pool run() ) ${processCall.value.errorText}`)
-            }
-            // Process back to class
-            let jobOutcome = processObjectToClass(processCall.value);
-            // Push update to job (doesn't update directly due to handoff to thread)
-            let update = this.jobListManager({ replaceJob: jobOutcome })
-            if(update.isErr()){
-                return logAndErr(`Error (allocateAndProgress -> jobListManager(replace) ) ${update.value}`);
-            }
+            // // Check pool is active
+            // if(Services.v2Core.WorkerThreads.pool.threads?.length == 0 || Services.v2Core.WorkerThreads.pool.closed){
+            //     return Services.v2Core.Helpers.Err('Error (allocateAndProgress) : Worker Pool is offline!')
+            // }
+            // processCall = await Services.v2Core.WorkerThreads.pool.run({ jobClassObject }, { name: 'poolRunAiJob' }); 
+            // //processCall ERROR
+            // if(processCall.outcome == 'Error'){ // cant use .isErr() as pool is stringifying the result!
+            //     // NOTE - Non-standard error {errorText: string, jobObject: object }
+            //     const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
+            //     FileSystem.saveFile(
+            //         targetDirectoryInContainer, 
+            //         JSON.stringify(processCall.value.jobObject, null, 2), 
+            //         `${processCall.value.jobObject.id}_Failed.txt`
+            //     );
+            //     return Err(`Error (allocateAndProgress -> pool run() ) ${processCall.value.errorText}`)
+            // }
+            // // Process back to class
+            // let jobOutcome = Services.v2Core.WorkerThreads.processObjectToClass(processCall.value);
+            // // Push update to job (doesn't update directly due to handoff to thread)
+            // let update = this.jobListManager({ replaceJob: jobOutcome })
+            // if(update.isErr()){
+            //     return Services.v2Core.Helpers.Err(`Error (allocateAndProgress -> jobListManager(replace) ) ${update.value}`);
+            // }
         }// end else
-        log(`Job Complete - ${jobID}`);  
-        return Ok(jobID);
+        Services.v2Core.Helpers.log(`Job Complete - ${jobID}`);  
+        return Services.v2Core.Helpers.Ok(jobID);
     }
 
     /**
@@ -145,7 +145,7 @@ class AI_JOB_MANAGER{
                 return Err(`Error (jobListManager): Record ${insertJob.id} already exists.`);
             }
             this.AI_JOBS.push(insertJob);
-            return Ok(`ID ${insertJob.id} added.`);
+            return Services.v2Core.Helpers.Ok(`ID ${insertJob.id} added.`);
         }
 
         // DELETE
@@ -153,9 +153,9 @@ class AI_JOB_MANAGER{
             const index = this.AI_JOBS.findIndex(job => job.id === deleteJob);
             if (index !== -1) {
                 this.AI_JOBS.splice(index, 1);
-                return Ok(`ID ${deleteJob} removed.`);
+                return Services.v2Core.Helpers.Ok(`ID ${deleteJob} removed.`);
             }
-            return Ok(`Ref not found.`);
+            return Services.v2Core.Helpers.Ok(`Ref not found.`);
         }
 
         // STOP
@@ -166,7 +166,7 @@ class AI_JOB_MANAGER{
                 job.status.setStoppedByUser();
                 job.isRunning = false; // ensure job stops
                 console.log(`Job ID: ${stopJob} has been stopped.`);
-                return Ok(`ID ${stopJob} Stopped`);
+                return Services.v2Core.Helpers.Ok(`ID ${stopJob} Stopped`);
             }
             return Err(`Error (jobListManager): Could not find ID: ${stopJob}`);
         }
@@ -174,7 +174,7 @@ class AI_JOB_MANAGER{
         // GET
         if (getJob) {
             const job = this.AI_JOBS.find(job => job.id === getJob);
-            return job ? Ok(job) : Err(`Error (jobListManager): Could not find ID: ${getJob}`);
+            return job ? Services.v2Core.Helpers.Ok(job) : Err(`Error (jobListManager): Could not find ID: ${getJob}`);
         }
 
         // REPLACE
@@ -185,7 +185,7 @@ class AI_JOB_MANAGER{
             } else {
                 this.AI_JOBS.push(replaceJob);
             }
-            return Ok(`ID ${replaceJob.id} has been replaced/added`);
+            return Services.v2Core.Helpers.Ok(`ID ${replaceJob.id} has been replaced/added`);
         }
 
         // PRUNE - removes any completed jobs that are over 1hr old. Called on each getUpdateOrResult call to keep list clean.
@@ -194,13 +194,13 @@ class AI_JOB_MANAGER{
             this.AI_JOBS = this.AI_JOBS.filter(
                 job => {
                 if(job.status == Classes.Status.Complete && job.endEpochMs < oneHourAgo){
-                    log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
+                    Services.v2Core.Helpers.log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
                     return false; // Remove from list
                 }
                 return true; // Keep in list
             });
         }
-        return Err("Error (jobListManager): No valid operation provided.");
+        return Services.v2Core.Helpers.Err("Error (jobListManager): No valid operation provided.");
     }
 
     isAllocatorActive(){

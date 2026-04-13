@@ -9,6 +9,7 @@ import * as v2FileSystem from '../SharedServices/v2FileSystem/index.js';
 
 // Register Services in the registry
 export function initRegistry() {
+    console.log("Initializing Service Registry...");
     registry.register('v2Core', v2Core);
     registry.register('aiAgents', v2AiAgents);
     registry.register('callAI', v2CallAI);

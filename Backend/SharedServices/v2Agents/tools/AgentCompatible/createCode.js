@@ -32,8 +32,9 @@ function safeEmit(agent, message){
 
 export async function run(Shared, params = {}, agent = {}) {
     const { taskDescription, context = "" } = params;
-    const aiCall = new Shared.AiCall.AiCall();
-    const superEditor = Shared.CoreTools.AgentCompatible.superEditor.run; 
+    const ai = Shared.callAI.aiFactory();
+    const aiCall = ai.AiCall();
+    const superEditor = Shared.aiAgents.AgentTools.superEditor.run; 
     let retAR = [];
 
     // [][] --- STEP 0: ROUTER PHASE --- [][]
@@ -57,7 +58,7 @@ export async function run(Shared, params = {}, agent = {}) {
     };
     safeEmit(agent, "Coding Tool: Determining user intent (Create, Edit, Review)...");
     const routerCall = await aiCall.generateCode(routerSys, `Task: ${taskDescription}`, { structuredOutput: routerSchema });
-    if (routerCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Router phase) : ${routerCall.value}`);
+    if (routerCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Router phase) : ${routerCall.value}`);
 
     const mode = routerCall.value.mode;
 
@@ -71,24 +72,24 @@ export async function run(Shared, params = {}, agent = {}) {
                           "Output your response in standard markdown format (not raw code).";
         
         const reviewCall = await aiCall.generateCode(reviewSys, `Task: ${taskDescription}\n\nCode to Review:\n${context}`);
-        if (reviewCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Review phase) : ${reviewCall.value}`);
+        if (reviewCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Review phase) : ${reviewCall.value}`);
 
-        retAR.push(new Shared.Classes.TextMessage({
-            role: Shared.Classes.Roles.Tool,
+        retAR.push(new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             mimeType: "text/markdown",
             textData: reviewCall.value,
             toolName: "createCodeTool",
             instructions: "Code review and analysis complete."
         }));
 
-        return Shared.Utils.Ok(retAR);
+        return Shared.v2Core.Helpers.Ok(retAR);
     }
 
 if (mode === "EDIT") {
         safeEmit(agent, "Coding Tool: Creating a list of specific edits...");
         // --- MODE: EDIT (Modify Existing Code) ---
         if (!context || context === "") {
-             return Shared.Utils.Err("Error: EDIT mode selected by router, but no existing code was provided in the context.");
+             return Shared.v2Core.Helpers.Err("Error: EDIT mode selected by router, but no existing code was provided in the context.");
         }
 
         // 1. Generate an Edit Plan
@@ -120,7 +121,7 @@ if (mode === "EDIT") {
             { structuredOutput: editPlanSchema }
         );
 
-        if (editPlanCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Edit Plan phase) : ${editPlanCall.value}`);
+        if (editPlanCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Edit Plan phase) : ${editPlanCall.value}`);
 
         let currentFileState = context;
         const edits = editPlanCall.value.edits;
@@ -134,22 +135,22 @@ if (mode === "EDIT") {
                 context: edit.codeSnippet // Pass the newly generated code snippet as context for the editor
             });
 
-            if (editResult.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor Edit phase) : ${editResult.value}`);
+            if (editResult.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> SuperEditor Edit phase) : ${editResult.value}`);
 
             // Update the working document for the next iteration
             currentFileState = editResult.value[0].data.editedDocument;
         }
 
         // 3. Output the final modified document
-        retAR.push(new Shared.Classes.TextMessage({
-            role: Shared.Classes.Roles.Tool,
+        retAR.push(new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             mimeType: "text/plain", 
             textData: currentFileState,
             toolName: "createCodeTool",
             instructions: "Iterative code modifications complete."
         }));
 
-        return Shared.Utils.Ok(retAR);
+        return Shared.v2Core.Helpers.Ok(retAR);
     }
 
     if (mode === "CREATE") {
@@ -182,7 +183,7 @@ if (mode === "EDIT") {
 
         safeEmit(agent, "Coding Tool: Creating the architectural skeleton...");
         const archCall = await aiCall.generateCode(archSys, taskDescription, {structuredOutput : archSchema});
-        if (archCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
+        if (archCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
 
         let currentFileState = archCall.value.skeleton;
         const mimeType = archCall.value.mimeType;
@@ -199,7 +200,7 @@ if (mode === "EDIT") {
                            `Here is any additional context: \n ${context} \n`;
             
             const devCall = await aiCall.generateCode(devSys, "Output ONLY the raw code logic. No markdown. No preamble.");
-            if (devCall.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> Development phase) : ${devCall.value}`);
+            if (devCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Development phase) : ${devCall.value}`);
 
             const generatedSnippet = devCall.value;
             const editorPrompt = `REPLACE the marker '${order.marker}' with the code provided in the context.`;
@@ -211,22 +212,22 @@ if (mode === "EDIT") {
                 context: generatedSnippet
             });
 
-            if (editResult.isErr()) return Shared.Utils.Err(`Error (createCodeTool -> SuperEditor phase) : ${editResult.value}`);
+            if (editResult.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> SuperEditor phase) : ${editResult.value}`);
 
             const editData = editResult.value[0].data;
             currentFileState = editData.editedDocument;
         }
 
-        retAR.push(new Shared.Classes.TextMessage({
-            role: Shared.Classes.Roles.Tool,
+        retAR.push(new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             mimeType: mimeType,
             textData: currentFileState,
             toolName: "createCodeTool",
             instructions: "Final Refined Code Assembly Complete"
         }));
 
-        return Shared.Utils.Ok(retAR);
+        return Shared.v2Core.Helpers.Ok(retAR);
     }
     
-    return Shared.Utils.Err("Error: Router failed to select a valid mode.");
+    return Shared.v2Core.Helpers.Err("Error: Router failed to select a valid mode.");
 }

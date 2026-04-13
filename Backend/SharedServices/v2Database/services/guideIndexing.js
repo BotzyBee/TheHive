@@ -1,32 +1,27 @@
-// import { Ok, Err } from '../SharedServices/Utils/helperFunctions.js';
-// import { AiCall } from '../SharedServices/_CallAI/index.js';
-// import { pluginDir, containerVolumeRoot, guideTableName, vectorEmbedSize } from '../SharedServices/constants.js';
-// import { createSummary } from '../SharedServices/v2Agents/core/agentUtils.js';
-// import { scanFolderRecursively, readFileContent, getUpdateStatsFromUrl } from '../../v2FileSystem/services/CRUD.js';
-// import { getDbAgent } from '../SharedServices/Database/utils.js';
-// import { getRecords, addVectorGuideToDB, deleteRecordsByField, getAllRecordsFromTable } from './CRUD.js';
-
 import path from 'path';
+import { Services } from '../../index.js';
+import { guideTableName, vectorEmbedSize } from '../core/constants.js';
+import { getRecords, addVectorGuideToDB, deleteRecordsByField, getAllRecordsFromTable} from './CRUD.js';
 
 export async function fetchPluginAgentGuides(){
-    let tool = scanFolderRecursively;
-    let call = await tool(`${pluginDir}/Guides/`);
-    if(call.isErr()){ return Err(
+    let tool = Services.fileSystem.CRUD.scanFolderRecursively;
+    let call = await tool(`${Services.fileSystem.Constants.pluginDir}/Guides/`);
+    if(call.isErr()){ return Services.v2Core.Helpers.Err(
         `Error (fetchPluginAgentGuides -> scanFolderRecursively ) : ${call.value}`
     )}
     let allFiles = call.value.fileList ?? [];
     let allFilesLen = allFiles.length ?? 0;
-    if( allFilesLen == 0 ){ return Ok([])}
+    if( allFilesLen == 0 ){ return Services.v2Core.Helpers.Ok([])}
 
     //Fetch Tools
     let results = [];
     for(let i=0; i< allFilesLen; i++){
         // read
         if(allFiles[i].includes('.txt')){
-            let fp = path.join(containerVolumeRoot, allFiles[i]);
-            const readFile = await readFileContent(fp)
+            let fp = path.join(Services.fileSystem.Constants.containerVolumeRoot, allFiles[i]);
+            const readFile = await Services.fileSystem.CRUD.readFileContent(fp)
             if(readFile.isErr()){ return readFile };
-            const fileStats = await getUpdateStatsFromUrl(fp);
+            const fileStats = await Services.fileSystem.CRUD.getUpdateStatsFromUrl(fp);
             if(fileStats.isErr()){ return fileStats };
             results.push({
                 filePath: fp,
@@ -37,18 +32,18 @@ export async function fetchPluginAgentGuides(){
             })
         }
     }
-    return Ok(results);
+    return Services.v2Core.Helpers.Ok(results);
 }
 
 export async function initGuideIndex(){
     // Find all guides and add them to the database.
     let plugIn = await fetchPluginAgentGuides();
-    if(plugIn.isErr()){ return Err(`Error ( initGuideIndex -> fetchPluginAgentGuides ) : ${plugIn.value}`) }
+    if(plugIn.isErr()){ return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> fetchPluginAgentGuides ) : ${plugIn.value}`) }
     // Process them into the DB (check if exist, check new version, add if needed);
     const cLen = plugIn.value.length ?? 0;
-    let getDB = await getDbAgent();
+    let getDB = await Services.database.ManageDb.getDbAgent();
     if(getDB.isErr()){
-        return Err(`Error ( initGuideIndex -> getDbAgent ) : ${getDB.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> getDbAgent ) : ${getDB.value}`);
     }
     const db = getDB.value;
     let stats = { guides: 0, added: 0, updated: 0, removed: 0 }
@@ -56,17 +51,17 @@ export async function initGuideIndex(){
         console.log("Checking Guide : ", plugIn.value[i].guideName);
         // check if exists
         let check = await getRecords( db, guideTableName, "GuideName", plugIn.value[i].guideName );
-        if(check.isErr()){ return Err(`Error ( initGuideIndex -> getRecords ) : ${check.value}`); }
+        if(check.isErr()){ return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> getRecords ) : ${check.value}`); }
         // if exists - check if needs updated
         if(check.value[0].length != 0 ){ 
             if(check.value[0][0].GuideName == plugIn.value[i].guideName && check.value[0][0].Version != plugIn.value[i].version){
                 let dCall = await removeGuideFromDB(db, plugIn.value[i].guideName);
                 if(dCall.isErr()){
-                    return Err(`Error ( initGuideIndex -> removeGuideFromDB ) : ${dCall.value}`);
+                    return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> removeGuideFromDB ) : ${dCall.value}`);
                 }
                 let aCall = await addGuideToDB(db, plugIn.value[i]);
                 if(aCall.isErr()){
-                    return Err(`Error ( initGuideIndex -> addGuideToDB ) : ${aCall.value}`);
+                    return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> addGuideToDB ) : ${aCall.value}`);
                 }
                 stats.updated++;
             }
@@ -74,7 +69,7 @@ export async function initGuideIndex(){
             // Doesn't exist - add it
             let aCall = await addGuideToDB(db, plugIn.value[i]);
             if(aCall.isErr()){
-                return Err(`Error ( initGuideIndex -> addGuideToDB ) : ${aCall.value}`);
+                return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> addGuideToDB ) : ${aCall.value}`);
             }
             stats.added++;
         }
@@ -84,10 +79,10 @@ export async function initGuideIndex(){
     // Check for deleted tools 
     let checkDeleted = await checkForDeletedGuides(db, plugIn.value);
     if(checkDeleted.isErr()){
-        return Err(`Error ( initGuideIndex -> checkForDeletedGuides ) : ${checkDeleted.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> checkForDeletedGuides ) : ${checkDeleted.value}`);
     }
     stats.removed = checkDeleted.value;
-    return Ok(stats);
+    return Services.v2Core.Helpers.Ok(stats);
 }
 
 
@@ -98,13 +93,14 @@ export async function initGuideIndex(){
  */
 async function addGuideToDB(dbObject, guideObject){
     // create summary of the guide for embedding.
-    let summary = await createSummary();
+    let summary = await Services.aiAgents.AgentSharedServices.createSummary();
     if(summary.isErr()){
-        return Err(`Error ( addGuideToDB -> createSummary ) : ${summary.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( addGuideToDB -> createSummary ) : ${summary.value}`);
     }
-    let vec = await new AiCall.AiCall().generateEmbeddings(
+    let ai = Services.callAI.aiFactory();
+    let vec = await ai.generateEmbeddings(
         {inputDataVec: [summary.value], dimensionSize: vectorEmbedSize, quality: 1 });
-    if( vec.isErr() ){ return Err(`Error ( addGuideToDB -> generateEmbeddings ) : ${vec.value}`); }
+    if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( addGuideToDB -> generateEmbeddings ) : ${vec.value}`); }
     let dbCall = await addVectorGuideToDB(
         dbObject,
         guideTableName,
@@ -115,9 +111,9 @@ async function addGuideToDB(dbObject, guideObject){
         vec.value[0]
     );
     if(dbCall.isErr()){
-        return Err(`Error ( addGuideToDB -> addVectorGuideToDB ) : ${dbCall.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( addGuideToDB -> addVectorGuideToDB ) : ${dbCall.value}`);
     }
-    return Ok(null);
+    return Services.v2Core.Helpers.Ok(null);
 }
 
 /**
@@ -134,9 +130,9 @@ async function removeGuideFromDB(dbObject, guideName){
         guideName
     );
     if(dbCall.isErr()){
-        return Err(`Error ( removeGuide -> deleteRecordsByField ) : ${dbCall.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( removeGuide -> deleteRecordsByField ) : ${dbCall.value}`);
     }
-    return Ok(null);
+    return Services.v2Core.Helpers.Ok(null);
 }
 
 
@@ -149,7 +145,7 @@ async function removeGuideFromDB(dbObject, guideName){
 async function checkForDeletedGuides(dbObject, liveGuides){
     let dbCall = await getAllRecordsFromTable(dbObject, guideTableName );
     if( dbCall.isErr()){
-        return Err(`Error ( initGuideIndex -> checkForDeletedGuides ) : ${dbCall.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> checkForDeletedGuides ) : ${dbCall.value}`);
     }
     // Check DB list against the 'live' tools found in folders.
     let tLen = dbCall.value.length ?? 0;
@@ -174,9 +170,9 @@ async function checkForDeletedGuides(dbObject, liveGuides){
     for(let i=0; i<dLen; i++){
         let call = await removeGuideFromDB(dbObject, deleteList[i]);
         if( call.isErr()){
-            return Err(`Error ( initGuideIndex -> checkForDeletedGuides 2 ) : ${call.value}`);
+            return Services.v2Core.Helpers.Err(`Error ( initGuideIndex -> checkForDeletedGuides 2 ) : ${call.value}`);
         }
         removed++;
     }
-    return Ok(removed) 
+    return Services.v2Core.Helpers.Ok(removed) 
 }

@@ -112,22 +112,22 @@ export async function run(
     const { contentMessage, options } = params;
     // Catch bad params
     if(contentMessage == null){
-        return Shared.Utils.Err(`Error (aiImageTool) - Input contentMessage missing or null.`);
+        return Shared.v2Core.Helpers.Err(`Error (aiImageTool) - Input contentMessage missing or null.`);
     }
 
     // Make the call
     safeEmit(agent, `Creating image using AI - 🤖🐝`);
-    const aiCall = new Shared.AiCall.AiCall();
+    const aiCall = Shared.callAI.aiFactory();
     let call = await aiCall.generateImage(contentMessage, options)
     if(call.isErr()){
-        return Shared.Utils.Err(`Error (aiImageTool -> Generate Image) : ${call.value}`);
+        return Shared.v2Core.Helpers.Err(`Error (aiImageTool -> Generate Image) : ${call.value}`);
     } 
     // Process Outputs
     for(let i in call.value){
         call.value[i].toolName = "aiImageTool";
         call.value[i].instructions = contentMessage;
-        call.value[i].role = Shared.Classes.Roles.Tool;
+        call.value[i].role = Shared.aiAgents.Constants.Roles.Tool;
     }
-    return Shared.Utils.Ok(call.value); // already an array of messages
+    return Shared.v2Core.Helpers.Ok(call.value); // already an array of messages
 }
 

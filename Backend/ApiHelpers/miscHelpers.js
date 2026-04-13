@@ -1,4 +1,5 @@
 import { Services } from "../SharedServices/index.js";
+import { JOBS } from "../SharedServices/v2Agents/engine/jobManager.js";
 
 export function getConfigForFrontend(){
   let rtnObject = {
@@ -12,4 +13,20 @@ export function getConfigForFrontend(){
     }
   }
   return rtnObject;
+}
+
+export function stopJob(jobID){
+  let msg = JOBS.jobListManager({ stopJob: jobID });
+  if (msg.isErr()) return { error: msg.value };
+
+  const rtnMsg = new Services.aiAgents.Classes.FrontendMessageFormat({
+      aiJobId: jobID,
+      status: Services.aiAgents.Classes.Status.Stopped,
+      isRunning: false,
+      messages: [new Services.aiAgents.Classes.TextMessage({ 
+          role: Services.aiAgents.Constants.Roles.Agent, 
+          textData: `Job ${jobID} has been stopped.` 
+      })]
+  });
+  return rtnMsg;
 }
