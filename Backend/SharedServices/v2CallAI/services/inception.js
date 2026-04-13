@@ -23,7 +23,7 @@ export async function callInception(
   const { capability } = options;
 
   if (!capability) {
-    return Services.coreTools.Helpers.Err('Error (callInception): Capability param is missing. Ensure options.capability has a valid ModelTypes value.');
+    return Services.v2Core.Helpers.Err('Error (callInception): Capability param is missing. Ensure options.capability has a valid ModelTypes value.');
   }
 
   switch (capability) {
@@ -39,9 +39,9 @@ export async function callInception(
     case ModelTypes.speechToText:
     case ModelTypes.maps:
     case ModelTypes.local:
-      return Services.coreTools.Helpers.Err(`Error (callInception): Inception AI does not handle or support the '${capability}' capability yet.`);
+      return Services.v2Core.Helpers.Err(`Error (callInception): Inception AI does not handle or support the '${capability}' capability yet.`);
     default:
-      return Services.coreTools.Helpers.Err(`Error (callInception): Capability '${capability}' is not specifically handled.`);
+      return Services.v2Core.Helpers.Err(`Error (callInception): Capability '${capability}' is not specifically handled.`);
   }
 }
 
@@ -61,12 +61,12 @@ async function generateText(
   options = {}
 ) {
   if (!model) {
-    return Services.coreTools.Helpers.Err('Error (generateText): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (generateText): No model provided in options.');
   }
 
   const apiKey = process.env.ICPTN_KEY;
   if (!apiKey) {
-    return Services.coreTools.Helpers.Err('Error (generateText): INCEPTION_API_KEY is not defined in environment variables.');
+    return Services.v2Core.Helpers.Err('Error (generateText): INCEPTION_API_KEY is not defined in environment variables.');
   }
 
   // 1. Prepare the payload base
@@ -107,24 +107,24 @@ async function generateText(
     if (options.structuredOutput) {
       try {
         // AI often returns the JSON inside a string that needs parsing
-        return Services.coreTools.Helpers.Ok(typeof content === 'string' ? JSON.parse(content) : content);
+        return Services.v2Core.Helpers.Ok(typeof content === 'string' ? JSON.parse(content) : content);
       } catch (e) {
-        return Services.coreTools.Helpers.Err(`Error (generateText): Failed to parse structured output: ${e.message}`);
+        return Services.v2Core.Helpers.Err(`Error (generateText): Failed to parse structured output: ${e.message}`);
       }
     }
 
-    return Services.coreTools.Helpers.Ok(content || '');
+    return Services.v2Core.Helpers.Ok(content || '');
   } catch (error) {
     // Handle Axios-specific error object
     if (error.response) {
       // The server responded with a status code outside the 2xx range
-      return Services.coreTools.Helpers.Err(`Error (generateText): Inception API responded with status ${error.response.status}. Details: ${JSON.stringify(error.response.data)}`);
+      return Services.v2Core.Helpers.Err(`Error (generateText): Inception API responded with status ${error.response.status}. Details: ${JSON.stringify(error.response.data)}`);
     } else if (error.request) {
       // The request was made but no response was received
-      return Services.coreTools.Helpers.Err('Error (generateText): No response received from Inception API.');
+      return Services.v2Core.Helpers.Err('Error (generateText): No response received from Inception API.');
     } else {
       // Something else happened while setting up the request
-      return Services.coreTools.Helpers.Err(`Error (generateText): ${error.message}`);
+      return Services.v2Core.Helpers.Err(`Error (generateText): ${error.message}`);
     }
   }
 }

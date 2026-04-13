@@ -11,7 +11,7 @@ import {
   toolTableName,
   guideTableName,
 } from '../SharedServices/constants.js';
-import { addDirectoryToDB } from '../SharedServices/Database/CRUD.js';
+import { addDirectoryToDB } from '../SharedServices/v2Database/services/CRUD.js';
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {

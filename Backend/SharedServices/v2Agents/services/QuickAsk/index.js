@@ -1,13 +1,15 @@
-import { Ok, Err } from '../../Utils/helperFunctions.js';
-import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
-import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
-import { callAgentTool } from '../../CoreTools/helperFunctions.js';
-import { TextMessage, Roles } from '../../Classes/index.js';
-import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
-import { AiJob } from '../../Classes/aiJob.js';
-import { containerVolumeRoot } from '../../constants.js';
-import { saveFile } from '../../FileSystem/CRUD.js';
 import path from 'path';
+import { Services } from '../../../index.js';
+
+// import { getToolsOrGuidesForTask, getToolDetails } from '../../Database/helpers.js';
+// import { parserPrompts, parseNunjucksTemplate } from '../../CoreTools/inputParser.js';
+// import { callAgentTool } from '../../CoreTools/helperFunctions.js';
+// import { TextMessage, Roles } from '../../Classes/index.js';
+// import { processMessageForContext, finialiseOutput } from '../agentUtils.js';
+// import { AiJob } from '../../Classes/aiJob.js';
+// import { containerVolumeRoot } from '../../constants.js';
+// import { saveFile } from '../../FileSystem/CRUD.js';
+
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -47,7 +49,7 @@ export class QuickAskAgent extends AiJob {
           this.isRunning = false; 
           this.errors.push(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`);
           this.emitFailed();
-          return Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
+          return Services.coreTools.Helpers.Err(`Error (Quick Task Agent -> startTask -> generateText) : ${taskCall.value}`)}
         this.task = taskCall.value;
         this.addAiCount(1);
       }
@@ -61,7 +63,7 @@ export class QuickAskAgent extends AiJob {
         this.emitUpdateStatus("Quick Ask Agent has failed :(");
         this.errors.push(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
         this.emitFailed();
-        return Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
+        return Services.coreTools.Helpers.Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
       }
 
       // Make call to determine the tool to use.
@@ -79,7 +81,7 @@ export class QuickAskAgent extends AiJob {
         this.isRunning = false;
         this.errors.push(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
         this.emitFailed();
-        return Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
+        return Services.coreTools.Helpers.Err(`Error (Quick Task Agent -> startTask -> aiCall) : ${routingCall.value}`);
       }
       // catch no-suitable tool Or clarify task
       if(routingCall.value.nextAction == "no-suitable-tool" || 
@@ -97,11 +99,11 @@ export class QuickAskAgent extends AiJob {
           role: Roles.Agent, textData: routingCall.value.message});
         this.messageHistory.addMessage(msg);
         this.taskOutput.push(msg);
-        return Ok("Agent has messaged the user.");
+        return Services.coreTools.Helpers.Ok("Agent has messaged the user.");
       }
 
       // Get tool details
-      if (!this.isRunning) return Ok("Job stopped by user."); 
+      if (!this.isRunning) return Services.coreTools.Helpers.Ok("Job stopped by user."); 
       let toolDetails = await getToolDetails(routingCall.value.toolName);
       if(toolDetails.isErr()){
         this.setFailed();
@@ -120,7 +122,7 @@ export class QuickAskAgent extends AiJob {
       // Try Params / Tools a few times if they fail.
       
       for(let i=0; i<this.toolRetryCount; i++){
-        if (!this.isRunning) return Ok("Job stopped by user."); 
+        if (!this.isRunning) return Services.coreTools.Helpers.Ok("Job stopped by user."); 
         let paramsCall = await this.aiCall.generateText(
           parserPrompts.craftParams.sys,
           parserPrompts.craftParams.usr(
@@ -180,7 +182,7 @@ export class QuickAskAgent extends AiJob {
         this.setFailed();
         this.emitUpdateStatus("Quick Ask Agent has failed :(");
         this.isRunning = false;
-        return Err(`Error ( Quick Task Agent (Param/ Tool loop) ) : ${JSON.stringify(loopErrors)}`);
+        return Services.coreTools.Helpers.Err(`Error ( Quick Task Agent (Param/ Tool loop) ) : ${JSON.stringify(loopErrors)}`);
       }
 
       // Process messages from tool call
@@ -197,7 +199,7 @@ export class QuickAskAgent extends AiJob {
             this.emitUpdateStatus("Quick Ask Agent has failed :(");
             this.errors.push(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);
             this.emitFailed();
-            return Err(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);   
+            return Services.coreTools.Helpers.Err(`Error : (Quick Task Agent -> startTask -> processMessageForContext ) : ${processed.value}`);   
           }
           // Add data to tool context;
           let k = processed.value.key;
@@ -210,7 +212,7 @@ export class QuickAskAgent extends AiJob {
         }
       }
       
-      if (!this.isRunning) return Ok("Job stopped by user."); 
+      if (!this.isRunning) return Services.coreTools.Helpers.Ok("Job stopped by user."); 
 
       // Finalise output
       this.emitUpdateStatus('Task Completed - Finalising Output...');
@@ -238,14 +240,14 @@ export class QuickAskAgent extends AiJob {
       this.emitUpdateStatus("Done 🐝");
       this.emitFinalResult();
 
-      return Ok(this.taskOutput);
+      return Services.coreTools.Helpers.Ok(this.taskOutput);
       } catch (e) {
         this.setFailed();
         this.isRunning = false;
         this.emitUpdateStatus("Quick Ask Agent has mega-failed :(");
         this.errors.push(`Unexpected error: ${e}`);
         this.emitFailed();
-        return Err(`Unexpected error: ${e}`);
+        return Services.coreTools.Helpers.Err(`Unexpected error: ${e}`);
     }
   }
 }

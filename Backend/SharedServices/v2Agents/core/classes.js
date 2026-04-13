@@ -88,7 +88,7 @@ export class MessageLog {
 
 export class BaseMessage {
   constructor(role, metadata = {}) {
-    this.id = Services.coreTools.Utils.generateShortID("MSG");
+    this.id = Services.v2Core.Utils.generateShortID("MSG");
     this.role = role; // as defined in Roles object
     this.timestamp = new Date();
     this.metadata = metadata; // for counting ai calls etc
@@ -250,7 +250,7 @@ export class ContextTemplate {
      * Updates globalData.timeAndDate with current time/ date.
      */
     updateDateTime(){
-        let getDT = Services.coreTools.Timers.getDateTime();
+        let getDT = Services.v2Core.Timers.getDateTime();
         if(getDT.isOk()){
             let d = getDT.value;
             this.globalData.timeAndDate = `Today is ${d.dayOfWeek} ${d.dayOfMonth} ${d.monthName} ${d.year} (Epoch: ${d.currentEpoch}, Date: ${d.fullDateTime}). The user is in timezone: ${d.timezone}`;
@@ -337,7 +337,7 @@ export class ContextTemplate {
 export class AiJob {
   constructor({ idPrefix = "AI", aiSettings, socketId, emitToSocketFunction } = {}){ 
     /**@type {string} */
-    this.id = Services.coreTools.Utils.generateLongID(idPrefix);
+    this.id = Services.v2Core.Utils.generateLongID(idPrefix);
 
     /**@type {string | null} - Socket ID for linking to the correct user for updates */
     this.socketId = socketId || null; 

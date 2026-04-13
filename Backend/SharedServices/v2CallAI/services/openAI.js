@@ -31,7 +31,7 @@ export async function callOpenAI(
   if (options.embeddingsMode) {
     const { inputDataVec, dimensionSize } = options;
     if (!Array.isArray(inputDataVec)) {
-      return Services.coreTools.Helpers.Err('Error: inputDataVec must be an array of strings.');
+      return Services.v2Core.Helpers.Err('Error: inputDataVec must be an array of strings.');
     }
     try {
       const embeddings = new OpenAIEmbeddings({
@@ -40,9 +40,9 @@ export async function callOpenAI(
         openAIApiKey: apiKey,
       });
       const vectors = await embeddings.embedDocuments(inputDataVec);
-      return Services.coreTools.Helpers.Ok(vectors);
+      return Services.v2Core.Helpers.Ok(vectors);
     } catch (error) {
-      return Services.coreTools.Helpers.Err(`Error (callOpenAI - embeddings): ${error}`);
+      return Services.v2Core.Helpers.Err(`Error (callOpenAI - embeddings): ${error}`);
     }
   }
 
@@ -50,7 +50,7 @@ export async function callOpenAI(
   const { structuredOutput } = options;
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.coreTools.Helpers.Err('Error (callOpenAI): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callOpenAI): No model provided in options.');
   }
   const hasImage = contentMessage?.imageUrl != null;
   const modelChoice = model;
@@ -82,12 +82,12 @@ export async function callOpenAI(
       const schemaWithStrictness = makeSchemaStrict(structuredOutput);
       const structured = chatModel.withStructuredOutput(schemaWithStrictness);
       const res = await structured.invoke(messages);
-      return Services.coreTools.Helpers.Ok(res);
+      return Services.v2Core.Helpers.Ok(res);
     } else {
       const res = await chatModel.invoke(messages);
-      return Services.coreTools.Helpers.Ok(res.content);
+      return Services.v2Core.Helpers.Ok(res.content);
     }
   } catch (error) {
-    return Services.coreTools.Helpers.Err(`Error (callOpenAI): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callOpenAI): ${error}`);
   }
 }

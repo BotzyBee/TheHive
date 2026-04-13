@@ -30,7 +30,7 @@ export async function callGemini(
   console.log(`Calling Gemini : ${model}`);
   const { capability } = options;
   if(!capability){
-    return Services.coreTools.Helpers.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
+    return Services.v2Core.Helpers.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
   }
 
   // Match Capabilities
@@ -48,28 +48,28 @@ export async function callGemini(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.deepResearch:
-      return Services.coreTools.Helpers.Err('Error (callGemini) : Gemini does not have deep research capability.');
+      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have deep research capability.');
 
     case ModelTypes.websearch:
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.embedding:
-      return Services.coreTools.Helpers.Err('Error (callGemini) : Gemini does not have embedding capability.');
+      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have embedding capability.');
 
     case ModelTypes.textToSpeech:
       return await generateAudio(contentMessage, model, options);
 
     case ModelTypes.speechToText:
-      return Services.coreTools.Helpers.Err('Error (callGemini) : Gemini does not have speech to text capability.');
+      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have speech to text capability.');
 
     case ModelTypes.maps:
-      return Services.coreTools.Helpers.Err('Error (callGemini) : Gemini does not have maps capability.');
+      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have maps capability.');
 
     case ModelTypes.local:
-      return Services.coreTools.Helpers.Err('Error (callGemini) : Gemini does not have local capability.');
+      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have local capability.');
 
     default:
-      Services.coreTools.Helpers.Err(`Error (callGemini) "${capability}" not specifically handled.`);
+      Services.v2Core.Helpers.Err(`Error (callGemini) "${capability}" not specifically handled.`);
   }
 }
 
@@ -144,7 +144,7 @@ export async function generateText(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.coreTools.Helpers.Err('Error (callGemini -> generateText): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callGemini -> generateText): No model provided in options.');
   }
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
@@ -181,7 +181,7 @@ export async function generateText(
         },
       });
 
-      return Services.coreTools.Helpers.Ok(JSON.parse(secondResponse.text));
+      return Services.v2Core.Helpers.Ok(JSON.parse(secondResponse.text));
     }
 
     // ------------------------------------------------------------------
@@ -232,19 +232,19 @@ export async function generateText(
       };
       
       const groundedResponse = processGrounding(mockApiResponse);
-      return Services.coreTools.Helpers.Ok(groundedResponse);
+      return Services.v2Core.Helpers.Ok(groundedResponse);
     }
 
     // Parse JSON if Structured Output
     if (structuredOutput) {
-      return Services.coreTools.Helpers.Ok(JSON.parse(fullText));
+      return Services.v2Core.Helpers.Ok(JSON.parse(fullText));
     }
 
     // Standard text completion
-    return Services.coreTools.Helpers.Ok(fullText);
+    return Services.v2Core.Helpers.Ok(fullText);
 
   } catch (error) {
-    return Services.coreTools.Helpers.Err(`Error (callGemini -> generateText): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText): ${error}`);
   }
 }
 
@@ -267,7 +267,7 @@ async function generateImage(
   options = {}
 ){
   if (!model) {
-    return Services.coreTools.Helpers.Err('Error (callGemini -> generateImage): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callGemini -> generateImage): No model provided in options.');
   }
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
@@ -310,9 +310,9 @@ async function generateImage(
         responseMessages.push(msg);
       }
     }
-    return Services.coreTools.Helpers.Ok(responseMessages);
+    return Services.v2Core.Helpers.Ok(responseMessages);
   } catch (error) {
-    return Services.coreTools.Helpers.Err(`Error (callGemini -> generateImage) : ${error}`)
+    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateImage) : ${error}`)
   }
 }
 
@@ -333,7 +333,7 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
   options = {}
 ) {
   if (contentMessage == null) {
-    return Services.coreTools.Helpers.Err('Error (callGemini -> generateAudio): No contentMessage provided.');
+    return Services.v2Core.Helpers.Err('Error (callGemini -> generateAudio): No contentMessage provided.');
   }
 
   const gemiKey = process.env.GEM_KEY;
@@ -405,8 +405,8 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
       }
     }
 
-    return Services.coreTools.Helpers.Ok(responseMessages);
+    return Services.v2Core.Helpers.Ok(responseMessages);
   } catch (error) {
-    return Services.coreTools.Helpers.Err(`Error (callGemini -> generateAudio) : ${error.message || error}`);
+    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateAudio) : ${error.message || error}`);
   }
 }

@@ -27,7 +27,7 @@ export async function callPerplexity(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.coreTools.Helpers.Err(
+    return Services.v2Core.Helpers.Err(
       'Error (callPerplexity): No model provided in options.'
     );
   }
@@ -68,13 +68,13 @@ export async function callPerplexity(
       try {
         content = JSON.parse(content);
       } catch (e) {
-        return Services.coreTools.Helpers.Err(
+        return Services.v2Core.Helpers.Err(
           'Error (callPerplexity): Could not parse response to JSON.'
         );
       }
     }
 
-    return Services.coreTools.Helpers.Ok({
+    return Services.v2Core.Helpers.Ok({
       searchResult: content,
       citations: data.citations || [],
     });
@@ -82,6 +82,6 @@ export async function callPerplexity(
     // Return detailed error if possible, otherwise generic message
     const errorMsg =
       error.response?.data?.error?.message || error.message || error;
-    return Services.coreTools.Helpers.Err(`Error (callPerplexity): ${errorMsg}`);
+    return Services.v2Core.Helpers.Err(`Error (callPerplexity): ${errorMsg}`);
   }
 }

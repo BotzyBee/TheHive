@@ -7,20 +7,20 @@ import {
   initDatabaseConnection,
   closeDatabaseConnection,
 } from './SharedServices/Database/utils.js';
-import { setupPool, pool, indexTimerActive } from './Engine/workers.js';
-import { addNewTimer, stopAndClearAllTimers  } from './SharedServices/v2CoreTools/services/timers.js';
+import { setupPool, pool, indexTimerActive } from './SharedServices/v2Core/engine/workers.js';
+import { addNewTimer, stopAndClearAllTimers  } from './SharedServices/v2Core/services/timers.js';
 import { FrontendMessageFormat, TextMessage, Roles } from './SharedServices/Classes/aiMessages.js';
 import { log } from './SharedServices/Utils/misc.js';
 import { writeLogsToFile } from './SharedServices/Utils/misc.js';
 import { getConfigForFrontend } from './Engine/routes/index.js';
-import { initToolIndex } from './Engine/toolIndex.js';
-import { initGuideIndex } from './Engine/guideIndex.js';
-import { JOBS } from './Engine/jobManager.js';
+import { initToolIndex } from './SharedServices/v2Database/services/toolIndexing.js';
+import { initGuideIndex } from './SharedServices/v2Database/services/guideIndexing.js';
+import { JOBS } from './SharedServices/v2Agents/engine/jobManager.js';
 import { getFormattedModelRegistry } from './SharedServices/_CallAI/utils.js';
 import { isMainThread } from 'node:worker_threads';
 import { testDrive, rustActionState } from './SharedServices/CoreTools/webDriver/engine.js'; // TESTING ONLY - REMOVE LATER
-import { handleQAMessage } from './Engine/routes/quickAsk.js';
-import { handleTAMessage } from './Engine/routes/taskAgent.js';
+import { handleQAMessage } from './SharedServices/v2Agents/engine/quickAsk.js';
+import { handleTAMessage } from './SharedServices/v2Agents/engine/taskAgent.js';
 import { connectedSockets, io} from './ApiHelpers/socketHelpers.js';
 let dbAgent; // Global variable to hold the database agent instance
 let servicesStarted = false;

@@ -18,7 +18,7 @@ export async function callAnthropic(
   model,
   options = {}
 ) {
-  Services.coreTools.Helpers.log('Calling Anthropic...');
+  Services.v2Core.Helpers.log('Calling Anthropic...');
   
   const client = new Anthropic({
     apiKey: process.env.ANT_KEY,
@@ -29,7 +29,7 @@ export async function callAnthropic(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.coreTools.Helpers.Err('Error (callClaude): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callClaude): No model provided in options.');
   }
   try {
     const params = {
@@ -52,13 +52,13 @@ export async function callAnthropic(
 
     // Check if the model cut off early
     if (res.stop_reason === 'max_tokens') {
-      return Services.coreTools.Helpers.Err('Error: Claude hit the max_token limit. The JSON is incomplete.');
+      return Services.v2Core.Helpers.Err('Error: Claude hit the max_token limit. The JSON is incomplete.');
     }
 
     // Find the first text block in the content array
     const textBlock = res.content.find((block) => block.type === 'text');
     if (!textBlock) {
-      return Services.coreTools.Helpers.Err('No text content returned from Claude.');
+      return Services.v2Core.Helpers.Err('No text content returned from Claude.');
     }
 
     let finalResult;
@@ -67,16 +67,16 @@ export async function callAnthropic(
           finalResult = JSON.parse(textBlock.text);
         } catch (e) {
           console.error("Failed to parse JSON. String preview:", textBlock.text.slice(-100)); // See the end of the string
-          return Services.coreTools.Helpers.Err(`JSON Syntax Error at position ${e.message}`);
+          return Services.v2Core.Helpers.Err(`JSON Syntax Error at position ${e.message}`);
         }
       } else {
         finalResult = textBlock.text;
     }
 
-    return Services.coreTools.Helpers.Ok(finalResult);
+    return Services.v2Core.Helpers.Ok(finalResult);
   } catch (error) {
     console.error('Anthropic ERROR DEBUG :', JSON.stringify(schemaWithStrictness, null, 2));
-    return Services.coreTools.Helpers.Err(`Error (callClaude): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callClaude): ${error}`);
   }
 }
 

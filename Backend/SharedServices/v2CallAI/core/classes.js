@@ -1,5 +1,5 @@
 import { Services } from '../../index.js';
-// uses Services.coreTools - ok, err, log
+// uses Services.v2Core - ok, err, log
 
 /*
 Function flow for AiCall
@@ -13,7 +13,7 @@ export class AiCall {
   #ProviderFunctions = {};
   #defaultProvider = '';
 
-  get coreTools(){ return Services.coreTools }
+  get v2Core(){ return Services.v2Core }
 
   constructor({
     models = [],
@@ -197,7 +197,7 @@ export class AiCall {
     if (model !== null && typeof model == 'string') {
       const entry = this.#models.find((m) => m.model === model);
       if (!entry) {
-        return this.coreTools.Helpers.Err(
+        return this.v2Core.Helpers.Err(
           `Error ( resolveModel ) : Unknown Model : ${model}`
         );
       }
@@ -205,11 +205,11 @@ export class AiCall {
         (c) => !entry.capabilities.includes(c)
       );
       if (missing.length) {
-        return this.coreTools.Helpers.Err(
+        return this.v2Core.Helpers.Err(
           `Error ( resolveModel ) : ${model} does not support ${missing.join(', ')}`
         );
       } 
-      return this.coreTools.Helpers.Ok(entry);
+      return this.v2Core.Helpers.Ok(entry);
     }
 
     // Filter models for other paths (filter capabilities & context size)
@@ -218,7 +218,7 @@ export class AiCall {
     );
     // catch no models available for task
     if (capableCandidates.length === 0) {
-      return this.coreTools.Helpers.Err(
+      return this.v2Core.Helpers.Err(
         `Error ( resolveModel ) : No model found supporting requested capabilities : ${[...requiredCaps].join(', ')}.`
       );
     }
@@ -237,7 +237,7 @@ export class AiCall {
       let randomNum = Math.floor(
         Math.random() * contextSizeAndQualityApproved.length
       );
-      return this.coreTools.Helpers.Ok(contextSizeAndQualityApproved[randomNum]);
+      return this.v2Core.Helpers.Ok(contextSizeAndQualityApproved[randomNum]);
     }
 
     // Path 3: Go with default provider (unless user specifies one) and closest model to quality
@@ -252,20 +252,20 @@ export class AiCall {
           (m) => m.maxContext >= contextSize
         );
         if (contextFit.length > 0) {
-          return this.coreTools.Helpers.Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
+          return this.v2Core.Helpers.Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
         }
         // No model from this provider fits the context — warn and fall through
-        this.coreTools.Helpers.log(
+        this.v2Core.Helpers.log(
           `WARN: ( AiCall -> resolveModel ) :  Provider "${resolvedProvider}" has no models with maxContext >= ${contextSize}.` +
             `Falling through to cross-provider selection.`
         );
       } else {
         // No context constraint — just pick by quality proximity within provider
-        return this.coreTools.Helpers.Ok(providerCandidates.sort(byQualityProximity)[0]);
+        return this.v2Core.Helpers.Ok(providerCandidates.sort(byQualityProximity)[0]);
       }
     } else if (provider) {
       // Caller explicitly named a provider that has no capable models — hard fail
-      this.coreTools.Helpers.log(
+      this.v2Core.Helpers.log(
         `WARN: ( resolveModel ) : Provider "${provider}" has no models supporting: ` +
           `[${[...requiredCaps].join(', ')}]. Falling back to any suitable model available.`
       );
@@ -284,12 +284,12 @@ export class AiCall {
       if (contextFit.length > 0) {
         fallbackCandidates = contextFit;
       } else {
-        return this.coreTools.Helpers.Err(
+        return this.v2Core.Helpers.Err(
           `Error ( resolveModel ) : No model across any provider has maxContext >= ${contextSize}. Unable to progress`
         );
       }
     }
-    return this.coreTools.Helpers.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
+    return this.v2Core.Helpers.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
   }
 
   /**
@@ -303,11 +303,11 @@ export class AiCall {
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
-      return this.coreTools.Helpers.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
+      return this.v2Core.Helpers.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
     }
     const callFn = this.#ProviderFunctions[entry.value.provider];
     if (!callFn) {
-      return this.coreTools.Helpers.Err(
+      return this.v2Core.Helpers.Err(
         `Error : ( #dispatch ) No dispatch function registered for provider. ${entry.value.provider}`
       );
     }
