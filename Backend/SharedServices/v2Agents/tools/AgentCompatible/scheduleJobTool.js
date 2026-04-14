@@ -56,27 +56,27 @@ async function handleScheduleMode(Shared, params) {
     const { timerName, delayMs, targetTime, intervalMs, aiComments } = params;
 
     if (!timerName) {
-        return Shared.Utils.Err("Mode 1 requires 'timerName' to uniquely identify the schedule.");
+        return Shared.v2Core.Helpers.Err("Mode 1 requires 'timerName' to uniquely identify the schedule.");
     }
     if (!aiComments) {
-        return Shared.Utils.Err("Mode 1 requires 'aiComments' defining the AI instructions.");
+        return Shared.v2Core.Helpers.Err("Mode 1 requires 'aiComments' defining the AI instructions.");
     }
 
     let calculatedDelay = 0;
     
     if (targetTime) {
-        const parsedDate = Shared.Utils.parseISOHelper(targetTime);
+        const parsedDate = Shared.aiAgents.ToolHelpers.parseISOHelper(targetTime);
         
-        if (!Shared.Utils.isValidHelper(parsedDate)) {
-            return Shared.Utils.Err(`Invalid targetTime format provided: ${targetTime}. Must be a valid ISO 8601 string.`);
+        if (!Shared.aiAgents.ToolHelpers.isValidHelper(parsedDate)) {
+            return Shared.v2Core.Helpers.Err(`Invalid targetTime format provided: ${targetTime}. Must be a valid ISO 8601 string.`);
         }
 
         // Calculate milliseconds between now and the target date
-        const now = new Date();
-        calculatedDelay = Shared.Utils.differenceInMillisecondsHelper(parsedDate, now);
+        const now = new Date(); 
+        calculatedDelay = Shared.aiAgents.ToolHelpers.differenceInMillisecondsHelper(parsedDate, now);
 
         if (calculatedDelay < 0) {
-            return Shared.Utils.Err("Cannot schedule a task in the past.");
+            return Shared.v2Core.Helpers.Err("Cannot schedule a task in the past.");
         }
     } else if (delayMs !== undefined) {
         calculatedDelay = Math.max(0, delayMs); // Ensure we don't get negative delays
@@ -86,7 +86,7 @@ async function handleScheduleMode(Shared, params) {
 
     // AI Execution Callback
     const callbackFn = async () => {
-        await Shared.Utils.createNewTaskAgentJob(aiComments);
+        await Shared.aiAgents.ToolHelpers.createNewTaskAgentJob(aiComments);
     };
 
     const config = {
@@ -95,13 +95,13 @@ async function handleScheduleMode(Shared, params) {
         isOneOff
     };
 
-    const timerResult = Shared.CoreTools.Timers.addNewTimer(timerName, callbackFn, config);
+    const timerResult = Shared.v2Core.Timers.addNewTimer(timerName, callbackFn, config);
     
     if (timerResult.isErr()) {
-        return Shared.Utils.Err(`Failed to create schedule: ${timerResult.value}`);
+        return Shared.v2Core.Helpers.Err(`Failed to create schedule: ${timerResult.value}`);
     }
 
-    return Shared.Utils.Ok(JSON.stringify({
+    return Shared.v2Core.Helpers.Ok(JSON.stringify({
         action: "scheduled",
         timerName,
         isOneOff,
@@ -120,13 +120,13 @@ async function handleCancelMode(Shared, params) {
     const { timerID, timerName } = params;
     console.log(`Attempting to cancel timer with ID: ${timerID} or Name: ${timerName}`);
     
-    const cancelResult = Shared.CoreTools.Timers.removeTimer(timerName, timerID);
+    const cancelResult = Shared.v2Core.Timers.removeTimer(timerName, timerID);
     
     if (cancelResult.isErr()) {
-        return Shared.Utils.Err(`Failed to cancel task: ${cancelResult.value}`);
+        return Shared.v2Core.Helpers.Err(`Failed to cancel task: ${cancelResult.value}`);
     }
 
-    return Shared.Utils.Ok(JSON.stringify({
+    return Shared.v2Core.Helpers.Ok(JSON.stringify({
         action: "cancelled",
         target: timerID || timerName,
         details: cancelResult.value,
@@ -140,13 +140,13 @@ async function handleCancelMode(Shared, params) {
  * @returns {Promise<object>} Result wrapper containing operation metadata
  */
 async function handleListMode(Shared) {
-    const listResult = Shared.CoreTools.Timers.getAllTimersAsString();
+    const listResult = Shared.v2Core.Timers.getAllTimersAsString();
     
     if (listResult.isErr()) {
-        return Shared.Utils.Err(`Failed to list tasks: ${listResult.value}`);
+        return Shared.v2Core.Helpers.Err(`Failed to list tasks: ${listResult.value}`);
     }
 
-    return Shared.Utils.Ok(JSON.stringify({
+    return Shared.v2Core.Helpers.Ok(JSON.stringify({
         action: "list",
         timers: listResult.value,
         status: "success"
@@ -174,7 +174,7 @@ export async function run(Shared, params = {}) {
             operationResult = await handleListMode(Shared);
             break;
         default:
-            return Shared.Utils.Err(`Error (scheduleJobTool) : Invalid mode '${mode}'. Supported modes are 1, 2, or 3.`);
+            return Shared.v2Core.Helpers.Err(`Error (scheduleJobTool) : Invalid mode '${mode}'. Supported modes are 1, 2, or 3.`);
     }
 
     // Catch errors bubbling up from specific mode handlers
@@ -187,11 +187,11 @@ export async function run(Shared, params = {}) {
                        mode === 2 ? "Scheduled task cancellation has been completed." : 
                        "Active timers retrieved successfully.";
     
-    const message = new Shared.Classes.TextMessage({
-        role: Shared.Classes.Roles.Tool,
+    const message = new Shared.aiAgents.Classes.TextMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool,
         textData: operationResult.value,
         toolName: details.toolName,
         instructions: instructions
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }

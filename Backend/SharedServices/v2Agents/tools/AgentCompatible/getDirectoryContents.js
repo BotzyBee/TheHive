@@ -1,7 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
 export const details = {
     toolName:   "getContentsOfDirectory",
     version:    "2026.0.1",
@@ -41,17 +40,17 @@ export async function run(
     const { relativeFolderPath } = params;
     // Catch bad params
     if(relativeFolderPath == null){
-        return Shared.Utils.logAndErr(`Error (getContentsOfDirectory) : Params missing or incorrect. Params: relativeFolderPath`);
+        return Shared.v2Core.Helpers.Err(`Error (getContentsOfDirectory) : Params missing or incorrect. Params: relativeFolderPath`);
     }
-    let call = await Shared.FileSystem.scanFolderRecursively(relativeFolderPath);
-    if (call.isErr()){ return Shared.Utils.Err(`Error (getContentsOfDirectory -> scanFolderRecursively) : ${call.value}`)}
+    let call = await Shared.fileSystem.CRUD.scanFolderRecursively(relativeFolderPath);
+    if (call.isErr()){ return Shared.v2Core.Helpers.Err(`Error (getContentsOfDirectory -> scanFolderRecursively) : ${call.value}`)}
 
-    let message = new Shared.Classes.DataMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new Shared.aiAgents.Classes.DataMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: null, 
         data: call.value,
         toolName: "getContentsOfDirectory",
         instructions: `Get the contents of the directory ${relativeFolderPath}.`
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }

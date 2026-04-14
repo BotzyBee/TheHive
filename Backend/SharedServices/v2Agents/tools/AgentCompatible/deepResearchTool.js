@@ -5,7 +5,7 @@
 */
 export const details = {
     toolName: "deepResearchTool",
-    version: "0.0.5",
+    version: "0.1.5",
     creator: "Botzy Bee",
     overview: "Conducts deep, factual, and actionable research on a given topic. It scopes the research, deconstructs terms, " 
     +"gathers official sources, fact-checks claims, and returns structured data. \n" 

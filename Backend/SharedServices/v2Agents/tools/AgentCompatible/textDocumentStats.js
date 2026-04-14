@@ -39,10 +39,10 @@ export async function run(
     const { filePath } = params;
     // Catch bad params
     if(filePath == null){
-        return Shared.Utils.Err(`Error (readFile) : Params missing or incorrect. Params: should include filePath.`);
+        return Shared.v2Core.Helpers.Err(`Error (readFile) : Params missing or incorrect. Params: should include filePath.`);
     }
-    const rootPath = Shared.Constants.containerVolumeRoot;
-    const targetURL = Shared.Utils.pathHelper.join(rootPath, filePath);
+    const rootPath = Shared.fileSystem.Constants.containerVolumeRoot;
+    const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(rootPath, filePath);
     let lineCount = null; // Initialize to null for non-text files
     let wordCount = null;
     let charCount = null;
@@ -69,11 +69,11 @@ export async function run(
     ];
     try {
         // Get file statistics (size)
-        const stats = Shared.Utils.fsHelper.statSync(targetURL);
+        const stats = Shared.aiAgents.ToolHelpers.fsHelper.statSync(targetURL);
         fileSize = stats.size;
-        fileSizeFormatted = Shared.Utils.formatBytes(fileSize);
+        fileSizeFormatted = Shared.v2Core.Utils.formatBytes(fileSize);
         // Get file extension and convert to lowercase, removing the leading dot
-        fileExtension = Shared.Utils.pathHelper.extname(targetURL).toLowerCase().substring(1);
+        fileExtension = Shared.aiAgents.ToolHelpers.pathHelper.extname(targetURL).toLowerCase().substring(1);
         // Only process for line, word, and character counts if it's a recognized text file
         if (textFileExtensions.includes(fileExtension)) {
         // Initialize text-specific counts to 0 before processing
@@ -81,8 +81,8 @@ export async function run(
         wordCount = 0;
         nonWhitespaceCharCount = 0;
         // Use readline to efficiently count lines, words, and non-whitespace characters
-        const rl = Shared.Utils.readlineHelper.createInterface({
-            input: Shared.Utils.fsHelper.createReadStream(targetURL, { encoding: 'utf8' }),
+        const rl = Shared.aiAgents.ToolHelpers.readlineHelper.createInterface({
+            input: Shared.aiAgents.ToolHelpers.fsHelper.createReadStream(targetURL, { encoding: 'utf8' }),
             crlfDelay: Infinity // Recognizes both \r\n and \n as line endings
         });
         for await (const line of rl) {
@@ -94,14 +94,14 @@ export async function run(
         }
         // Read the entire file content to get an accurate total character count,
         // including all newline characters as they exist in the file.
-        const fullContent = Shared.Utils.fsHelper.readFileSync(targetURL, 'utf8');
+        const fullContent = Shared.aiAgents.ToolHelpers.fsHelper.readFileSync(targetURL, 'utf8');
         charCount = fullContent.length;
         }
     } catch (err) {
-        return Shared.Utils.Err(`Error (getTextDocumentStats) : ${err}`);
+        return Shared.v2Core.Helpers.Err(`Error (getTextDocumentStats) : ${err}`);
     }
-    let message = new Shared.Classes.DataMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new Shared.aiAgents.Classes.DataMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: null, 
         data: {
             lines: lineCount,
@@ -115,5 +115,5 @@ export async function run(
         toolName: "getTextDocumentStats",
         instructions: `Get the file stats for ${filePath}.`
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }

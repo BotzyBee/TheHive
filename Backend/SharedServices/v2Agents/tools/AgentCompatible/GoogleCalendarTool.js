@@ -107,9 +107,9 @@ User wants to change a meeting time: Action: update + eventId + eventDetails (ne
  * @param {object} params - Inputs defined in inputSchema
  */
 export async function run(Shared, params = {}) {
-    const tokenResult = await Shared.Utils.getGoogleAccessToken();
+    const tokenResult = await Shared.v2Core.getGoogleAccessToken();
     if (tokenResult.isErr()) {
-        return Shared.Utils.Err(`Error (manageCalendar): Failed to obtain Google Access Token. ${tokenResult.value}`);
+        return Shared.v2Core.Helpers.Err(`Error (manageCalendar): Failed to obtain Google Access Token. ${tokenResult.value}`);
     }
 
     const OAUTH_TOKEN = tokenResult.value;
@@ -134,7 +134,7 @@ export async function run(Shared, params = {}) {
 
         const makeRequest = async (config) => {
             try {
-                const response = await Shared.Utils.axiosHelper({ ...config, headers });
+                const response = await Shared.aiAgents.ToolHelpers.axiosHelper({ ...config, headers });
                 return response.data;
             } catch (error) {
                 const apiErrorMsg = error.response?.data?.error?.message || error.message;
@@ -201,16 +201,16 @@ export async function run(Shared, params = {}) {
                 throw new Error(`Unsupported calendar action: '${requestedAction}'`);
         }
 
-        const message = new Shared.Classes.DataMessage({
-            role: Shared.Classes.Roles.Tool,
+        const message = new Shared.aiAgents.Classes.DataMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             data: resultData,
             toolName: details.toolName,
             instructions: 'Summarise the calendar action results for the user.'
         });
 
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
 
     } catch (error) {
-        return Shared.Utils.Err(`Error (manageCalendar): ${error.message}`);
+        return Shared.v2Core.Helpers.Err(`Error (manageCalendar): ${error.message}`);
     }
 }

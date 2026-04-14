@@ -1,8 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
-
 export const details = {
     toolName:   "findFileorFolder",
     version:    "2026.0.1",
@@ -34,17 +32,19 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
     // Destructure input
     const { searchTerm } = params;
     // Catch bad params
     if(searchTerm == null){
-        return Shared.Utils.Err(`Error (findFileorFolder) : Params missing or incorrect. Param needed: searchTerm`);
+        
+        return Shared.v2Core.Helpers.Err(`Error (findFileorFolder) : Params missing or incorrect. Param needed: searchTerm`);
     }
-    let userFolder = Shared.Constants.userFilesDir;
-    let allFoldersAndFiles = await Shared.FileSystem.scanFolderRecursively(`/${userFolder}`);
-    if (allFoldersAndFiles.isErr()){ return Shared.Utils.Err(`Error (findFileorFolder -> scanFolderRecursively) : ${allFoldersAndFiles.value}`)}
+    let userFolder = Shared.fileSystem.Constants.userFilesDir;
+    let allFoldersAndFiles = await Shared.fileSystem.CRUD.scanFolderRecursively(`/${userFolder}`);
+    if (allFoldersAndFiles.isErr()){ return Shared.v2Core.Helpers.Err(`Error (findFileorFolder -> scanFolderRecursively) : ${allFoldersAndFiles.value}`)}
     let dirListLen = allFoldersAndFiles.value.directoryList.length ?? 0;   //url  directoryList, fileList
     let fileListLen = allFoldersAndFiles.value.fileList.length ?? 0; // fileUrl
     let matches = [];
@@ -59,14 +59,14 @@ export async function run(
             matches.push(allFoldersAndFiles.value.fileList[i]);
         }
     }
-    let message = new Shared.Classes.DataMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new Shared.aiAgents.Classes.DataMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: null, 
         data: matches,
         toolName: "findFileorFolder",
         instructions: `Find: ${searchTerm}`
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }
 
 

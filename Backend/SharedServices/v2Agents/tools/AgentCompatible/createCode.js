@@ -2,6 +2,7 @@
     Uses The Hive Plugin Tool Standard
     Orchestrator Version: Multi-Modal (Router -> Skeleton / Editor / Reviewer)
 */
+
 export const details = {
     toolName:   "createCodeTool",
     version:    "2026.5.1",
@@ -56,7 +57,7 @@ export async function run(Shared, params = {}, agent = {}) {
         },
         "required": ["mode"]
     };
-    safeEmit(agent, "Coding Tool: Determining user intent (Create, Edit, Review)...");
+    safeEmit(agent, "Coding Tool 🖥️ : Setting things up...");
     const routerCall = await aiCall.generateCode(routerSys, `Task: ${taskDescription}`, { structuredOutput: routerSchema });
     if (routerCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Router phase) : ${routerCall.value}`);
 
@@ -65,7 +66,7 @@ export async function run(Shared, params = {}, agent = {}) {
     // [][] --- EXECUTE BASED ON MODE --- [][]
 
     if (mode === "REVIEW") {
-        safeEmit(agent, "Coding Tool: Reviewing the user provided code...");
+        safeEmit(agent, "Coding Tool 🖥️ :: Reviewing the user provided code...");
         // --- MODE: REVIEW (Text/Analysis Output) ---
         const reviewSys = "You are an expert Senior Developer. Review the provided code based on the user's task description. " +
                           "Provide clear, concise, and insightful analysis. Point out bugs, security flaws, or performance issues if asked. " +
@@ -86,7 +87,7 @@ export async function run(Shared, params = {}, agent = {}) {
     }
 
 if (mode === "EDIT") {
-        safeEmit(agent, "Coding Tool: Creating a list of specific edits...");
+        safeEmit(agent, "Coding Tool 🖥️ :: Creating a list of specific edits...");
         // --- MODE: EDIT (Modify Existing Code) ---
         if (!context || context === "") {
              return Shared.v2Core.Helpers.Err("Error: EDIT mode selected by router, but no existing code was provided in the context.");
@@ -128,7 +129,7 @@ if (mode === "EDIT") {
 
         // 2. Loop through the plan and use superEditor for each targeted change
         for (const [index, edit] of edits.entries()) {
-            safeEmit(agent, `Coding Tool: Applying edit - ${index + 1} of ${edits.length}...`);
+            safeEmit(agent, `Coding Tool 🖥️ :: Applying edit - ${index + 1} of ${edits.length}...`);
             const editResult = await superEditor(Shared, {
                 prompt: edit.instruction,
                 document: currentFileState,
@@ -154,7 +155,7 @@ if (mode === "EDIT") {
     }
 
     if (mode === "CREATE") {
-        safeEmit(agent, "Coding Tool: Creating new code...");
+        safeEmit(agent, "Coding Tool 🖥️ :: Creating new code...");
         // --- MODE: CREATE (Skeleton + Injector Orchestrator) ---
         const archSys = "You are a Software Architect. Create a valid file SKELETON. " +
             "Include all boilerplate, imports, and function signatures. " +
@@ -181,7 +182,7 @@ if (mode === "EDIT") {
             "required": ["mimeType", "skeleton", "workOrders"]
         };
 
-        safeEmit(agent, "Coding Tool: Creating the architectural skeleton...");
+        safeEmit(agent, "Coding Tool 🖥️ :: Planning the structure...");
         const archCall = await aiCall.generateCode(archSys, taskDescription, {structuredOutput : archSchema});
         if (archCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
 
@@ -191,7 +192,7 @@ if (mode === "EDIT") {
 
         // Generate & Inject Loop
         for (const [index, order] of orders.entries()) {
-            safeEmit(agent, `Coding Tool: Generating code for marker (${index + 1} of ${orders.length})...`);
+            safeEmit(agent, `Coding Tool 🖥️ :: Generating code for marker (${index + 1} of ${orders.length})...`);
             const devSys = `You are a Senior Developer. Write ONLY the code required for ${order.marker}. ` +
                            `Requirement: ${order.description}. ` +
                            `Context: You are working within this file skeleton:\n${currentFileState}\n`+
@@ -205,7 +206,7 @@ if (mode === "EDIT") {
             const generatedSnippet = devCall.value;
             const editorPrompt = `REPLACE the marker '${order.marker}' with the code provided in the context.`;
 
-            safeEmit(agent, `Coding Tool: Applying new code to document...`);
+            safeEmit(agent, `Coding Tool 🖥️ :: Applying new code to document...`);
             const editResult = await superEditor(Shared, {
                 prompt: editorPrompt,
                 document: currentFileState,

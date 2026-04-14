@@ -26,10 +26,10 @@ The core logic must be an exported `async` function.
 
 ### Arguments
 * **`Shared`:** An object providing system-wide services:
-    * `Shared.Classes.DataMessage`: Constructor for the tool's response.
-    * `Shared.Classes.Roles`: Enum for message types (e.g., `Tool`).
-    * `Shared.Utils.Ok()`: Success wrapper.
-    * `Shared.Utils.Err()`: Failure wrapper.
+    * `Shared.aiAgents.Classes.TextMessage`: Constructor for the tool's response. Multiple options DataMessage | TextMessage etc
+    * `Shared.aiAgents.Constants.Roles`: Enum for message types (e.g., `Tool`).
+    * `Shared.v2Core.Helpers.Ok()`: Success wrapper.
+    * `Shared.v2Core.Helpers.Err()`: Failure wrapper.
 * **`params`:** An object containing the arguments extracted from the AI's prompt based on your `inputSchema`.
 * **`agent`:** An optional object for passing the agent object - to allow use of functions like emitUpdateStatus() or get agent data like agent.id (jobID).
 
@@ -81,13 +81,23 @@ function safeEmit(agent, message){
  */
 export async function run(Shared, params = {}, agent = {}) {
     const { query } = params;
+    const { aiSettings } = agent?.aiSettings || {};
 
     try {
         safeEmit(agent, `This is a status update message`); // send status updates back to user. 
         // 1. Tool Logic Here
+        
+        // Example AI call
+        const aiCall =  Shared.callAI.aiFactory();
+        const sysText = "System prompt";
+        let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
+        let call = await aiCall.generateText(sysText, usrText, aiSettings );
+        if(call.isErr()){
+            return Shared.v2Core.Helpers.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
+        }
+        
         const resultData = {
-            success: true,
-            processed: query.toUpperCase(),
+            processed: call.value,
             timestamp: new Date().toISOString()
         };
 
@@ -100,10 +110,10 @@ export async function run(Shared, params = {}, agent = {}) {
         });
 
         // 3. Return as a successful result array
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
 
     } catch (error) {
         // Return structured error
-        return Shared.Utils.Err(`Error in ${details.toolName}: ${error.message}`);
+        return Shared.v2Core.Helpers.Err(`Error in ${details.toolName}: ${error.message}`);
     }
 }

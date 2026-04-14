@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "readFile",
     version:    "2026.0.1",
@@ -38,24 +39,24 @@ export async function run(
     const { filePath } = params;
     // Catch bad params
     if(filePath == null){
-        return Shared.Utils.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
+        return Shared.v2Core.Helpers.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
     }
-    const root = Shared.Constants.containerVolumeRoot; 
-    const targetURL = Shared.Utils.pathHelper.join(root, filePath.trim());
+    const root = Shared.fileSystem.Constants.containerVolumeRoot 
+    const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(root, filePath.trim());
     
 if (!targetURL.startsWith(root)) {
-    return Shared.Utils.Err(`Error: Access denied. Path is outside of allowed directory.`);
+    return Shared.v2Core.Helpers.Err(`Error: Access denied. Path is outside of allowed directory.`);
 }
 
     // Get File data
-    let fileInfo = Shared.FileSystem.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
+    let fileInfo = Shared.fileSystem.CRUD.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
     if(fileInfo.isErr()){
-        return Shared.Utils.Err(`Error (readFile -> getFileExtensionAndSize) : ${fileInfo.value}`)
+        return Shared.v2Core.Helpers.Err(`Error (readFile -> getFileExtensionAndSize) : ${fileInfo.value}`)
     }
     // lookup correct read tool
     let fileSupported = false;
     let fileMethods = undefined;
-    for (const value of Shared.FileSystem.MIME_MAP.values()) {
+    for (const value of Shared.fileSystem.MIME_MAP.values()) {
         if (value.extension === fileInfo.value.extension) {
             fileMethods = value;
             fileSupported = true;
@@ -63,21 +64,21 @@ if (!targetURL.startsWith(root)) {
         }
     }
     if(fileSupported === false ){
-        return Shared.Utils.Err(`Error (readFile) : Target file type is not supported. Target Type ${fileInfo.value.extension}`)
+        return Shared.v2Core.Helpers.Err(`Error (readFile) : Target file type is not supported. Target Type ${fileInfo.value.extension}`)
     }
     // Use the supplied read function;
     let toolCall = await fileMethods.readFN(targetURL);
     if(toolCall.isErr()){
-        return Shared.Utils.Err(`Error (readFile -> fileMethods.readFN() : ${toolCall.value})`);
+        return Shared.v2Core.Helpers.Err(`Error (readFile -> fileMethods.readFN() : ${toolCall.value})`);
     }
 
-    let message = new Shared.Classes.DataMessage({
-        role: Shared.Classes.Roles.Tool, 
+    let message = new Shared.aiAgents.Classes.DataMessage({
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: fileMethods.mimeType, 
         data: toolCall.value,
         toolName: "readFile",
         instructions: `Read the file: ${targetURL}`
     });
-    return Shared.Utils.Ok([message]);
+    return Shared.v2Core.Helpers.Ok([message]);
 }
 

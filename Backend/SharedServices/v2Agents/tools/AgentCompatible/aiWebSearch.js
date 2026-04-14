@@ -116,7 +116,7 @@ function transformReferences(Shared, inputText, linksArray) {
   // We do this first so we have a lookup table for the text replacement
   const updatedReferences = linksArray.map((url) => {
     return {
-      ref: Shared.v2Core.Utils.generateSimpleRefgenerateSimpleRef(4),
+      ref: Shared.v2Core.Utils.generateSimpleRef(4),
       url: url
     };
   });

@@ -56,6 +56,13 @@ export const details = {
     }
 };
 
+
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * Generates an audio (speech) from input text. 
  * @param {string} contentMessage - The text to be converted to speech
@@ -70,27 +77,29 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
     // Destructure input
     const { contentMessage, options } = params;
     // Catch bad params
     if(contentMessage == null){
-        return Shared.Utils.Err(`Error (textToSpeech) - Input contentMessage missing or null.`);
+        return Shared.v2Core.Helpers.Err(`Error (textToSpeech) - Input contentMessage missing or null.`);
     }
 
     // Make the call
-    const aiCall = new Shared.AiCall.AiCall();
+    safeEmit(agent, `📝 -> -> 🎤`);
+    const aiCall = new Shared.callAI.aiFactory();
     let call = await aiCall.textToSpeech(contentMessage, options)
     if(call.isErr()){
-        return Shared.Utils.Err(`Error (textToSpeech -> aiCall) : ${call.value}`);
+        return Shared.v2Core.Helpers.Err(`Error (textToSpeech -> aiCall) : ${call.value}`);
     } 
     // Process Outputs
     for(let i in call.value){
         call.value[i].toolName = "textToSpeech";
         call.value[i].instructions = contentMessage;
-        call.value[i].role = Shared.Classes.Roles.Tool;
+        call.value[i].role = Shared.aiAgents.Constants.Roles.Tool;
     }
-    return Shared.Utils.Ok(call.value); // already an array of messages
+    return Shared.v2Core.Helpers.Ok(call.value); // already an array of messages
 }
 

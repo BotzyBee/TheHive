@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "calculatorTool",
     version:    "2026.0.1",
@@ -28,6 +29,12 @@ export const details = {
         }
     };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * Calculates the value based on math expression.
  * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
@@ -37,8 +44,10 @@ export const details = {
  */
 export async function run( 
     Shared, 
-    params = {}
+    params = {},
+    agent = {}
 ){  
+    safeEmit(agent, `Bashing some numbers.. 🤓`);
     // Destructure input
     let { expression } = params;
 

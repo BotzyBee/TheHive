@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "findAndReplaceTextTool",
     version:    "2026.0.1",
@@ -67,9 +68,9 @@ export async function run(
         caseSensitive = false,
         exactMatch = true
     } = params;
-
+    
     // Catch objects passed as context
-    if(typeof context === 'object'){ return Err(`Error (findAndReplaceTextTool) : Object passed as context - this should only be a string!`) }
+    if(typeof context === 'object'){ return Shared.v2Core.Helpers.Err(`Error (findAndReplaceTextTool) : Object passed as context - this should only be a string!`) }
 
     try {
         // Escape special regex characters in the match phrase
@@ -81,15 +82,15 @@ export async function run(
         const flags = caseSensitive ? 'g' : 'gi';
         const regex = new RegExp(pattern, flags);
         let newText = context.replace(regex, replaceWith);
-        let message = new Shared.Classes.TextMessage({
-            role: Shared.Classes.Roles.Tool, 
+        let message = new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool, 
             mimeType: "text/plain", 
             textData: newText,
             toolName: "findAndReplaceTextTool",
             instructions: `Replace ${matchPhrase} with ${replaceWith} in the provided context.`
         });
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
     } catch (error) {
-        return Shared.Utils.Err(`Error (findAndReplaceTextTool): ${error.message || error}`);
+        return Shared.v2Core.Helpers.Err(`Error (findAndReplaceTextTool): ${error.message || error}`);
     }
 }

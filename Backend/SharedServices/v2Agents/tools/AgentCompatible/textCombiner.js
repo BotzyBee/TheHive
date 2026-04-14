@@ -3,7 +3,6 @@
  * Tool: textCombiner
  * Merges two or more text strings using a configurable separator.
  */
-
 export const details = {
     toolName: "textCombiner",
     version: "1.0.0",
@@ -92,7 +91,7 @@ export async function run(Shared, params = {}) {
     // --- Input Validation ---
     const validation = validateTexts(texts);
     if (!validation.valid) {
-        return Shared.Utils.Err(`[${details.toolName}] Invalid input — ${validation.reason}`);
+        return Shared.v2Core.Helpers.Err(`[${details.toolName}] Invalid input — ${validation.reason}`);
     }
 
     // Coerce separator: if the AI passes a literal '\n' string, honour the escape
@@ -111,18 +110,18 @@ export async function run(Shared, params = {}) {
             timestamp: new Date().toISOString()
         };
 
-        const message = new Shared.Classes.DataMessage({
-            role: Shared.Classes.Roles.Tool,
+        const message = new Shared.aiAgents.Classes.DataMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             data: resultData,
             toolName: details.toolName,
             instructions: "Combined the provided text strings using the specified separator. "
         });
 
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
 
     } catch (error) {
         // Defensive catch — combineTexts is synchronous and unlikely to throw,
         // but we guard here to satisfy the standard's error-handling contract.
-        return Shared.Utils.Err(`[${details.toolName}] Unexpected error: ${error.message}`);
+        return Shared.v2Core.Helpers.Err(`[${details.toolName}] Unexpected error: ${error.message}`);
     }
 }

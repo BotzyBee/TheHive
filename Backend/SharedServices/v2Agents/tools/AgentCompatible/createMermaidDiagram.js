@@ -1,6 +1,8 @@
 /**
  * 🐝 TheHive Plugin Tool Standard - Mermaid Diagram Generator
  */
+
+
 const MERMAID_GUIDE = `
 Use Quoted Labels for All Nodes
 Wrap node contents in double quotes to avoid issues with special characters or line breaks. Example: A["Initialize process"]. Quoted strings safely contain spaces, symbols, and line breaks (\n), preventing parse errors.
@@ -86,6 +88,12 @@ export const details = {
     })
 };
 
+function safeEmit(agent, message){
+    if(agent && typeof agent.emitUpdateStatus === "function"){
+        agent.emitUpdateStatus(message);
+    }
+}
+
 /**
  * Executes the Mermaid Code Generator logic.
  * 
@@ -93,7 +101,7 @@ export const details = {
  * @param {object} params - Inputs defined in inputSchema
  * @returns {Promise<object>} - A Shared.Utils.Ok or Shared.Utils.Err Result
  */
-export async function run(Shared, params = {}) {
+export async function run(Shared, params = {}, agent = {}) {
     const { prompt } = params;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -101,6 +109,7 @@ export async function run(Shared, params = {}) {
     }
 
     try {
+        safeEmit(agent, `Charting and drawing...`);
         // Instantiate the standard AI Caller service
         const aiCall = Shared.callAI.aiFactory();
 
@@ -111,12 +120,13 @@ export async function run(Shared, params = {}) {
         if (generationResponse.isErr()) {
             return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid generation step: ${generationResponse.value}`);
         }
-
+        safeEmit(agent, `Sharpening pencil.. `);
         const rawGeneratedCode = extractCodeBlock(generationResponse.value);
 
         // Step 2: Critic / Review Phase
         const reviewPrompt = `Review this mermaid code for errors and fix any that you find:\n\n\n${rawGeneratedCode}`;
         
+        safeEmit(agent, `Checking my work...`);
         const reviewResponse = await aiCall.generateText(reviewPrompt, REVIEW_SYSTEM_PROMPT, { quality: 3 });
         if (reviewResponse.isErr()) {
             return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid review step: ${reviewResponse.value}`);
@@ -131,7 +141,6 @@ export async function run(Shared, params = {}) {
             timestamp: new Date().toISOString()
         };
         const message = new Shared.aiAgents.Classes.DataMessage({
-            
             role: Shared.aiAgents.Constants.Roles.Tool,
             data: resultData,
             toolName: details.toolName,

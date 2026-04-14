@@ -78,7 +78,8 @@ export async function run(Shared, params = {}, agent = {}) {
     const { prompt, document, context, chunkSize = 100000 } = params; // chunk size not included in schema as it's just for testing.
     const CHUNK_SIZE = chunkSize; // Character limit per AI call
     if (!prompt || typeof document !== 'string') {
-        return Shared.Utils.Err("SuperEditor: Missing prompt or document.");
+        
+         return Shared.v2Core.Helpers.Err("SuperEditor: Missing prompt or document.");
     }
     safeEmit(agent, `Using SuperEditor to process the document - 🐝🔧`);
     // Failsafe for empty documents
@@ -88,7 +89,7 @@ export async function run(Shared, params = {}, agent = {}) {
 
     // Edit document with existing content
     try {
-        const aiService = new Shared.AiCall.AiCall();
+        const aiService = new Shared.callAI.aiFactory();
         const mutator = new DocumentMutator();
         
         // 1. Chunking
@@ -124,9 +125,9 @@ ${currentChunk}
         const finalDocument = processedChunks.join("");
         const textualDiff = computeTextDiff(document, finalDocument);
 
-        return Shared.Utils.Ok([
-            new Shared.Classes.DataMessage({
-                role: Shared.Classes.Roles.Tool,
+         return Shared.v2Core.Helpers.Ok([
+            new Shared.aiAgents.Classes.DataMessage({
+                role: Shared.aiAgents.Constants.Roles.Tool,
                 data: {
                     success: true,
                     editedDocument: finalDocument,
@@ -140,7 +141,7 @@ ${currentChunk}
         ]);
 
     } catch (error) {
-        return Shared.Utils.Err(`Fatal error in SuperEditor: ${error.message}`);
+         return Shared.v2Core.Helpers.Err(`Fatal error in SuperEditor: ${error.message}`);
     }
 }
 
@@ -148,7 +149,7 @@ ${currentChunk}
  * Logic for handling completely new files
  */
 async function handleNewDocument(Shared, prompt, context) {
-    const aiService = new Shared.AiCall.AiCall();
+    const aiService = new Shared.callAI.aiFactory();
     const response = await aiService.generateText(SYSTEM_PROMPT, `TASK: ${prompt}\nCONTEXT: ${context}\nDOCUMENT IS EMPTY. USE REPLACE_ALL.`);
     aiCount++;
     if (response.isErr()) return response;
@@ -156,9 +157,9 @@ async function handleNewDocument(Shared, prompt, context) {
     const mutator = new DocumentMutator();
     const result = mutator.apply("", response.value);
     
-    return Shared.Utils.Ok([
-        new Shared.Classes.DataMessage({
-            role: Shared.Classes.Roles.Tool,
+     return Shared.v2Core.Helpers.Ok([
+        new Shared.aiAgents.Classes.DataMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,
             data: { success: true, editedDocument: result.value },
             toolName: details.toolName,
             metadata: { aiCount}

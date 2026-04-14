@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "timeAndDateTool",
     version:    "2026.0.1",
@@ -67,8 +68,8 @@ export async function run(
             timeZoneName: 'short'
         }).substring(12); // Extracting just the timezone part
         
-        let message = new Shared.Classes.DataMessage({
-            role: Shared.Classes.Roles.Tool,  
+        let message = new Shared.aiAgents.Classes.DataMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool,  
             data: {
                 currentEpoch,
                 fullDateTime,
@@ -82,9 +83,9 @@ export async function run(
             toolName: "timeAndDateTool",
             instructions: `Return the current time and date.`
         });
-        return Shared.Utils.Ok([message]);
+        return Shared.v2Core.Helpers.Ok([message]);
     } catch (error) {
-        return Shared.Utils.Err(`Error (timeAndDateTool) : ${error}`);
+        return Shared.v2Core.Helpers.Err(`Error (timeAndDateTool) : ${error}`);
     }
 }
    

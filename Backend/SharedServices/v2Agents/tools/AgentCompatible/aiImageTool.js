@@ -1,6 +1,7 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
+
 export const details = {
     toolName:   "aiImageTool",
     version:    "2026.0.1",
@@ -21,16 +22,6 @@ export const details = {
         "options": {
         "type": "object",
         "properties": {
-            "model": {
-            "type": "string",
-            "description": "A specific AI model identifier."
-            },
-            "quality": {
-            "type": "number",
-            "description": "Quality level of the output.",
-            "minimum": 1,
-            "maximum": 3
-            },
             "imageOptions": {
             "type": "object",
             "properties": {
@@ -94,9 +85,6 @@ function safeEmit(agent, message){
  * Generates an Image using AI 
  * @param {string} contentMessage - Input prompt for the AI to follow 
  * @param {object} options
- * @param {string} [options.model] - Exact model string (optional)
- * @param {string} [options.provider] - AiProviders value (optional)
- * @param {number} [options.quality] - AiQuality value (optional)
  * @param {object} [options.imageOptions] - Image Options (all optional)
  * @param {string}  [options.imageOptions.aspectRatio] - eg 4:3 16:9 etc
  * @param {string}  [options.imageOptions.resolution] - 1K, 2K, 4K etc
@@ -109,7 +97,8 @@ export async function run(
     agent = {}
 ){  
     // Destructure input
-    const { contentMessage, options } = params;
+    const { contentMessage, options = {} } = params;
+    const { aiSettings } = agent?.aiSettings || {};
     // Catch bad params
     if(contentMessage == null){
         return Shared.v2Core.Helpers.Err(`Error (aiImageTool) - Input contentMessage missing or null.`);
@@ -118,7 +107,7 @@ export async function run(
     // Make the call
     safeEmit(agent, `Creating image using AI - 🤖🐝`);
     const aiCall = Shared.callAI.aiFactory();
-    let call = await aiCall.generateImage(contentMessage, options)
+    let call = await aiCall.generateImage(contentMessage, {...aiSettings, ...options})
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (aiImageTool -> Generate Image) : ${call.value}`);
     } 
