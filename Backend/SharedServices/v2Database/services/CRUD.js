@@ -12,7 +12,7 @@ export async function addDirectoryToDB(
 ) {
   let encodedURL = encodeURIComponent(URL);
   try {
-    const dirRef = generateLongID('DIR');
+    const dirRef = Services.v2Core.Utils.generateLongID('DIR');
     let result = await dbAgent.query(
       `INSERT INTO ${dirTableName} {
                 DirRef: '${dirRef}',
@@ -45,7 +45,7 @@ export async function addFileToDB(
 ) {
   let encodedURL = encodeURIComponent(URL);
   try {
-    const filRef = generateLongID('FIL');
+    const filRef = Services.v2Core.Utils.generateLongID('FIL');
     let result = await dbAgent.query(
       `
                 INSERT INTO ${fileTableName} {

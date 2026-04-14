@@ -1,6 +1,6 @@
 import path from 'path';
 import { Services } from '../../../index.js';
-import { AiJob } from '../../core/classes.js'; 
+import { AiJob } from '../../core/classes.js';
 
 /**
  *  Quick Ask Agent - used for direct queries to any of the
@@ -9,7 +9,6 @@ import { AiJob } from '../../core/classes.js';
  */
 export class QuickAskAgent extends AiJob {
   constructor({ task = "", aiSettings = {}, socketId = null } = {}){
-    console.log("Socket ID in QuickAskAgent constructor: ", socketId);
     super({aiSettings, socketId}) // setup parent class
     this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ 
       role: Services.aiAgents.Constants.Roles.User, textData: task }));
@@ -96,13 +95,13 @@ export class QuickAskAgent extends AiJob {
 
       // Get tool details
       if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
-      let toolDetails = await getToolDetails(routingCall.value.toolName);
+      let toolDetails = await Services.database.Helpers.getToolDetails(routingCall.value.toolName);
       if(toolDetails.isErr()){
         this.setFailed();
         this.isRunning = false;
         this.errors.push(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`);
         this.emitFailed();
-        return Err(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`)
+        return Services.v2Core.Helpers.Err(`Error (Quick Task Agent -> startTask -> getToolDetails) : ${toolDetails.value}`);
       };
       
       // Craft input params;
@@ -152,13 +151,12 @@ export class QuickAskAgent extends AiJob {
           toolName: toolDetails.value.details.toolName,
           inputParams: paramObject.value
         })
-        console.log(`Calling ${toolDetails.value.details.toolName} ...`);
         this.status.setCustomStatus(`Calling ${toolDetails.value.details.toolName} ...`);
         toolCall = await Services.aiAgents.AgentHelpers.callAgentTool(
           toolDetails.value.details.toolName,
           toolDetails.value.filePath,
           paramObject.value,
-          this // give the tool access to agent functions. 
+          this, // give the tool access to agent functions. ,
         ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
         if(toolCall.isErr()){
           failedCount += 1;
@@ -183,7 +181,6 @@ export class QuickAskAgent extends AiJob {
       for(let i=0; i<newMessageLen; i++){
         // Shorten & add to context
         if(toolCall.value[i].role === Services.aiAgents.Constants.Roles.Tool){
-          console.log("Processing Tool Message... ");
           let processed = await Services.aiAgents.AgentSharedServices.processMessageForContext(toolCall.value[i], 500, this.aiSettings, this );
           if(processed.isErr()){
             this.setFailed();

@@ -3,7 +3,7 @@
 */
 export const details = {
     toolName:   "aiTextAction",
-    version:    "2026.0.1",
+    version:    "2026.1.2",
     creator:    "Botzy Bee",
     overview:   "This tool uses AI to create text, summarise text, extract information or modify a given text input. \n"+
                 "This tool DOES NOT perform research, create code or find information from any sources.", 
@@ -67,6 +67,7 @@ export async function run(
 ){  
     // Destructure input
     const { taskDescription, context } = params;
+    const { aiSettings } = agent?.aiSettings || {};
     // Catch bad params
     if(taskDescription == null){
         return Shared.v2Core.Helpers.Err(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
@@ -81,12 +82,12 @@ export async function run(
     const aiCall =  Shared.callAI.aiFactory();
     const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
-    let call = await aiCall.generateText(usrText, sysText, params );
+    let call = await aiCall.generateText(sysText, usrText, aiSettings );
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
     }
     let message = new  Shared.aiAgents.Classes.TextMessage({
-        role: Shared.aiAgents.Classes.Roles.Tool, 
+        role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: "text/plain", 
         textData: call.value,
         toolName: "AiTextAction",

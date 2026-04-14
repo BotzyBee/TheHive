@@ -5,6 +5,7 @@ import path from 'path';
 import { AiJob } from '../core/classes.js';
 import { useMultipleThreads } from '../core/constants.js';
 import { Services } from '../../index.js';
+import { Status } from '../core/classes.js';
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -193,7 +194,7 @@ class AI_JOB_MANAGER{
             const oneHourAgo = Date.now() - (60 * 60 * 1000);
             this.AI_JOBS = this.AI_JOBS.filter(
                 job => {
-                if(job.status == Classes.Status.Complete && job.endEpochMs < oneHourAgo){
+                if(job.status == Status.Complete && job.endEpochMs < oneHourAgo){
                     Services.v2Core.Helpers.log(`Pruning Job ID ${job.id} from AI_JOBS list.`);
                     return false; // Remove from list
                 }

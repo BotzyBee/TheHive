@@ -1,5 +1,6 @@
 import { Services } from "../../index.js";
 import { emitToSocket } from '../../../ApiHelpers/socketHelpers.js';
+import { Roles } from "./constants.js";
 /**
  * Main Holder of Messages from user, agent and tools. 
  */
@@ -391,6 +392,7 @@ export class AiJob {
    * @param {string} statusMessage - Status text to send to the user.
    */
   emitUpdateStatus(statusMessage){
+    console.log(`Emitting: ${statusMessage}`);
     if(this.socketId && this.isRunning == true){
         let status = new TaskStatus();
         status.setCustomStatus(statusMessage);

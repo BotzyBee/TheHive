@@ -25,7 +25,7 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
             processBase64Audio_ToWavBuffer,
             callAgentTool
         };
-        return CoreTools.AgentCompatible[toolName].run(injectedDependencies, params, agentDependencies); // tools must return Ok/ Err.
+        return Services.aiAgents.AgentTools[toolName].run(injectedDependencies, params, agentDependencies ); // tools must return Ok/ Err.
     } else {
         // plug-in tool
         let readFile = await import(/* @vite-ignore */ filePath);

@@ -3,12 +3,13 @@ import { ModelTypes, AiQuality, AiProviders, MODEL_REGISTRY, DEFAULT_PROVIDER } 
 import { PROVIDER_DISPATCH } from './dispatcher.js';
 
 export function aiFactory(){
-    return new AiCall(
-        MODEL_REGISTRY,
-        AiQuality,
-        AiProviders,
-        ModelTypes,
-        PROVIDER_DISPATCH,
-        DEFAULT_PROVIDER
-    );
+    let CL = new AiCall({
+        models: MODEL_REGISTRY,
+        quality: AiQuality,
+        providers: AiProviders,
+        capabilities: ModelTypes,
+        functions: PROVIDER_DISPATCH,
+        defaultProvider: DEFAULT_PROVIDER
+    });
+    return CL;
 }

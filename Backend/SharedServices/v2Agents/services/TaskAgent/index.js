@@ -120,9 +120,9 @@ export class TaskAgent extends AiJob {
         for (let i = 0; i < this.toolRetryCount; i++) {
             call = await this.aiCall.generateText(systemMessage, userMessage, options); 
             this.addAiCount(1);
-            if (call.is()) return call; // already has result
+            if (call.isOk()) return call; // already has result
         }
-        const errorMsg = `Error ( TaskAgent - #generateText ) : ${call.value}`;
+        const errorMsg = `Error ( TaskAgent - #generateText ) : ${JSON.stringify(call.value, null, 2)}`;
         this.errors.push(errorMsg);
         return Services.v2Core.Helpers.Err(errorMsg);        
     }
@@ -131,7 +131,7 @@ export class TaskAgent extends AiJob {
         // Get guides by vector loup
         let matchingGuides = await Services.database.Helpers.getToolsOrGuidesForTask(task, maxGuides, false); // false = search guides not tools
         if(matchingGuides.isErr()){
-            return Services.v2Core.Helpers.Err(`Erorr (getSuitableGuides -> getToolsOrGuidesForTask) : ${matchingGuides.value}`);
+            return Services.v2Core.Helpers.Err(`Erorr (getSuitableGuides -> getToolsOrGuidesForTask) : ${JSON.stringify(matchingGuides.value, null, 2)}`);
         }
         // Use AI to select the most suitable
         let call = await this.#generateText(
@@ -155,7 +155,7 @@ export class TaskAgent extends AiJob {
             }
         );
         if(call.isErr()){
-            return Services.v2Core.Helpers.Err(`Error (getSuitableGuides -> generateText ) : ${call.value}`);
+            return Services.v2Core.Helpers.Err(`Error (getSuitableGuides -> generateText ) : ${JSON.stringify(call.value, null, 2)}`);
         }
         // fetch the texts
         let OPlen = call.value.filePaths.length ?? 0;
@@ -425,7 +425,7 @@ export class TaskAgent extends AiJob {
                 toolObj.value.details.toolName,
                 toolObj.value.filePath,
                 resolvedParams.value,
-                this // give the tool access to agent functions. 
+                this, // give the tool access to agent functions. 
             ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
             if(toolCall.isErr()){
                 toolErrorText = toolCall.value;
@@ -830,7 +830,7 @@ export class TaskAgent extends AiJob {
             this.setEndTime();
             this.debugParams = [];
             const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
-            await saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
+            await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
             
             this.emitFinalResult();
             return Services.v2Core.Helpers.Ok("Task Agent has stopped or completed");

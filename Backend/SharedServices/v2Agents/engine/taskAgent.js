@@ -3,6 +3,7 @@ import { JOBS } from "./jobManager.js";
 import { Roles } from "../core/constants.js";
 import { processApiMessagesToClasses } from "../services/processMessages.js";
 import { TaskAgent, TaskPhases } from "../services/TaskAgent/index.js";
+import { Services } from "../../index.js";
 
 /**
  * Creates a new QuickAsk Agent and adds it to non-allocated jobs.
@@ -57,7 +58,7 @@ export async function handleTAMessage(frontendMessage, socketId = null){
             status: Status.NotStarted
         });
         let processedMsg = processApiMessagesToClasses(frontendMessage.messages);
-        if( processedMsg.isServices.v2Core.Helpers.Err() ){ 
+        if( processedMsg.isErr() ){ 
         return Services.v2Core.Helpers.Err(`Error (handleTAMessage) : could not process the messages into classes. ${processedMsg.value}`);
         }
         rtnMsg.addMessages(processedMsg.value);

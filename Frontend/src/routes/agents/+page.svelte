@@ -24,6 +24,7 @@
 
     onMount(() => {
         // refresh the socket if it doesn't exist. 
+        chatStore.reset();
         if (!socketStore.socket) {
             refreshSocket();
         }

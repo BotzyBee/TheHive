@@ -18,17 +18,17 @@ export async function getToolsOrGuidesForTask(task, limit, modeTools = true){
     let tableName = modeTools ? toolTableName : guideTableName;
     let getDB = await getDbAgent();
     if(getDB.isErr()){
-        return Services.v2Core.Helpers.Err(`Error ( matchToolsToTask -> getDbAgent ) : ${getDB.value}`);
+        return Services.v2Core.Helpers.Err(`Error ( getToolsOrGuidesForTask -> getDbAgent ) : ${getDB.value}`);
     }
     const db = getDB.value;
     // Create embedding of task
     let ai = Services.callAI.aiFactory();
     let vec = await ai.generateEmbeddings(
     {inputDataVec: [task], dimensionSize: vectorEmbedSize, quality: 1 });
-    if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( matchToolsToTask -> generateEmbeddings ) : ${vec.value}`); }
+    if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( getToolsOrGuidesForTask -> generateEmbeddings ) : ${vec.value}`); }
     // Search the database
     let search = await searchVectorRecords(db, tableName, vec.value[0], limit);
-    if( search.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( matchToolsToTask -> searchVectorRecords ) : ${search.value}`); }
+    if( search.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( getToolsOrGuidesForTask -> searchVectorRecords ) : ${JSON.stringify(search.value, null, 2)}`); }
     // remove embeddings
     let resLen = search.value[0].length ?? 0;
     for(let i=0; i<resLen; i++){
@@ -52,9 +52,9 @@ export async function getToolDetails(toolName){
     const db = getDB.value;
     // Search DB
     let search = await getRecords(db, toolTableName, "ToolName", toolName);
-    if( search.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> searchVectorRecords ) : ${search.value}`); }
+    if( search.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> getRecords ) : ${search.value}`); }
     let resLen = search.value[0]?.length ?? 0;
-    if(resLen == 0){ return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> searchVectorRecords 2 ) : DB returned no results `);}
+    if(resLen == 0){ return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> getRecords 2 ) : DB returned no results `);}
     // Get tool object
     const fp = search.value[0][0].FilePath;
     let toolObj; 
@@ -69,7 +69,7 @@ export async function getToolDetails(toolName){
         if(readFile){
             toolObj = readFile.details;
         } else {
-           return Err(`Error ( getToolDetails -> import ) : Could not read file - ${fp}`); 
+           return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> import ) : Could not read file - ${fp}`); 
         }
     }
     return Services.v2Core.Helpers.Ok({filePath: fp, details: toolObj})
