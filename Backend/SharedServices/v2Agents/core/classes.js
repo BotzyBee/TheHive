@@ -114,6 +114,7 @@ export class TextMessage extends BaseMessage {
     super(role, metadata);
     this.type = 'text';
     this.mime = mimeType || "text/plain";
+    this.ext = "txt";
     this.textData = textData;
     this.toolName = toolName;
     this.instructions = instructions;
@@ -136,6 +137,7 @@ export class ImageMessage extends BaseMessage {
     super(role, metadata);
     this.type = 'image';
     this.mime = mimeType || "image/png";
+    this.ext = "png";
     this.url = url;
     this.base64 = base64;
     this.altText = altText;
@@ -160,6 +162,7 @@ export class AudioMessage extends BaseMessage {
     super(role, metadata);
     this.type = 'audio';
     this.mime = mimeType || "audio/mp4";
+    this.ext = "wav";
     this.url = url;
     this.base64 = base64;
     this.transcript = transcript; // Multimodal models often provide both
@@ -182,6 +185,7 @@ export class DataMessage extends BaseMessage {
     super(role, metadata);
     this.type = 'data';
     this.mime = mimeType || null;
+    this.ext = "json";
     this.data = data;
     this.toolName = toolName;
     this.instructions = instructions;

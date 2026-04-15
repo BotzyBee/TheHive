@@ -13,39 +13,43 @@ export const details = {
         "type": "object",
         "properties": {
             "relativeFolderPath": {
-            "type": "string",
-            "description": "The relative path to where the file should be saved."
+                "type": "string",
+                "description": "The relative path to where the file should be saved within the knowledgebase."
             },
             "mimeType": {
-            "type": "string",
-            "description": "The mime type of the data - for example 'text/plain'."
+                "type": "string",
+                "description": "Optional. The mime type of the data (e.g., 'text/markdown', 'image/png')."
             },
             "fileContent": {
-            "description": "The file content. Can be any type; stringification is handled automatically."
+                "description": "The file content. Can be a string, base64 data, or a Javascript object; the system handles serialization based on the mimeType/extension."
             },
             "fileName": {
-            "type": "string",
-            "description": "The name of the file excluding the extension (e.g., 'filename').",
+                "type": "string",
+                "description": "The name of the file excluding the extension (e.g., 'report_summary')."
+            },
+            "ext": {
+                "type": "string",
+                "description": "An explicit file extension (e.g., 'js', '.md'). This is required to determine the tool to use to save the content."
             }
         },
         "required": [
             "relativeFolderPath",
             "fileContent",
             "fileName",
-            "mimeType"
+            "ext"
         ],
         "additionalProperties": false
-        }
-    };
+    }
+}
 
 /**
- * 
- * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
+ * * @param {Services} Shared - For passing the SharedServices object exported via 'Services' 
  * @param {object}  options
  * @param {string}  options.relativeFolderPath - The relative path to where the file should be saved (within the knowledgebase)
- * @param {string}  options.mimeType - The mime type of the content needing saved.
+ * @param {string}  options.mimeType - Optional. The mime type of the content needing saved.
  * @param {any}  options.fileContent - the file content, does not need to be stringified. This is handled automagically. 
  * @param {string}  options.fileName - eg filename excluding extension
+ * @param {string}  [options.ext] - explicit extension to use
  * @returns {Result[[TextMessage | ImageMessage | AudioMessage | DataMessage] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
@@ -53,41 +57,56 @@ export async function run(
     params = {}
 ){  
     // Destructure input
-    let { relativeFolderPath, fileContent, fileName, mimeType } = params;
+    let { relativeFolderPath, fileContent, fileName, mimeType, ext } = params;
 
     // Catch bad params
-    if(relativeFolderPath == null || fileContent == null || fileName == null || mimeType == null ){
-        return Shared.v2Core.Helpers.Err(`Error (writeFile) : Params missing or incorrect. Params: relativeFolderPath, fileContent, fileName, mimeType`);
+    if(relativeFolderPath == null || fileContent == null || fileName == null || ext == null ){
+        return Shared.v2Core.Helpers.Err(`Error (writeFile) : Params missing or incorrect. Params: relativeFolderPath, fileContent, fileName, ext`);
     }
 
-    // Resolve Extension and Config
-    let fileInfo = Shared.fileSystem.MIME_MAP.get(mimeType);
-    if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8', writeFN: null };
-    const finalFileName = fileName 
-      ? `${fileName}.${fileInfo.extension}` 
-      : `Undefined.${fileInfo.extension}`;
+    const fileRegistry = Shared.fileSystem.IO.fileRegistry; 
 
-    // this is set in docker-compose.yml and maps to the UserFiles folder on the host machine
+    // 1. Resolve Extension and Strategy
+    // Logic: Use provided 'ext' first, otherwise lookup via 'mimeType'
+    let fileConfig;
+    let finalExtension;
+
+    finalExtension = ext.replace(/^\.+/, ''); // Strip any dots
+    fileConfig = fileRegistry.getByExt(finalExtension);
+
+    const finalFileName = `${fileName}.${finalExtension}`;
+
+    // 2. Resolve Paths
     const containerVolumeRoot = Shared.fileSystem.Constants.containerVolumeRoot; 
-    //Construct the full path and save the content
     const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, relativeFolderPath);
-    if(fileInfo.writeFN != null){
-        let call = await fileInfo.writeFN({
-            relativeFolderPath: targetDirectoryInContainer, 
-            fileContent, 
-            fileNameIncExt: finalFileName
-        });
-        if (call?.outcome == "Error"){ return Shared.v2Core.Helpers.Err(`Error (writeFile -> saveFile) : ${call.value}`)}
 
+    // 3. Execute Write Strategy
+    const strategy = fileConfig.strategy;
+
+    if (strategy && typeof strategy.write === 'function') {
+        let call = await strategy.write(
+            targetDirectoryInContainer, 
+            fileContent, 
+            finalFileName
+        );
+
+        if (call?.outcome === "Error") { 
+            return Shared.v2Core.Helpers.Err(`Error (writeFile -> strategy.write) : ${call.value}`);
+        }
+
+        // 4. Return Success Message
         let message = new Shared.aiAgents.Classes.TextMessage({
             role: Shared.aiAgents.Constants.Roles.Tool, 
             mimeType: "text/plain", 
-            textData: `File created in ${relativeFolderPath} with filename ${finalFileName} - using the data provided. Mark task as complete!`,
+            ext: "txt",
+            textData: `File created in ${relativeFolderPath} with filename ${finalFileName} - using the ${fileConfig.name} strategy. Mark task as complete!`,
             toolName: "writeFile",
             instructions: `Write content to file`
         });
+
         return Shared.v2Core.Helpers.Ok([message]);
+
     } else {
-        return Shared.v2Core.Helpers.Err(`Error (writeFile) : No function for saving ${mimeType} files. Sorry!`)
+        return Shared.v2Core.Helpers.Err(`Error (writeFile) : No write strategy available for type ${mimeType} (Extension: ${finalExtension}).`);
     }
 }

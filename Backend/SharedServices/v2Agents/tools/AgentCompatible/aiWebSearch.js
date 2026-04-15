@@ -97,6 +97,7 @@ export async function run(
     let message = new Shared.aiAgents.Classes.DataMessage({
         role: Shared.aiAgents.Constants.Roles, 
         data: combined,
+        ext: "json",
         toolName: "aiWebSearch",
         instructions: taskDescription
     });

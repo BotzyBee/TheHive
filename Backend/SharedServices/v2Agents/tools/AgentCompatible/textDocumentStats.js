@@ -103,6 +103,7 @@ export async function run(
     let message = new Shared.aiAgents.Classes.DataMessage({
         role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: null, 
+        ext: "json",
         data: {
             lines: lineCount,
             words: wordCount,

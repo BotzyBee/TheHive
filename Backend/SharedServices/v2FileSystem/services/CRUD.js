@@ -212,7 +212,7 @@ export function getFileExtensionAndSize(filePath) {
     return Services.v2Core.Helpers.Ok({
       extension: extension,
       sizeBytes: sizeBytes,
-      sizeFormatted: formatBytes(sizeBytes),
+      sizeFormatted: Services.v2Core.Utils.formatBytes(sizeBytes),
     });
   } catch (error) {
     return Services.v2Core.Helpers.Err(`OS Error accessing file: ${error.message}`);

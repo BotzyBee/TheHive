@@ -1,6 +1,5 @@
 import { Services } from "../../index.js";
 import path from 'path';
-import * as CoreTools from '../tools/AgentCompatible/index.js';
 
 /**
  * 
@@ -45,65 +44,57 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
  * @returns {Promise<Result>}
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
-  if(!message || !folderPath){
-    return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : message or folderPath missing or null.`)
+  if (!message || !folderPath) {
+    return Services.v2Core.Helpers.Err(`Error (saveMessageContent): message or folderPath missing.`);
   }
   try {
-    let contentToSave;
-    // Resolve Extension and Config
-    let fileInfo = Services.fileSystem.MIME_MAP.get(message.mime);
-    if(!fileInfo) fileInfo = { ext: 'bin', encoding: 'utf8' };
+    const fileRegistry = Services.fileSystem.IO.fileRegistry;
+    let finalExtension;
+    let strategyToUse;
+
+    // Determine Extension and Strategy
+    // Strip any leading dots to prevent ..txt etc
+    const providedExt = message.ext ? message.ext.replace(/^\.+/, '') : null;
+
+    if (providedExt) {
+      finalExtension = providedExt;
+      // Look up the I/O strategy directly using the provided extension
+      strategyToUse = fileRegistry.getByExt(providedExt).strategy;
+    } else {
+      // Fallback to MIME type if no explicit extension is provided
+      const mimeConfig = fileRegistry.getByMime(message.mime);
+      finalExtension = mimeConfig.defaultExt;
+      strategyToUse = mimeConfig.strategy;
+    }
+
     const finalFileName = fileName 
-      ? `${fileName}.${fileInfo.extension}` 
-      : `${message.id}.${fileInfo.extension}`;
+      ? `${fileName}.${finalExtension}` 
+      : `${message.id}.${finalExtension}`;
 
-    let options = { encoding: fileInfo.encoding };
+    const targetDirectory = path.join(Services.fileSystem.Constants.containerVolumeRoot, folderPath);
 
-    const targetDirectoryInContainer = path.join( Services.fileSystem.Constants.containerVolumeRoot, folderPath);
-    // Extract content based on message type
-    // We prioritise raw data/base64 over metadata
-    switch (message.type) {
-      case 'text':
-        contentToSave = message.textData;
-        break;
+    // 2. Extract content dynamically based on priority
+    let contentToSave = message.base64 || message.textData || message.data;
 
-      case 'image':
-        // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
-        if (message.base64) {
-          contentToSave = message.base64;
-          options.encoding = 'base64'; 
-        } else if (message.url) {
-          return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
-        }
-      case 'audio':
-        // If we have base64, save it. If only a URL, we'd need a fetch step (omitted for brevity)
-        if (message.base64) {
-          // Can only handle audio/L16;codec=pcm;rate=24000 at the moment! 
-            contentToSave = processBase64Audio_ToWavBuffer(message.base64, message.mime); 
-        } else if (message.url) {
-          return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : Cannot save remote URL ${message.type} directly. Download required.`);
-        }
-        break;
-
-      case 'data':
-        contentToSave = message.data; // saveFile handles objects via JSON.stringify
-        break;
-
-      default:
-        // Fallback: Save the whole message object as JSON if type is unknown
-        contentToSave = message.toJSON();
-        return await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, contentToSave, `${message.id}.json`);
+    // Handle URL-only Edge Case
+    if (message.url && !contentToSave) {
+       return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Cannot save remote URL ${message.type} directly. Download required.`);
     }
-    await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, `Contenxt to save ${message}`, finalFileName, options);
+
+    // Handle Empty/Null Content Edge Case
     if (!contentToSave) {
-        return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : No savable content found for message ${message.id}`);
+      // Fallback: Save the whole message object as JSON
+      return await fileRegistry.getByExt("json").strategy.write(targetDirectory, message.toJSON(), `${message.id}.json`);
     }
-
-    // Delegate to the optimized saveFile function
-    return await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, contentToSave, finalFileName, options);
+    // Not supported
+    if (!strategyToUse || !strategyToUse.write) {
+      return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Writing is not supported for extension '.${finalExtension}'`);
+    }
+    // Delegate to the Strategy's Write Method
+    return await strategyToUse.write(targetDirectory, contentToSave, finalFileName);
 
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (saveMessageContent) : saveMessageContent Exception: ${error.message}.`);
+    return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Exception: ${error.message}`);
   }
 }
 
@@ -142,6 +133,33 @@ export function processBase64Audio_ToWavBuffer(base64_Audio, mime){
   }
   return null;
 }
+
+/**
+ * Normalizes image data into a Buffer for saving
+ * Handles: Raw Base64, Data URLs (data:image/png;base64,...), and existing Buffers.
+ * * @param {string|Buffer} input - The image data to process.
+ * @returns {Buffer} - The processed binary buffer.
+ */
+export function prepareImageForSaving(input){
+  // If it's already a Buffer, just hand it back.
+  if (Buffer.isBuffer(input)) {
+    return Services.v2Core.Helpers.Ok(input);
+  }
+
+  if (typeof input === 'string') {
+    // Check for the "data:image/png;base64," prefix (Data URL)
+    // We split by comma; if the prefix exists, the actual data is the second part.
+    if (input.startsWith('data:')) {
+      const base64Content = input.split(',')[1];
+      return Services.v2Core.Helpers.Ok(Buffer.from(base64Content, 'base64'));
+    }
+
+    // Assume it's a raw Base64 string
+    return Services.v2Core.Helpers.Ok(Buffer.from(input, 'base64'));
+  }
+
+  return Services.v2Core.Helpers.Err('Error (prepareImageForSaving) : Unsupported image format. Input must be a Base64 string or a Buffer.');
+};
 
 // WIP! 
 // import { spawn } from 'child_process';

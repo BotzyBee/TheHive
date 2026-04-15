@@ -143,6 +143,7 @@ export async function run(Shared, params = {}, agent = {}) {
         const message = new Shared.aiAgents.Classes.DataMessage({
             role: Shared.aiAgents.Constants.Roles.Tool,
             data: resultData,
+            ext: "json",
             toolName: details.toolName,
             instructions: "Present the generated Mermaid code to the user or process it for rendering."
         });

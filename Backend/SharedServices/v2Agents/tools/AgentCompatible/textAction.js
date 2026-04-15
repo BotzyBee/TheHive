@@ -66,16 +66,25 @@ export async function run(
     // Make the call
     safeEmit(agent, `Crafting text using AI - 🤖🐝`);
     const aiCall =  Shared.callAI.aiFactory();
-    const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English.";
+    const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English."+
+    "As well as your text response, you must also provide a file extension type (ext) - eg 'txt', 'md', 'js', 'html' - so the content can be saved correctly.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
-    let call = await aiCall.generateText(sysText, usrText, aiSettings );
+    let call = await aiCall.generateText(sysText, usrText, {...aiSettings, structuredOutput: {
+            "type": "object",
+            "description": "An object containing textOutput and ext properties",
+            "properties": {
+                "textOutput": { "type": "string", "description": "Your output text" },
+                "ext": { "type": "string", "description": "The file extension associated with your text output. Default is 'txt' or 'md' - but could be 'js', 'html' etc if required." }
+            },
+            "required": ["textOutput", "ext"]
+        }} );
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
     }
     let message = new  Shared.aiAgents.Classes.TextMessage({
-        role: Shared.aiAgents.Constants.Roles.Tool, 
-        mimeType: "text/plain", 
-        textData: call.value,
+        role: Shared.aiAgents.Constants.Roles.Tool,  
+        textData: call.value.textOutput,
+        ext: call.value.ext,
         toolName: "AiTextAction",
         instructions: taskDescription
     });

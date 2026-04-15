@@ -2,7 +2,6 @@
     Uses The Hive Plugin Tool Standard
     Orchestrator Version: Multi-Modal (Router -> Skeleton / Editor / Reviewer)
 */
-
 export const details = {
     toolName:   "createCodeTool",
     version:    "2026.5.1",
@@ -33,8 +32,7 @@ function safeEmit(agent, message){
 
 export async function run(Shared, params = {}, agent = {}) {
     const { taskDescription, context = "" } = params;
-    const ai = Shared.callAI.aiFactory();
-    const aiCall = ai.AiCall();
+    const aiCall = Shared.callAI.aiFactory();
     const superEditor = Shared.aiAgents.AgentTools.superEditor.run; 
     let retAR = [];
 
@@ -78,6 +76,7 @@ export async function run(Shared, params = {}, agent = {}) {
         retAR.push(new Shared.aiAgents.Classes.TextMessage({
             role: Shared.aiAgents.Constants.Roles.Tool,
             mimeType: "text/markdown",
+            ext: "md",
             textData: reviewCall.value,
             toolName: "createCodeTool",
             instructions: "Code review and analysis complete."
@@ -97,7 +96,8 @@ if (mode === "EDIT") {
         const editPlanSys = "You are a Senior Developer. Review the existing code and the user's edit request. " +
                             "Break down the required changes into a sequence of distinct, logical edits. " +
                             "For each edit, provide a clear instruction for a 'dumb' text replacement tool and the EXACT new code snippet that needs to be inserted, added, or replaced. " +
-                            "Ensure the code snippets are production-ready and contain no markdown wrappers.";
+                            "Ensure the code snippets are production-ready and contain no markdown wrappers."+
+                            "You must also output the file extension for the file being created or edited - 'js' 'html' 'rs' etc. This is to ensure that the code created matches the saved format.";
 
         const editPlanSchema = {
             "type": "object",
@@ -111,9 +111,10 @@ if (mode === "EDIT") {
                             "codeSnippet": { "type": "string", "description": "The raw code snippet to be inserted or swapped in. Provide ONLY the raw code." }
                         }
                     }
-                }
+                },
+                "ext": { "type": "string" },
             },
-            "required": ["edits"]
+            "required": ["edits", "ext"]
         };
 
         const editPlanCall = await aiCall.generateCode(
@@ -126,6 +127,7 @@ if (mode === "EDIT") {
 
         let currentFileState = context;
         const edits = editPlanCall.value.edits;
+        const ext = editPlanCall.value.ext;
 
         // 2. Loop through the plan and use superEditor for each targeted change
         for (const [index, edit] of edits.entries()) {
@@ -145,7 +147,7 @@ if (mode === "EDIT") {
         // 3. Output the final modified document
         retAR.push(new Shared.aiAgents.Classes.TextMessage({
             role: Shared.aiAgents.Constants.Roles.Tool,
-            mimeType: "text/plain", 
+            ext: ext,
             textData: currentFileState,
             toolName: "createCodeTool",
             instructions: "Iterative code modifications complete."
@@ -161,12 +163,13 @@ if (mode === "EDIT") {
             "Include all boilerplate, imports, and function signatures. " +
             "Inside every empty function or logic block, put a unique marker like '// [INJECT_1]', '// [INJECT_2]'. " +
             "Return a JSON list of what each marker should contain." +
+            "You must also output a file extension - eg 'js' 'html' 'rs' so that the created code is saved as the correct file type."+
             `Here is any context: \n ${context} \n`;
 
         const archSchema = {
             "type": "object",
             "properties": {
-                "mimeType": { "type": "string" },
+                "ext": { "type": "string" },
                 "skeleton": { "type": "string" },
                 "workOrders": {
                     "type": "array",
@@ -179,7 +182,7 @@ if (mode === "EDIT") {
                     }
                 }
             },
-            "required": ["mimeType", "skeleton", "workOrders"]
+            "required": ["ext", "skeleton", "workOrders"]
         };
 
         safeEmit(agent, "Coding Tool 🖥️ :: Planning the structure...");
@@ -187,7 +190,7 @@ if (mode === "EDIT") {
         if (archCall.isErr()) return Shared.v2Core.Helpers.Err(`Error (createCodeTool -> Architecture phase) : Architecture phase failed. ${archCall.value}`);
 
         let currentFileState = archCall.value.skeleton;
-        const mimeType = archCall.value.mimeType;
+        const extType = archCall.value.ext;
         const orders = archCall.value.workOrders;
 
         // Generate & Inject Loop
@@ -221,7 +224,7 @@ if (mode === "EDIT") {
 
         retAR.push(new Shared.aiAgents.Classes.TextMessage({
             role: Shared.aiAgents.Constants.Roles.Tool,
-            mimeType: mimeType,
+            ext: extType,
             textData: currentFileState,
             toolName: "createCodeTool",
             instructions: "Final Refined Code Assembly Complete"

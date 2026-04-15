@@ -374,7 +374,8 @@ export async function run(Shared, params = {}, agent = {}) {
 
     let message = new Shared.aiAgents.Classes.TextMessage({
         role: Shared.aiAgents.Constants.Roles.Tool, 
-        mimeType: "text/plain", 
+        mimeType: "text/markdown",
+        ext: "md", 
         textData: finalReport,
         toolName: "deepResearchTool",
         instructions: `Deep research has completed on the topic: "${topic}". The final report has been saved to ${savePath} with the filename "Final_Report_${jobID || Date.now()}.txt". The report includes detailed research findings, structured sections, and a reference list.`

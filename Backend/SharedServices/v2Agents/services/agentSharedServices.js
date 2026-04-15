@@ -238,7 +238,6 @@ export async function finialiseOutput(agentObject, saveFolder){
       PromptsAndSchemas.processText.usr(
         agentObject.task,
         JSON.stringify({ context: contextObj }),
-
       ),
       { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.processText.schema } 
     ); // { output: [enum "Text_Output", "Quote_Text" ], data: string }

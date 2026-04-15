@@ -1,7 +1,6 @@
 /*
     Uses The Hive Plugin Tool Standard
 */
-
 export const details = {
     toolName:   "readFile",
     version:    "2026.0.1",
@@ -44,9 +43,9 @@ export async function run(
     const root = Shared.fileSystem.Constants.containerVolumeRoot 
     const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(root, filePath.trim());
     
-if (!targetURL.startsWith(root)) {
-    return Shared.v2Core.Helpers.Err(`Error: Access denied. Path is outside of allowed directory.`);
-}
+    if (!targetURL.startsWith(root)) {
+        return Shared.v2Core.Helpers.Err(`Error: Access denied. Path is outside of allowed directory.`);
+    }
 
     // Get File data
     let fileInfo = Shared.fileSystem.CRUD.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
@@ -54,27 +53,20 @@ if (!targetURL.startsWith(root)) {
         return Shared.v2Core.Helpers.Err(`Error (readFile -> getFileExtensionAndSize) : ${fileInfo.value}`)
     }
     // lookup correct read tool
-    let fileSupported = false;
-    let fileMethods = undefined;
-    for (const value of Shared.fileSystem.MIME_MAP.values()) {
-        if (value.extension === fileInfo.value.extension) {
-            fileMethods = value;
-            fileSupported = true;
-            break; 
-        }
+    let strategyToUse = Shared.fileSystem.IO.fileRegistry.getByExt(fileInfo.value.extension).strategy;
+    if(strategyToUse.read == null){
+        Shared.v2Core.Helpers.Err(`Error (readFile) : No strategy to read ${fileInfo.value.extension} files.`)
     }
-    if(fileSupported === false ){
-        return Shared.v2Core.Helpers.Err(`Error (readFile) : Target file type is not supported. Target Type ${fileInfo.value.extension}`)
-    }
+
     // Use the supplied read function;
-    let toolCall = await fileMethods.readFN(targetURL);
+    let toolCall = await strategyToUse.read(targetURL);
     if(toolCall.isErr()){
-        return Shared.v2Core.Helpers.Err(`Error (readFile -> fileMethods.readFN() : ${toolCall.value})`);
+        return Shared.v2Core.Helpers.Err(`Error (readFile -> strategyToUse.readFN() : ${toolCall.value})`);
     }
 
     let message = new Shared.aiAgents.Classes.DataMessage({
         role: Shared.aiAgents.Constants.Roles.Tool, 
-        mimeType: fileMethods.mimeType, 
+        ext: fileInfo.value.extension,
         data: toolCall.value,
         toolName: "readFile",
         instructions: `Read the file: ${targetURL}`
