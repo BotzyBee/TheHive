@@ -50,10 +50,6 @@
 </button>
 
 <style>
-    /* All CSS related to the sidebar, buttons, and branding has been
-       moved here. This includes styles for the `.sidebar`, `.collapse-button`,
-       `.open-sidebar-btn`, and their child elements.
-    */
     :root {
         --sidebar-width: 250px;
         --open-btn-size: 48px;
@@ -215,7 +211,7 @@
         .open-sidebar-btn {
             transform: translateX(0);
             left: 0;
-            top: 10px;
+            /* top: 10px; */
         }
     }
 </style>

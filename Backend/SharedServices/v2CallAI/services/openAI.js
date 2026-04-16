@@ -4,6 +4,7 @@ import { makeSchemaStrict } from '../core/utils.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
 import { Services } from '../../index.js';
+import { ModelTypes } from '../core/constants.js';
 
 /**
  * Unified OpenAI call handler.
@@ -23,34 +24,99 @@ export async function callOpenAI(
   model,
   options = {}
 ) {
-  console.log(`Calling Open AI : ${model}`);
-  
-  const apiKey = process.env.OAI_KEY;
-
-  // --- Embeddings path ---
-  if (options.embeddingsMode) {
-    const { inputDataVec, dimensionSize } = options;
-    if (!Array.isArray(inputDataVec)) {
-      return Services.v2Core.Helpers.Err('Error: inputDataVec must be an array of strings.');
-    }
-    try {
-      const embeddings = new OpenAIEmbeddings({
-        model: model,
-        dimensions: dimensionSize,
-        openAIApiKey: apiKey,
-      });
-      const vectors = await embeddings.embedDocuments(inputDataVec);
-      return Services.v2Core.Helpers.Ok(vectors);
-    } catch (error) {
-      return Services.v2Core.Helpers.Err(`Error (callOpenAI - embeddings): ${error}`);
-    }
+  Services.v2Core.Helpers.log(`Calling Open AI : ${model}`);
+  const { capability } = options;
+  if (!capability) {
+    return Services.v2Core.Helpers.Err('Error (callOpenAI) : Capability param is missing or null. Ensure options.capability has valid ModelTypes');
   }
 
-  // --- Chat path ---
+  // Match Capabilities
+  switch (capability) {
+    case ModelTypes.text:
+      return await generateText(systemMessage, contentMessage, model, options);
+
+    case ModelTypes.code:
+      return await generateText(systemMessage, contentMessage, model, options);
+
+    case ModelTypes.image:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI image generation not implemented yet.');
+
+    case ModelTypes.reasoning:
+      return await generateText(systemMessage, contentMessage, model, options);
+
+    case ModelTypes.deepResearch:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI deep research not implemented yet.');
+
+    case ModelTypes.websearch:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI websearch not implemented yet.');
+
+    case ModelTypes.embedding:
+      return await generateEmbeddings(model, options);
+
+    case ModelTypes.textToSpeech:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI text to speech not implemented yet.');
+
+    case ModelTypes.speechToText:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI speech to text not implemented yet.');
+
+    case ModelTypes.maps:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : Maps capability not available.');
+
+    case ModelTypes.local:
+      return Services.v2Core.Helpers.Err('Error (callOpenAI) : Local capability not available.');
+
+    default:
+      return Services.v2Core.Helpers.Err(`Error (callOpenAI) "${capability}" not specifically handled.`);
+  }
+}
+
+/**
+ * Uses OpenAI to generate embeddings
+ * @param {string} model - Model to use
+ * @param {object} options - further options
+ * @returns {Result}
+ */
+export async function generateEmbeddings(model, options = {}) {
+  Services.v2Core.Helpers.log('Calling OpenAI -> generateEmbeddings');
+  const apiKey = process.env.OAI_KEY;
+  const { inputDataVec, dimensionSize } = options;
+  if (!Array.isArray(inputDataVec)) {
+    return Services.v2Core.Helpers.Err('Error: inputDataVec must be an array of strings.');
+  }
+  try {
+    const embeddings = new OpenAIEmbeddings({
+      model: model,
+      dimensions: dimensionSize,
+      openAIApiKey: apiKey,
+    });
+    const vectors = await embeddings.embedDocuments(inputDataVec);
+    return Services.v2Core.Helpers.Ok(vectors);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error (callOpenAI -> generateEmbeddings): ${error}`);
+  }
+}
+
+/**
+ * Uses OpenAI to generate text
+ * @param {*} systemMessage - System message for the AI to follow.
+ * @param {string | object} contentMessage - Prompt for the AI to follow
+ * @param {string} model - Model to use
+ * @param {object} options - further options, optional
+ * @param {object}  [options.structuredOutput] - a JSON schema for structured outputs, optional.
+ * @returns {Result}
+ */
+export async function generateText(
+  systemMessage,
+  contentMessage,
+  model,
+  options = {}
+) {
+  Services.v2Core.Helpers.log('Calling OpenAI -> generateText');
+  const apiKey = process.env.OAI_KEY;
   const { structuredOutput } = options;
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callOpenAI): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callOpenAI -> generateText): No model provided in options.');
   }
   const hasImage = contentMessage?.imageUrl != null;
   const modelChoice = model;
@@ -88,6 +154,6 @@ export async function callOpenAI(
       return Services.v2Core.Helpers.Ok(res.content);
     }
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callOpenAI): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callOpenAI -> generateText): ${error}`);
   }
 }

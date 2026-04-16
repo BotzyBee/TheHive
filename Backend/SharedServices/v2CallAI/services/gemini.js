@@ -148,6 +148,12 @@ export async function generateText(
   }
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
+  // FOR DEBUG
+  // let rootDir = Services.fileSystem.Constants.containerVolumeRoot;
+  // let joined = Services.aiAgents.ToolHelpers.pathHelper.join(rootDir, "UserFiles/GemiTesting/");
+  // let rndm = systemMessage.length + contentMessage.length; 
+  // Services.fileSystem.CRUD.saveFile(joined, `System Prompt: \n\n ${systemMessage} \n\n ${contentMessage}`, `File_${rndm}.txt`);
+
   try {
     // ------------------------------------------------------------------
     // Case 1: Structured Output WITH Web Search (Requires 2-step process)
@@ -211,6 +217,7 @@ export async function generateText(
 
     // Consume the stream internally
     for await (const chunk of responseStream) {
+      // console.log("CHUNK :: ", chunk) // FOR DEBUG
       fullText += chunk.text;
       
       // The grounding metadata is usually attached to the final chunk's candidates array

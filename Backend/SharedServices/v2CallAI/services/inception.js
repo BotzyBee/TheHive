@@ -19,29 +19,50 @@ export async function callInception(
   model,
   options = {}
 ) {
-  console.log(`Calling Inception AI: ${model}`);
+  Services.v2Core.Helpers.log(`Calling Inception : ${model}`);
   const { capability } = options;
 
   if (!capability) {
-    return Services.v2Core.Helpers.Err('Error (callInception): Capability param is missing. Ensure options.capability has a valid ModelTypes value.');
+    return Services.v2Core.Helpers.Err('Error (callInception) : Capability param is missing or null. Ensure options.capability has valid ModelTypes');
   }
 
+  // Match Capabilities
   switch (capability) {
     case ModelTypes.text:
       return await generateText(systemMessage, contentMessage, model, options);
+
     case ModelTypes.code:
+      return await generateText(systemMessage, contentMessage, model, options);
+
     case ModelTypes.image:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have image capability.');
+
     case ModelTypes.reasoning:
+      return await generateText(systemMessage, contentMessage, model, options);
+
     case ModelTypes.deepResearch:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have deep research capability.');
+
     case ModelTypes.websearch:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have websearch capability.');
+
     case ModelTypes.embedding:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have embedding capability.');
+
     case ModelTypes.textToSpeech:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have text to speech capability.');
+
     case ModelTypes.speechToText:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have speech to text capability.');
+
     case ModelTypes.maps:
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have maps capability.');
+
     case ModelTypes.local:
-      return Services.v2Core.Helpers.Err(`Error (callInception): Inception AI does not handle or support the '${capability}' capability yet.`);
+      return Services.v2Core.Helpers.Err('Error (callInception) : Inception does not have local capability.');
+
     default:
-      return Services.v2Core.Helpers.Err(`Error (callInception): Capability '${capability}' is not specifically handled.`);
+      return Services.v2Core.Helpers.Err(`Error (callInception) "${capability}" not specifically handled.`);
   }
 }
 
