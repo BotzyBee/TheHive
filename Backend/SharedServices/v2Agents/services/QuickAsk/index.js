@@ -57,6 +57,10 @@ export class QuickAskAgent extends AiJob {
         return Services.v2Core.Helpers.Err(`Error (Quick Task Agent -> startTask -> getToolsOrGuidesForTask) : ${tools.value}`);
       }
 
+      // [][] ----------------- [][]
+      // [][] -- SELECT TOOL -- [][]
+      // [][] ----------------- [][]
+
       // Make call to determine the tool to use.
       this.emitUpdateStatus("Selecting the best tool...");
       let routingCall = await this.aiCall.generateText(
@@ -110,8 +114,12 @@ export class QuickAskAgent extends AiJob {
       let failedCount = 0;
       let loopErrors = [];
       let toolCall;
+
+      // [][] ------------------ [][]
+      // [][] -- CRAFT PARAMS -- [][]
+      // [][] ------------------ [][]
+
       // Try Params / Tools a few times if they fail.
-      
       for(let i=0; i<this.toolRetryCount; i++){
         if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
         let paramsCall = await this.aiCall.generateText(
@@ -145,7 +153,10 @@ export class QuickAskAgent extends AiJob {
           continue; // try again
         }
 
-        // Call Tool
+      // [][] -------------------- [][]
+      // [][] -- MAKE TOOL CALL -- [][]
+      // [][] -------------------- [][]
+
         this.emitUpdateStatus(`Calling tool: ${toolDetails.value.details.toolName} ...`);
         this.debugParams.push({
           toolName: toolDetails.value.details.toolName,
