@@ -103,6 +103,7 @@ function safeEmit(agent, message){
  */
 export async function run(Shared, params = {}, agent = {}) {
     const { prompt } = params;
+    const { aiSettings = {} } = agent || {};
 
     if (!prompt || typeof prompt !== 'string') {
         return Shared.v2Core.Helpers.Err("Error (createMermaidDiagram): 'prompt' parameter is strictly required and must be a string.");
@@ -116,7 +117,7 @@ export async function run(Shared, params = {}, agent = {}) {
         // Step 1: Generate initial diagram
         const userPrompt = `Here are your instructions: <prompt>${prompt}</prompt>\nReturn only the Mermaid code.`;
         
-        const generationResponse = await aiCall.generateText(userPrompt, GENERATION_SYSTEM_PROMPT, { quality: 3 });
+        const generationResponse = await aiCall.generateText(userPrompt, GENERATION_SYSTEM_PROMPT, { ...aiSettings, quality: 3 });
         if (generationResponse.isErr()) {
             return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid generation step: ${generationResponse.value}`);
         }
@@ -127,7 +128,7 @@ export async function run(Shared, params = {}, agent = {}) {
         const reviewPrompt = `Review this mermaid code for errors and fix any that you find:\n\n\n${rawGeneratedCode}`;
         
         safeEmit(agent, `Checking my work...`);
-        const reviewResponse = await aiCall.generateText(reviewPrompt, REVIEW_SYSTEM_PROMPT, { quality: 3 });
+        const reviewResponse = await aiCall.generateText(reviewPrompt, REVIEW_SYSTEM_PROMPT, { ...aiSettings, quality: 3 });
         if (reviewResponse.isErr()) {
             return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid review step: ${reviewResponse.value}`);
         }
@@ -147,7 +148,9 @@ export async function run(Shared, params = {}, agent = {}) {
             toolName: details.toolName,
             instructions: "Present the generated Mermaid code to the user or process it for rendering."
         });
-
+        if (agent && typeof agent.addAiCount === 'function') {
+            agent.addAiCount(2);
+        }
         return Shared.v2Core.Helpers.Ok([message]);
 
     } catch (error) {

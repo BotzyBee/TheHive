@@ -74,9 +74,12 @@ function safeEmit(agent, message){
 /**
  * Core plugin execution interface.
  */
+
 export async function run(Shared, params = {}, agent = {}) {
     const { prompt, document, context, chunkSize = 100000 } = params; // chunk size not included in schema as it's just for testing.
     const CHUNK_SIZE = chunkSize; // Character limit per AI call
+    const { aiSettings = {}} = agent || {};
+
     if (!prompt || typeof document !== 'string') {
         
          return Shared.v2Core.Helpers.Err("SuperEditor: Missing prompt or document.");
@@ -84,7 +87,7 @@ export async function run(Shared, params = {}, agent = {}) {
     safeEmit(agent, `Using SuperEditor to process the document - 🐝🔧`);
     // Failsafe for empty documents
     if (document.trim() === "") {
-        return await handleNewDocument(Shared, prompt, context);
+        return await handleNewDocument(Shared, prompt, context, aiSettings);
     }
 
     // Edit document with existing content
@@ -109,7 +112,7 @@ CHUNK ${i + 1} OF ${chunks.length}:
 ${currentChunk}
 ---
             `.trim();
-            const response = await aiService.generateText(SYSTEM_PROMPT, chunkPrompt, { quality: 2 });
+            const response = await aiService.generateText(SYSTEM_PROMPT, chunkPrompt, { ...aiSettings });
             aiCount++;
             if (response.isErr() || !containsActionableBlocks(response.value)) {
                 processedChunks.push(currentChunk);
@@ -125,6 +128,10 @@ ${currentChunk}
         const finalDocument = processedChunks.join("");
         const textualDiff = computeTextDiff(document, finalDocument);
 
+        if (agent && typeof agent.addAiCount === 'function') {
+            agent.addAiCount(aiCount);
+        }
+
          return Shared.v2Core.Helpers.Ok([
             new Shared.aiAgents.Classes.DataMessage({
                 role: Shared.aiAgents.Constants.Roles.Tool,
@@ -136,7 +143,6 @@ ${currentChunk}
                     timestamp: new Date().toISOString()
                 },
                 toolName: details.toolName,
-                metadata: { aiCount}
             })
         ]);
 
@@ -148,9 +154,9 @@ ${currentChunk}
 /**
  * Logic for handling completely new files
  */
-async function handleNewDocument(Shared, prompt, context) {
+async function handleNewDocument(Shared, prompt, context, aiSettings) {
     const aiService = new Shared.callAI.aiFactory();
-    const response = await aiService.generateText(SYSTEM_PROMPT, `TASK: ${prompt}\nCONTEXT: ${context}\nDOCUMENT IS EMPTY. USE REPLACE_ALL.`);
+    const response = await aiService.generateText(SYSTEM_PROMPT, `TASK: ${prompt}\nCONTEXT: ${context}\nDOCUMENT IS EMPTY. USE REPLACE_ALL.`, aiSettings);
     aiCount++;
     if (response.isErr()) return response;
     
@@ -162,7 +168,6 @@ async function handleNewDocument(Shared, prompt, context) {
             role: Shared.aiAgents.Constants.Roles.Tool,
             data: { success: true, editedDocument: result.value },
             toolName: details.toolName,
-            metadata: { aiCount}
         })
     ]);
 }

@@ -19,10 +19,6 @@ export const details = {
             "context": {
             "type": "string",
             "description": "Optional context or reference text for the task."
-            },
-            "structuredOutput": {
-            "type": "object",
-            "description": "A JSON schema for the AI to follow for its response."
             }
         },
         "required": ["taskDescription"]
@@ -41,7 +37,6 @@ function safeEmit(agent, message){
  * @param {object}  options
  * @param {string}  options.taskDescription - Mandatory. The task or action needing undertaken.
  * @param {string}  options.context - Optional. For passing any context or reference text along with the task. 
- * @param {object}  options.structuredOutput - Optional (Schema). If used the AI model will output a structured output to match this schema.
  * @returns {Result[[ TextMessage ] | string ] } - Returns a result or string depending if Ok or Err.
  */
 export async function run( 
@@ -50,10 +45,9 @@ export async function run(
     agent = {}
 ){  
     // Destructure input
-    const { taskDescription, context, structuredOutput } = params;
-    const { aiSettings } = agent?.aiSettings || {};
-    if (structuredOutput) aiSettings.structuredOutput = structuredOutput;
-    
+    const { taskDescription, context } = params;
+    const { aiSettings = {}} = agent || {};
+
     // Catch bad params
     if(taskDescription == null){
         return Shared.v2Core.Helpers.Err(`Error (AiTextAction Tool) - Input taskDescription missing or null.`);
@@ -69,7 +63,7 @@ export async function run(
     const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English."+
     "As well as your text response, you must also provide a file extension type (ext) - eg 'txt', 'md', 'js', 'html' - so the content can be saved correctly.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
-    let call = await aiCall.generateText(sysText, usrText, {...aiSettings, structuredOutput: {
+    let call = await aiCall.generateText(sysText, usrText, { ...aiSettings, structuredOutput: {
             "type": "object",
             "description": "An object containing textOutput and ext properties",
             "properties": {
@@ -80,6 +74,9 @@ export async function run(
         }} );
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (AiTextAction -> Generate Text) : ${call.value}`);
+    }
+    if (agent && typeof agent.addAiCount === 'function') {
+            agent.addAiCount(1);
     }
     let message = new  Shared.aiAgents.Classes.TextMessage({
         role: Shared.aiAgents.Constants.Roles.Tool,  

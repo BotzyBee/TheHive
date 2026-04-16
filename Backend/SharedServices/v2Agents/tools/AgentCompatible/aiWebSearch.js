@@ -51,58 +51,67 @@ export async function run(
     params = {},
     agent = {}
 ){  
-    // Destructure input
-    let { taskDescription, referenceText, targetURL } = params;
-    // Catch bad params
-    if( taskDescription == null ){
-        return Shared.v2Core.Helpers.Err(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);
-    }
-    // Create prompt
-    let addText = 'Focus on reliable sources and verify information where possible. Use UK English when responding.';
-    if (targetURL != null && targetURL != ""){ 
-        addText = `Limit your search to this Site <URL>${targetURL}</URL>. Do not include information from any other source.`
-    }
-    // Context Handling
-    let context = "";
-    if(Array.isArray(referenceText)){
-        referenceText = referenceText.join(" \n ");
-    }
-    if(typeof referenceText == "object"){
-        referenceText = JSON.stringify(referenceText);
-    }
-    if( referenceText != null ){ context = `Use this context to help you complete the task <context> ${referenceText} </context>` }
-        let sysText = 
-    `You are a tool which searches for information online. Focus on quality and accuracy in completing the task.
-    Do NOT add your own thoughts, comments or working notes.`;
-    let usrText = `Here are your instructions <task>${taskDescription}</task>. ${addText}. ${context}`;
-    
-    safeEmit(agent, `Performing web-search via Gemini and Perplexity - 🐝🔍`);
-    let providers = Shared.callAI.Constants.AiProviders;
-    let ai = Shared.callAI.aiFactory();
-    let allCalls = [
-        ai.webSearch(sysText, usrText, { provider: providers.gemini }),
-        ai.webSearch(sysText, usrText, { provider: providers.perplexity }),
-    ];
-    let res = await Promise.all(allCalls);
-    if (res[0].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
-    if (res[1].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
-    
-    const GemiProcessed = transformReferences(Shared, res[0].value.text, res[0].value.references);
-    const PxltyProcessed = transformReferences(Shared, res[1].value.searchResult, res[1].value.citations);
-    const mergedRefs = [...GemiProcessed.references, ...PxltyProcessed.references];
-    
-    let combined = { result: `Gemini_Result - ${GemiProcessed.text} `+
-        `Perplexity Result - ${PxltyProcessed.text}`, sources: mergedRefs };
+    try {
+        console.log("SHARED :: ", JSON.stringify(Shared, null, 2));
 
-    let message = new Shared.aiAgents.Classes.DataMessage({
-        role: Shared.aiAgents.Constants.Roles, 
-        data: combined,
-        ext: "json",
-        toolName: "aiWebSearch",
-        instructions: taskDescription
-    });
-    return Shared.v2Core.Helpers.Ok([message]);
-    
+        console.log("PARAMS :: ", JSON.stringify(params, null, 2));
+        // Destructure input
+        let { taskDescription, referenceText, targetURL } = params;
+        // Catch bad params
+        if( taskDescription == null ){
+            return Shared.v2Core.Helpers.Err(`Error (aiWebSearch) : Params missing or incorrect. Param needed: taskDescription`);
+        }
+        // Create prompt
+        let addText = 'Focus on reliable sources and verify information where possible. Use UK English when responding.';
+        if (targetURL != null && targetURL != ""){ 
+            addText = `Limit your search to this Site <URL>${targetURL}</URL>. Do not include information from any other source.`
+        }
+        // Context Handling
+        let context = "";
+        if(Array.isArray(referenceText)){
+            referenceText = referenceText.join(" \n ");
+        }
+        if(typeof referenceText == "object"){
+            referenceText = JSON.stringify(referenceText);
+        }
+        if( referenceText != null ){ context = `Use this context to help you complete the task <context> ${referenceText} </context>` }
+            let sysText = 
+        `You are a tool which searches for information online. Focus on quality and accuracy in completing the task.
+        Do NOT add your own thoughts, comments or working notes.`;
+        let usrText = `Here are your instructions <task>${taskDescription}</task>. ${addText}. ${context}`;
+        
+        safeEmit(agent, `Performing web-search via Gemini and Perplexity - 🐝🔍`);
+        let providers = Shared.callAI.Constants.AiProviders;
+        let ai = Shared.callAI.aiFactory();
+        let allCalls = [
+            ai.webSearch(sysText, usrText, { provider: providers.gemini }),
+            ai.webSearch(sysText, usrText, { provider: providers.perplexity }),
+        ];
+        let res = await Promise.all(allCalls);
+        if (res[0].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Gemini Search) : ${res[0].value}`)}
+        if (res[1].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
+        
+        const GemiProcessed = transformReferences(Shared, res[0].value.text, res[0].value.references);
+        const PxltyProcessed = transformReferences(Shared, res[1].value.searchResult, res[1].value.citations);
+        const mergedRefs = [...GemiProcessed.references, ...PxltyProcessed.references];
+        
+        let combined = { result: `Gemini_Result - ${GemiProcessed.text} `+
+            `Perplexity Result - ${PxltyProcessed.text}`, sources: mergedRefs };
+
+        let message = new Shared.aiAgents.Classes.DataMessage({
+            role: Shared.aiAgents.Constants.Roles, 
+            data: combined,
+            ext: "json",
+            toolName: "aiWebSearch",
+            instructions: taskDescription
+        });
+        if (agent && typeof agent.addAiCount === 'function') {
+        agent.addAiCount(2);
+        }
+        return Shared.v2Core.Helpers.Ok([message]);
+    } catch (error) {
+        return Shared.v2Core.Helpers.Err(`Error (aiWebSearch) Mega Failed :( ${JSON.stringify(error, null, 2)})`)
+    }
 }
 
 /**

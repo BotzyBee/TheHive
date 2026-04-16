@@ -82,6 +82,7 @@ export async function run(
 ){  
     // Destructure input
     const { contentMessage, options } = params;
+    const { aiSettings = {}} = agent || {};
     // Catch bad params
     if(contentMessage == null){
         return Shared.v2Core.Helpers.Err(`Error (textToSpeech) - Input contentMessage missing or null.`);
@@ -90,10 +91,13 @@ export async function run(
     // Make the call
     safeEmit(agent, `📝 -> -> 🎤`);
     const aiCall = new Shared.callAI.aiFactory();
-    let call = await aiCall.textToSpeech(contentMessage, options)
+    let call = await aiCall.textToSpeech(contentMessage, options, aiSettings)
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (textToSpeech -> aiCall) : ${call.value}`);
     } 
+    if (agent && typeof agent.addAiCount === 'function') {
+            agent.addAiCount(1);
+    }
     // Process Outputs
     for(let i in call.value){
         call.value[i].toolName = "textToSpeech";

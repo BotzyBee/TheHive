@@ -98,7 +98,7 @@ export async function run(
 ){  
     // Destructure input
     const { contentMessage, options = {} } = params;
-    const { aiSettings } = agent?.aiSettings || {};
+    const { aiSettings = {} } = agent || {};
     // Catch bad params
     if(contentMessage == null){
         return Shared.v2Core.Helpers.Err(`Error (aiImageTool) - Input contentMessage missing or null.`);
@@ -116,6 +116,9 @@ export async function run(
         call.value[i].toolName = "aiImageTool";
         call.value[i].instructions = contentMessage;
         call.value[i].role = Shared.aiAgents.Constants.Roles.Tool;
+    }
+    if (agent && typeof agent.addAiCount === 'function') {
+       agent.addAiCount(1);
     }
     return Shared.v2Core.Helpers.Ok(call.value); // already an array of messages
 }
