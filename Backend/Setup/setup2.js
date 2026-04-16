@@ -2,22 +2,25 @@ import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
 dotenv.config({ path: ".env" });
 import {
-  namespaceName,
-  databaseName,
-  dirTableName,
-  fileTableName,
-  vectorTableName,
-  vectorEmbedSize,
-  mgmtTableName,
-  toolTableName,
-  guideTableName,
-} from '../SharedServices/constants.js';
-import { addDirectoryToDB } from '../SharedServices/v2Database/services/CRUD.js';
+    namespaceName,
+    databaseName,
+    dirTableName,
+    fileTableName,
+    vectorTableName,
+    vectorEmbedSize,
+    mgmtTableName,
+    toolTableName,
+    guideTableName,
+} from '../SharedServices/v2Database/core/constants.js'
+
+import { generateLongID } from "../SharedServices/v2Core/core/utils.js";
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
+    console.log("1")
     const db = new Surreal();
-    
+    console.log("DB :: ", db);
+
     const dbUser = process.env.dbRootUser;
     const dbPass = process.env.dbRootPass;
     const dbUserRegular = process.env.dbRegularUser;
@@ -26,13 +29,14 @@ export async function setupFolderBotDB() {
 
     try {
         // Connect to the SurrealDB instance
-        await db.connect("http://127.0.0.1:8000/rpc"); 
+        await db.connect("ws://127.0.0.1:8000");
+        //await db.connect("http://127.0.0.1:8000/rpc"); 
         // Authenticate as a root user (required to define namespaces and databases)
         await db.signin({
             username: dbUser,
             password: dbPass,
         });
-
+        console.log("3")
         // --- Create Namespace if it doesn't exist ---
         await db.query(`DEFINE NAMESPACE IF NOT EXISTS ${namespaceName};`);
         await db.use({ namespace: namespaceName });
@@ -93,9 +97,29 @@ export async function setupFolderBotDB() {
                 toolSettings: {}
             };
         `);
-        
+
         // Add Root Dir Record
-        await addDirectoryToDB(db, rootDirUrl,"N/A", 999, {});
+        let encodedURL = encodeURIComponent(URL);
+        
+        const dirRef = generateLongID('DIR');
+            let result = await db.query(
+            `INSERT INTO ${dirTableName} {
+                        DirRef: '${dirRef}',
+                        ParentDirRef: $pdr,
+                        Url: $u,
+                        LastUpdate: $lu,
+                        Meta: $mo
+                        }`,
+            {
+                pdr: rootDirUrl,
+                u: encodedURL,
+                lu: 999,
+                mo: {},
+            }
+        );
+
+
+        //await addDirectoryToDB(db, rootDirUrl,"N/A", 999, {});
 
         // Define the schema for the File Vector Table
         await db.query(`
@@ -107,7 +131,7 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Vector ON TABLE ${vectorTableName} TYPE array<float>  ASSERT $value != NONE;
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
-        
+
         // Define Index for File Vector DB
         await db.query(`
             DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${vectorTableName}
