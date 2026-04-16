@@ -241,7 +241,7 @@ export class TaskAgent extends AiJob {
                 { role: Services.aiAgents.Constants.Roles.Agent, textData: actionResponse.failText });
             this.messageHistory.addMessage(msg);
             this.taskOutput.push(msg);
-            return Services.v2Core.Helpers.Ok(`Error (planningEngine) - ${actionResponse.failText}`);
+            return Services.v2Core.Helpers.Err(`Error (planningEngine) - ${actionResponse.failText}`);
         }
 
         // Get tools
