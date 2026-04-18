@@ -1,9 +1,8 @@
 <script>
-    import { chatStore } from '$lib/code/agentChat/chatStore.js';
+    import { chatStore } from '$lib/code/Stores/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
     import { slide } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
-    import { socketStore, refreshSocket } from '../../lib/code/agentChat/socketStore.js';
     import { onMount, tick } from 'svelte';
     import { invoke } from '@tauri-apps/api/core';
     import { open } from '@tauri-apps/plugin-dialog';
@@ -21,14 +20,6 @@
     let menuOpen = false;
     let filteredOptions = [];
     let selectedIndex = 0;
-
-    onMount(() => {
-        // refresh the socket if it doesn't exist. 
-        chatStore.reset();
-        if (!socketStore.socket) {
-            refreshSocket();
-        }
-    });
 
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;

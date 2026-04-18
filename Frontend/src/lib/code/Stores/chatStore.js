@@ -1,7 +1,7 @@
 // $lib/code/aiJobs/chatStore.js
 import { writable, get } from 'svelte/store';
-import { socketStore } from './socketStore.js';
-import { emitTask, emitStopTask, emitDirectToModel } from '../aiJobs/socketEmitters.js';
+import { sockets } from './socketStore.js';
+import { emitTask, emitStopTask, emitDirectToModel } from '../helpers/socketEmitters.js';
 import { parseAndSanitizeMarkdown, processApiMessagesToClasses, parseStatus, getConfig } from '../utils.js';
 import { TextMessage, Roles } from '../classes.js';
 import { parse } from 'svelte/compiler';
@@ -25,11 +25,16 @@ function createChatStore() {
     const { subscribe, set, update } = writable(state);
 
     // Watch the socketStore so we can attach listeners as soon as the socket initializes
-    socketStore.subscribe(socket => {
+    sockets['/'].subscribe(socket => {
         if (socket) {
             setupSocketListeners(socket);
         }
-    });
+    })
+    // socketStore.subscribe(socket => {
+    //     if (socket) {
+    //         setupSocketListeners(socket);
+    //     }
+    // });
 
     function setupSocketListeners(socket) {
         // Clear previous listeners to prevent duplicates during hot reloads

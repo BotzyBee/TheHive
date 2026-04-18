@@ -1,7 +1,7 @@
 <script>
     import { fade, fly } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
-    import { chatStore } from '$lib/code/agentChat/chatStore.js';
+    import { chatStore } from '$lib/code/Stores/chatStore.js';
     import { onMount } from 'svelte';
     import { getConfig } from '$lib/code/utils.js';
 

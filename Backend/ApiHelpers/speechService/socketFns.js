@@ -1,78 +1,84 @@
-import 'dotenv/config';
-dotenv.config({ path: '.env' });
-//import { Telegraf, Input } from 'telegraf';
-import { PassThrough } from 'stream';
+// socketFns.js
 import { SpeechService } from './elevenLabs.js';
-import { normalizeToAudioStream, convertToTelegramVoice } from './processAudio.js';
+import { convertToMp3Buffer } from './processAudio.js';
+import { TestBotzyAgent } from './botzy.js';
 
-export async function handleFrontendConnection(ws){
-    const inputStream = new PassThrough();
-    const normalizedStream = normalizeToAudioStream(inputStream);
+export async function handleFrontendConnection(socket) {
+    let chunks        = [];   // raw WebM/Ogg chunks from the browser
+    let isRecording   = false;
+    let mimeType      = 'audio/webm;codecs=opus';
 
-    // Initialize ElevenLabs connection
-    const scribeConnection = await SpeechService.createRealtimeSTT(
-        (text) => ws.send(JSON.stringify({ type: 'partial', text })),
-        async (text) => {
-            ws.send(JSON.stringify({ type: 'final', text }));
-            
-            // Botzy Handles the text here (New Botzy Voice Agent?)
+    // ── recording_start ──────────────────────────────────────────────────────
+    socket.on('recording_start', ({ mimeType: mt } = {}) => {
+        console.log(`[STT] recording_start — mimeType: "${mt}"`);
+        mimeType    = mt || 'audio/webm;codecs=opus';
+        chunks      = [];
+        isRecording = true;
+    });
 
-            // Generate TTS Response
-            const ttsBuffer = await SpeechService.generateSpeech(`I heard you say: ${text}`);
-            ws.send(JSON.stringify({ type: 'tts_start' }));
-            ws.send(ttsBuffer);
+    // ── audio_chunk ──────────────────────────────────────────────────────────
+    socket.on('audio_chunk', (chunk) => {
+        if (!isRecording) {
+            // recording_start never arrived — start buffering anyway
+            isRecording = true;
         }
-    );
-
-    // Pipe normalized opus audio into ElevenLabs
-    normalizedStream.on('data', (chunk) => {
-        if (scribeConnection) scribeConnection.sendAudio(chunk);
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });
 
-    // Handle incoming binary messages
-    ws.on('message', (message) => {
-        inputStream.write(message);
+    // ── recording_stop ───────────────────────────────────────────────────────
+    socket.on('recording_stop', async () => {
+        console.log(`[STT] recording_stop — ${chunks.length} chunks buffered`);
+        isRecording = false;
+
+        if (chunks.length === 0) {
+            console.warn('[STT] No audio chunks received, skipping transcription');
+            return;
+        }
+
+        try {
+            // 1. Concatenate all raw browser chunks into one buffer
+            const rawBuffer = Buffer.concat(chunks);
+            chunks = []; // free memory immediately
+
+            // 2. Convert WebM/Ogg → MP3 via FFmpeg
+            console.log('[STT] Converting audio to MP3...');
+            const format   = mimeToFFmpegFormat(mimeType);
+            const mp3Buffer = await convertToMp3Buffer(rawBuffer, format);
+            console.log(`[STT] MP3 ready — ${mp3Buffer.length} bytes`);
+
+            // 3. Send to ElevenLabs batch STT
+            console.log('[STT] Sending to ElevenLabs batch transcription...');
+            const text = await SpeechService.transcribeFile(mp3Buffer, 'audio/mpeg');
+            console.log('[STT] Transcript:', text);
+
+            // 3A. Get AI to answer
+            let aiAnswer = await TestBotzyAgent(text);
+
+            // 3B. Test audio generation
+            const speechResponse = await SpeechService.generateSpeech(aiAnswer);
+            socket.emit('audio_stream', speechResponse);
+
+            // 4. Emit the final transcript to the frontend
+            socket.emit('message', { type: 'final', text });
+
+        } catch (err) {
+            console.error('[STT] Transcription failed:', err);
+            socket.emit('message', { type: 'error', error: 'Transcription failed' });
+        }
     });
 
-    // Cleanup on disconnect
-    ws.on('close', () => {
-        inputStream.end();
-        console.log('Frontend disconnected');
+    // ── disconnect ───────────────────────────────────────────────────────────
+    socket.on('disconnect', () => {
+        console.log('[STT] Client disconnected — clearing buffer');
+        chunks      = [];
+        isRecording = false;
     });
-};
 
-// // ==========================================
-// // 2. TELEGRAM: BOT CONTROLLER
-// // ==========================================
-// const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-
-// bot.on('voice', async (ctx) => {
-//     try {
-//         // 1. Fetch OGG Voice message from Telegram
-//         const fileLink = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
-//         const response = await fetch(fileLink.href);
-//         const arrayBuffer = await response.arrayBuffer();
-//         const incomingBuffer = Buffer.from(arrayBuffer);
-
-//         // 2. Normalize and extract to pure Opus Buffer (optional but safe)
-//         // Note: For REST API, ElevenLabs handles OGG well, but keeping with the matrix logic:
-//         const transcript = await SpeechService.transcribeFile(incomingBuffer);
-        
-//         ctx.reply(`Transcription: ${transcript}`);
-
-//         // 3. Generate TTS (MP3 Buffer)
-//         const ttsBuffer = await SpeechService.generateSpeech(`You said: ${transcript}`);
-
-//         // 4. Encode to .ogg (Opus) for Telegram Voice Message
-//         const telegramOggBuffer = await convertToTelegramVoice(ttsBuffer);
-
-//         // 5. Send native voice message back
-//         await ctx.replyWithVoice(Input.fromBuffer(telegramOggBuffer));
-
-//     } catch (error) {
-//         console.error("Telegram Processing Error:", error);
-//         ctx.reply("Sorry, I had trouble processing that audio.");
-//     }
-// });
-
-// bot.launch();
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function mimeToFFmpegFormat(mt = '') {
+        if (mt.includes('ogg'))  return 'ogg';
+        if (mt.includes('mp4'))  return 'mp4';
+        if (mt.includes('webm')) return 'webm';
+        return 'webm';
+    }
+}

@@ -1,49 +1,61 @@
-// audio.js
+// processAudio.js
 import ffmpeg from 'fluent-ffmpeg';
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 
 /**
- * SOURCE: Frontend (WebM) & Telegram (OGG)
- * PROCESS: Strip container / Extract & Normalize Opus
- * DESTINATION: ElevenLabs STT
+ * Convert a raw audio Buffer (WebM, Ogg, MP4, etc.) to an MP3 Buffer.
+ * Used before handing audio off to the ElevenLabs batch STT endpoint.
+ *
+ * @param {Buffer} inputBuffer   - Raw audio bytes from the browser
+ * @param {string} inputFormat   - FFmpeg input format hint ('webm', 'ogg', 'mp4', …)
+ * @returns {Promise<Buffer>}    - MP3-encoded audio
  */
-export const normalizeToAudioStream = (inputStream) => {
-    const outputStream = new PassThrough();
-    
-    ffmpeg(inputStream)
-        // Normalize everything to a clean Opus stream. 
-        // Note: If ElevenLabs rejects raw 'opus', change format to 's16le' (PCM 16-bit)
-        .audioCodec('libopus')
-        .format('opus') 
-        .on('error', (err) => console.error('FFmpeg Normalization Error:', err.message))
-        .pipe(outputStream);
-        
-    return outputStream;
-};
-
-/**
- * SOURCE: ElevenLabs TTS (MP3 / Raw Buffer)
- * PROCESS: Encode to .ogg (Opus)
- * DESTINATION: Telegram sendVoice
- */
-export const convertToTelegramVoice = async (audioBuffer) => {
+export const convertToMp3Buffer = (inputBuffer, inputFormat = 'webm') => {
     return new Promise((resolve, reject) => {
-        const inputStream = new PassThrough();
-        inputStream.end(audioBuffer);
-        
-        const chunks = [];
+        // Wrap the buffer in a readable stream so fluent-ffmpeg can consume it
+        const inputStream  = Readable.from(inputBuffer);
         const outputStream = new PassThrough();
-        
-        outputStream.on('data', chunk => chunks.push(chunk));
-        outputStream.on('end', () => resolve(Buffer.concat(chunks)));
+
+        const chunks = [];
+        outputStream.on('data',  (chunk) => chunks.push(chunk));
+        outputStream.on('end',   ()      => resolve(Buffer.concat(chunks)));
         outputStream.on('error', reject);
 
         ffmpeg(inputStream)
-            .inputFormat('mp3') // Assumes ElevenLabs output is MP3
-            .audioCodec('libopus')
-            .audioFrequency(48000)
-            .format('ogg')
-            .on('error', reject)
+            .inputFormat(inputFormat)
+            .audioCodec('libmp3lame')
+            .audioBitrate('128k')
+            .audioChannels(1)
+            .audioFrequency(16000)
+            .format('mp3')
+            .on('error', (err) => {
+                console.error('[FFmpeg] Conversion error:', err.message);
+                reject(err);
+            })
             .pipe(outputStream);
     });
+};
+
+
+/**
+ * SOURCE: Frontend WebSockets (WebM) — kept for reference / future use
+ * PROCESS: Strip container / Extract & encode to raw PCM 16kHz
+ * DESTINATION: Streaming STT (not currently used)
+ */
+export const normalizeToPCMStream = (inputStream, inputFormat = 'webm') => {
+    const outputStream = new PassThrough();
+
+    ffmpeg(inputStream)
+        .inputFormat(inputFormat)
+        .audioCodec('pcm_s16le')
+        .format('s16le')
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .on('error', (err) => {
+            console.error('[FFmpeg] PCM stream error:', err.message);
+            outputStream.end();
+        })
+        .pipe(outputStream);
+
+    return outputStream;
 };

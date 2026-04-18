@@ -1,7 +1,7 @@
 FROM node:alpine AS base
 
-# Install FFmpeg (TO DO - convert wav format )
-# RUN apk update && apk add --no-cache ffmpeg
+# Install FFmpeg (For audio conversion)
+RUN apk update && apk add --no-cache ffmpeg
 
 WORKDIR /app
 
