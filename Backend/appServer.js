@@ -115,7 +115,7 @@ io.value.on('connection', (socket) => {
     // --- CALL MODEL DIRECTLY ---
     socket.on('direct_to_model', async (data, callback) => {
       console.log("Direct to Model Call...");
-      await directToModel(data.query, data.aiSettings, socket.id);
+      await directToModel(data.query, data.aiSettings, data.webGrounding, socket.id);
     });
 
     // Existing rust logic

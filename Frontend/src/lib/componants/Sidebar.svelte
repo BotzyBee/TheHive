@@ -36,6 +36,7 @@
         <li><a href="/">Home</a></li>
         <li><a href="/agents">Agents</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/directToModel">Direct to Provider</a></li>
     </ul>
 </aside>
 {/if}

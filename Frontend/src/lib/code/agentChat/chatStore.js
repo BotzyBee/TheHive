@@ -18,7 +18,8 @@ function createChatStore() {
         aiSettings: {
             agent: "Task_Agent"
         },
-        config: {}
+        config: {},
+        webGrounding: false
     }; 
 
     const { subscribe, set, update } = writable(state);
@@ -163,7 +164,7 @@ function createChatStore() {
         for(let message of currentState.messageHistory){
             msgs.push(`Role: ${message.role} , Message: ${message.textData}`)
         }
-        emitDirectToModel(msgs, currentState.aiSettings);
+        emitDirectToModel(msgs, currentState.aiSettings, currentState.webGrounding);
     }
 
     async function submitPrompt({ promptText } = {}) {
@@ -261,6 +262,10 @@ function createChatStore() {
                 ...s.aiSettings,
                 ...newSettings
             }
+        })),
+        updateWebGrounding: (webGrounding) => update(s => ({
+            ...s,
+            webGrounding: webGrounding
         })),
         submitDirectToModel
     };

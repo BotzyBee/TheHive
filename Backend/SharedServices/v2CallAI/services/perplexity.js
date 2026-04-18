@@ -88,11 +88,8 @@ export async function callPerplexity(
             return resolve(Services.v2Core.Helpers.Err('Error: Could not parse final stream to JSON.'));
           }
         }
-
-        resolve(Services.v2Core.Helpers.Ok({
-          searchResult: finalOutput,
-          citations: finalCitations,
-        }));
+        
+        resolve(Services.v2Core.Helpers.Ok(new Services.aiAgents.Classes.WebsearchResult(finalOutput, finalCitations)));
       });
 
       response.data.on('error', (err) => {

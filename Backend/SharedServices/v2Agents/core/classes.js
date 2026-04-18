@@ -192,6 +192,13 @@ export class DataMessage extends BaseMessage {
   }
 }
 
+// For AI Websearch responses. 
+export class WebsearchResult {
+    constructor(text, references){
+        this.text = text;
+        this.references = references
+    }
+}
 
 // For passing messages between Backend <> Frontend
 /**

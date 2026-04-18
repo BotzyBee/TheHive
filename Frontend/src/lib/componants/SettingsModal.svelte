@@ -6,6 +6,9 @@
     import { getConfig } from '$lib/code/utils.js';
 
     export let isOpen = false;
+    export let showAgents = true;
+    export let showWebCheckbox = false;
+
     const dispatch = createEventDispatcher();
     // Placeholder data - you can move these to a store later
     let providers = [];
@@ -15,6 +18,7 @@
     let selectedQuality = [];
     let selectedAgent = [];
     let randomModel = false;
+    let webGrouding = false;
 
 onMount(() => {
     const init = async () => {
@@ -44,6 +48,7 @@ onMount(() => {
             agent: selectedAgent,
             randomModel: randomModel
         });
+        chatStore.updateWebGrounding(webGrouding);
         close();
     }
 
@@ -97,15 +102,16 @@ onMount(() => {
                     </select>
                 </div>
 
-                <div class="setting-group">
-                    <label for="agent">AI Agent</label>
-                    <select id="agent" bind:value={selectedAgent}>
-                        {#each agents as item}
-                            <option value={item}>{item}</option>
-                        {/each}
-                    </select>
-                </div>
-
+                {#if showAgents == true}
+                    <div class="setting-group">
+                        <label for="agent">AI Agent</label>
+                        <select id="agent" bind:value={selectedAgent}>
+                            {#each agents as item}
+                                <option value={item}>{item}</option>
+                            {/each}
+                        </select>
+                    </div>
+                {/if}
                 <div class="setting-group flex items-center justify-between">
                     <label for="randomModel" class="text-sm font-medium text-gray-700">Random Model</label>
                     
@@ -119,6 +125,22 @@ onMount(() => {
                         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                 </div>
+
+                {#if showWebCheckbox == true}
+                    <div class="setting-group flex items-center justify-between">
+                        <label for="webGrounding" class="text-sm font-medium text-gray-700">Use Web Grounding (if Available)</label>
+                        
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                id="webGrounding" 
+                                bind:checked={webGrouding} 
+                                class="sr-only peer"
+                            />
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                {/if}
             </div>
 
             <div class="modal-footer">

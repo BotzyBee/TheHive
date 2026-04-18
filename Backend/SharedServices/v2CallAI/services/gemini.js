@@ -27,7 +27,6 @@ export async function callGemini(
   model,
   options = {}
 ) {
-  console.log(`Calling Gemini : ${model}`);
   const { capability } = options;
   if(!capability){
     return Services.v2Core.Helpers.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
@@ -113,10 +112,7 @@ function processGrounding(apiResponse) {
     fullText = fullText.slice(0, endIndex) + refLabel + fullText.slice(endIndex);
   });
 
-  return {
-    text: fullText,
-    references: usedReferences
-  };
+  return new Services.aiAgents.Classes.WebsearchResult(fullText, usedReferences);;
 }
 
 
@@ -146,6 +142,7 @@ export async function generateText(
   if (!model) {
     return Services.v2Core.Helpers.Err('Error (callGemini -> generateText 1): No model provided in options.');
   }
+
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
   // FOR DEBUG
@@ -194,7 +191,6 @@ export async function generateText(
       } catch (error) {
         return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 2): JSON Parse failed ${parsed}`);
       }
-
       return Services.v2Core.Helpers.Ok(parsed);
     }
 
@@ -225,7 +221,7 @@ export async function generateText(
 
     // Consume the stream internally
     for await (const chunk of responseStream) {
-      // console.log("CHUNK :: ", chunk) // FOR DEBUG
+      // FOR DEBUG
       fullText += chunk.text;
       
       // The grounding metadata is usually attached to the final chunk's candidates array

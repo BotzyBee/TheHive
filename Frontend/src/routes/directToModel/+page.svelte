@@ -29,6 +29,15 @@
         }
     });
 
+    // Custom Page Colour
+    onMount(() => {
+        const body = document.querySelector('.mainBody');
+        if (body) body.classList.add('alt-theme');
+        return () => {
+            if (body) body.classList.remove('alt-theme');
+        };
+    });
+
     function toggleSidebar() {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
@@ -201,7 +210,9 @@
     </button>
 
     <SettingsModal 
-        isOpen={isSettingsOpen} 
+        isOpen={isSettingsOpen}
+        showAgents={false}
+        showWebCheckbox={true}
         on:close={() => isSettingsOpen = false} 
     />
 
@@ -306,21 +317,19 @@
 </div>
 
 <style>
-/* 1. Fix the Code Block Container */
+    /* Code Block Container */
     :global(.ai-response pre), :global(.user-message pre) {
-        background-color: #2d2d2d; /* Professional dark theme */
+        background-color: #2d2d2d; 
         color: #f8f8f2;
         padding: 16px;
         border-radius: 12px;
         margin: 12px 0;
-        
-        /* The Magic Sauce */
-        overflow-x: auto;   /* Adds horizontal scrollbar when needed */
-        max-width: 100%;    /* Constrains it to the message bubble width */
-        display: block;     /* Ensures it behaves as a block */
+        overflow-x: auto;  
+        max-width: 100%;   
+        display: block;    
     }
 
-    /* 2. Style the Code inside the block */
+    /* Style the Code inside the block */
     :global(.ai-response pre code) {
         font-family: 'Fira Code', 'Cascadia Code', monospace;
         font-size: 0.9rem;
@@ -376,7 +385,7 @@
     :root {
         --sidebar-width: 250px;
         --open-btn-size: 48px;
-        --input-form-max-width: 768px;
+        --input-form-max-width: 900px;
         --primary-blue: #4285f4;
         --primary-blue-dark: #357ae8;
         --text-color-light: #fefefe;

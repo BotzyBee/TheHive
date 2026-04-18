@@ -383,7 +383,7 @@
     :root {
         --sidebar-width: 250px;
         --open-btn-size: 48px;
-        --input-form-max-width: 768px;
+        --input-form-max-width: 900px;
         --primary-blue: #4285f4;
         --primary-blue-dark: #357ae8;
         --text-color-light: #fefefe;

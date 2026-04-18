@@ -7,7 +7,7 @@ import { emitToSocket } from "../socketHelpers.js";
  * @param {object} aiSettings - Ai Settings object (Same as used in agents)
  * @returns {Result} - Result ( string | string ) - depending if structured OP or not.
  */
-export async function directToModel(userQuery, aiSettings, socketID){
+export async function directToModel(userQuery, aiSettings, webGrounding, socketID, ){
     try {
         if(!userQuery){
             throw new Error('Missing a user input!');
@@ -18,11 +18,19 @@ export async function directToModel(userQuery, aiSettings, socketID){
         'Focus on quality and accuracy. Do not try to flatter the user - be polite and direct. Do not be sycophantic in your replies.'+
         'Answer in UK English and use markdown formatting. Your replies should be well structured.';
         let ai = Services.callAI.aiFactory();
-        let call = await ai.generateText(systemMessage, prompt, { ...aiSettings } );
+        let call;
+        if(webGrounding == false){
+            console.log("Direct To Model");
+            call = await ai.generateText(systemMessage, prompt, { ...aiSettings } );
+            emitToSocket(socketID, "direct_to_model_response", call);
+        } else {
+            console.log("Direct To Model & WebGrounding");
+            call = await ai.webSearch(systemMessage, prompt, { ...aiSettings } );
+            emitToSocket(socketID, "direct_to_model_response", {outcome: "Ok", value: call.value.text});
+        }
         if(call.isErr()){
             throw new Error(`AI Call threw and error : ${call.value}`);
         }
-        emitToSocket(socketID, "direct_to_model_response", call);
         return 
     } catch (error) {
         emitToSocket(socketID, "direct_to_model_response", { outcome: "Error", value: error});

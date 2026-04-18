@@ -91,7 +91,7 @@ export async function run(
     if (res[1].isErr()){ return Shared.v2Core.Helpers.Err(`Error (aiWebSearch -> Perplexity Search) : ${res[1].value}`)}
 
     const GemiProcessed = transformReferences(Shared, res[0].value.text, res[0].value.references);
-    const PxltyProcessed = transformReferences(Shared, res[1].value.searchResult, res[1].value.citations);
+    const PxltyProcessed = transformReferences(Shared, res[1].value.text, res[1].value.references);
     const mergedRefs = [...GemiProcessed.references, ...PxltyProcessed.references];
     
     let combined = { result: `Gemini_Result - ${GemiProcessed.text} `+
