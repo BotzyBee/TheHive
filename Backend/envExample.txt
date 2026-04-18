@@ -23,6 +23,14 @@ GEM_KEY=
 ANT_KEY=
 # Perplexity
 PXY_KEY=
+# Inception
+ICPTN_KEY=
+# Eleven Labs
+EVNLBS_KEY=
+
+# Google Calendar API KEYS
+G_CLIENT_EMAIL=
+G_PRIVATE_KEY="
 
 # User Timezone
 TIMEZONE='Europe/London'

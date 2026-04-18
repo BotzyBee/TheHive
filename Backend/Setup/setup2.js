@@ -1,22 +1,26 @@
 import { Surreal } from "surrealdb";
 import dotenv from 'dotenv';
+dotenv.config({ path: ".env" });
 import {
-  namespaceName,
-  databaseName,
-  dirTableName,
-  fileTableName,
-  vectorTableName,
-  vectorEmbedSize,
-  mgmtTableName,
-  toolTableName,
-  guideTableName,
-} from '../SharedServices/constants.js';
-import { addDirectoryToDB } from '../SharedServices/Database/CRUD.js';
+    namespaceName,
+    databaseName,
+    dirTableName,
+    fileTableName,
+    vectorTableName,
+    vectorEmbedSize,
+    mgmtTableName,
+    toolTableName,
+    guideTableName,
+} from '../SharedServices/v2Database/core/constants.js'
+
+import { generateLongID } from "../SharedServices/v2Core/core/utils.js";
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
+
     const db = new Surreal();
-    dotenv.config({ path: ".env" });
+    console.log("DB :: ", db);
+
     const dbUser = process.env.dbRootUser;
     const dbPass = process.env.dbRootPass;
     const dbUserRegular = process.env.dbRegularUser;
@@ -25,7 +29,8 @@ export async function setupFolderBotDB() {
 
     try {
         // Connect to the SurrealDB instance
-        await db.connect("http://127.0.0.1:8000/rpc"); 
+        await db.connect("ws://127.0.0.1:8000");
+        //await db.connect("http://127.0.0.1:8000/rpc"); 
         // Authenticate as a root user (required to define namespaces and databases)
         await db.signin({
             username: dbUser,
@@ -92,9 +97,25 @@ export async function setupFolderBotDB() {
                 toolSettings: {}
             };
         `);
-        
+
         // Add Root Dir Record
-        await addDirectoryToDB(db, rootDirUrl,"N/A", 999, {});
+        let encodedURL = encodeURIComponent(rootDirUrl);
+        const dirRef = generateLongID('DIR');
+            let result = await db.query(
+            `INSERT INTO ${dirTableName} {
+                        DirRef: '${dirRef}',
+                        ParentDirRef: $pdr,
+                        Url: $u,
+                        LastUpdate: $lu,
+                        Meta: $mo
+                        }`,
+            {
+                pdr: 'N/A',
+                u: encodedURL,
+                lu: 999,
+                mo: {},
+            }
+        );
 
         // Define the schema for the File Vector Table
         await db.query(`
@@ -106,7 +127,7 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Vector ON TABLE ${vectorTableName} TYPE array<float>  ASSERT $value != NONE;
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
-        
+
         // Define Index for File Vector DB
         await db.query(`
             DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${vectorTableName}

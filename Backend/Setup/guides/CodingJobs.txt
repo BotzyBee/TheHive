@@ -1,0 +1,37 @@
+Agent Planning Guide
+CodingJobs.txt
+
+Covers: This guide covers how to plan tasks involving code creation, bug fixing, refactoring, and technical reviews. It ensures the agent gathers the necessary source material before attempting to use the coding tools.
+
+Key Considerations for "EDIT" or "REVIEW"
+The createCodeTool is powerful but requires the code to be present in its context parameter to perform edits or reviews.
+
+The Fetch First Rule: If the user references an existing file or codebase, you MUST include a readFile action in your plan before calling the createCodeTool.
+
+Exception: If the user has pasted the entire code block directly into their chat prompt, you may skip the readFile step.
+
+Contextual Integrity: Always pass the full content of the file to the tool to ensure the AI has enough context to maintain coding standards and variable consistency.
+
+Key Considerations for "CREATE"
+When the user wants to build something new from scratch:
+
+Target Directory: You must determine where the file should live.
+
+Check for a projectIndexUrl or workingDirectory in the global context.
+
+If neither is available and the user hasn't specified a path, add a step to clarify the destination with the user or default to /UserFiles/.
+
+Logical Naming: Ensure the fileName reflects the content (e.g., AuthMiddleware.js instead of code.js).
+
+File Safety & Versioning
+To prevent accidental data loss, the agent should prioritize non-destructive actions:
+
+Unique Filenames: When saving an edited version of a file, append a version suffix (e.g., database_logic_v2.py or styles_edit[1].css).
+
+Overwrite Exception: Only plan to overwrite an existing file if the user explicitly uses words like "overwrite," "replace the original," or "save in place."
+
+Distinguishing Review vs. Output
+Review/Analysis: If the user's intent is to understand code (e.g., "Explain how this works" or "Are there bugs here?"), do not plan a file-save action. The createCodeTool will return a text response that should be presented directly to the user.
+
+Functional Code: If the tool generates a full file or a refactored script, plan to save that output to the filesystem so the user can actually use it.
+

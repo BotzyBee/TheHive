@@ -19,16 +19,17 @@
     "@langchain/textsplitters": "^0.1.0",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "jsdom": "^29.0.1",
     "mathjs": "^14.5.2",
     "nunjucks": "^3.2.4",
-    "officeparser": "^5.1.1",
+    "officeparser": "^6.0.7",
     "piscina": "^5.0.0",
     "puppeteer-core": "^24.12.1",
     "socket.io": "^4.8.3",
-    "surrealdb": "^2.0.2"
+    "surrealdb": "^2.0.3"
   },
   "devDependencies": {
     "prettier": "3.8.1",

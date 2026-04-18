@@ -34,7 +34,9 @@
     </div>
     <ul>
         <li><a href="/">Home</a></li>
-        <li><a href="/task">Agents</a></li>
+        <li><a href="/agents">Agents</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/directToModel">Direct to Provider</a></li>
     </ul>
 </aside>
 {/if}
@@ -49,10 +51,6 @@
 </button>
 
 <style>
-    /* All CSS related to the sidebar, buttons, and branding has been
-       moved here. This includes styles for the `.sidebar`, `.collapse-button`,
-       `.open-sidebar-btn`, and their child elements.
-    */
     :root {
         --sidebar-width: 250px;
         --open-btn-size: 48px;
@@ -214,7 +212,7 @@
         .open-sidebar-btn {
             transform: translateX(0);
             left: 0;
-            top: 10px;
+            /* top: 10px; */
         }
     }
 </style>

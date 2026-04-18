@@ -31,9 +31,11 @@
 						The Hive : AI Agents for Everyone
 					</p>
 					<p style="padding-top: 20px;">	
-					<a href="/task"><span class="p-6">AGENTS</span></a>
+					<a href="/agents"><span class="p-6">AGENTS</span></a>
 					<a href="/dashboard"><span class="p-5">DASHBOARD</span></a>
-					<a href="/test"><span class="p-5">TEST</span></a>
+					<a href="/directToModel"><span class="p-5">DIRECT TO PROVIDER</span></a>
+					<!-- <a href="/test"><span class="p-5">TEST</span></a>
+					<a href="/slashTest"><span class="p-5">SLASH TEST</span></a> -->
 					</p>
 				</div>
 			</div>

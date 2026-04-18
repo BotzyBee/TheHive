@@ -1,0 +1,2 @@
+VITE_BACKEND_DOMAIN=http://localhost:3000
+VITE_KNOWLEDGEBASE_PATH= Path_to_knowledgebase

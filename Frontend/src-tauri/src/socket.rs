@@ -55,6 +55,22 @@ async fn return_dom_to_express(payload: String){
     agent::send_to_express("page-content-response".to_string(), message, APP_HANDLE.get().unwrap().clone()).await.unwrap();
 }
 
+use std::fs;
+use std::path::Path;
+
+#[tauri::command]
+async fn list_directory_contents(path: String) -> Result<Vec<String>, String> {
+    let target_path = if path.is_empty() { "." } else { &path };
+    
+    let entries = fs::read_dir(target_path)
+        .map_err(|e| e.to_string())?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path().display().to_string())
+        .collect();
+
+    Ok(entries)
+}
+
 
 // [][] ---------- SETUP WEB SOCKET & APP ---------- [][]
 
@@ -65,6 +81,7 @@ pub fn start_socket() {
     let socket_state_clone = socket_state_inner.clone();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(agent_state)
         .manage(MetricsChannel(Arc::new(Mutex::new(None))))
         .setup(move |app| {
@@ -201,7 +218,8 @@ pub fn start_socket() {
         .manage(SocketState(socket_state_inner)) // Manage the socket state
         .invoke_handler(tauri::generate_handler![
             return_dom_to_express,
-            submit_metrics
+            submit_metrics,
+            list_directory_contents
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
