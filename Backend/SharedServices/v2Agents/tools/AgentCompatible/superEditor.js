@@ -80,6 +80,11 @@ export async function run(Shared, params = {}, agent = {}) {
     const CHUNK_SIZE = chunkSize; // Character limit per AI call
     const { aiSettings = {}} = agent || {};
 
+    // Set minimum quality level for this tool. 
+    if(aiSettings?.quality){
+        if(aiSettings.quality < 2) aiSettings.quality = 2;
+    }
+
     if (!prompt || typeof document !== 'string') {
         
          return Shared.v2Core.Helpers.Err("SuperEditor: Missing prompt or document.");

@@ -67,7 +67,7 @@ export const initServices = async (threadOveride = false) => {
         async () => {
           if (!indexTimerActive) {
             console.log("Running KB Indexing...");
-            let poolCall = await pool.run({}, {name: 'poolIndexKnowledgebase'})
+            await pool.run({}, {name: 'poolIndexKnowledgebase'})
           }
         },
         { delay: 0, intervalMs: 60000, isOneOff : false }

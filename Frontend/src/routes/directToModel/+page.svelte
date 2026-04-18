@@ -14,7 +14,6 @@
     let inputTextArea;
     let chatContainer; 
     let lastMessageCount = 0;
-    let agentName = "Botzy Bee";
     let providerName = "Default"
 
     // For slash command menu
@@ -42,11 +41,6 @@
     $: if ($chatStore.messageHistory && chatContainer) {
         const currentCount = $chatStore.messageHistory.length;
         const isNewMessage = currentCount > lastMessageCount;
-
-        // Update agent name if it exists in settings
-        if($chatStore.aiSettings.agent){
-            agentName = $chatStore.aiSettings.agent;
-        }
 
         if($chatStore.aiSettings.provider && $chatStore.aiSettings?.randomModel != true){
             providerName = $chatStore.aiSettings.provider;  
@@ -106,7 +100,7 @@
         const userPrompt = prompt.trim();
         if (!userPrompt || $chatStore.isLoading || $chatStore.jobDone === false) return;
         // The store handles API logic, polling, and markdown parsing
-        await chatStore.submitPrompt({ promptText: userPrompt });
+        await chatStore.submitDirectToModel({ promptText: userPrompt });
         prompt = '';
         if (inputTextArea) inputTextArea.style.height = 'auto';
     }
@@ -216,8 +210,7 @@
         <div class="content-display">
             {#if $chatStore.messageHistory.length === 0}
                 <div class="start-message">
-                    <p>Welcome to Botzy Bee.. give me a task or ask a question</p>
-                    <p style="padding-top: 5px; color: #FFF; font-size: 14px;">Using Agent : {agentName}</p>
+                    <p>Direct to Provider : No Botzy Agents</p>
                     <p style="padding-top: 5px; color: #FFF; font-size: 14px;">Provider : {providerName}</p>
                 </div>
             {/if}

@@ -34,6 +34,18 @@ export async function emitTask(messages = [], jobId = null, settings = {}) {
     });
 }
 
+// Sends an array of strings & returns { outcome: 'Ok' | 'Error' value: string }
+export async function emitDirectToModel(messages = [], aiSettings) {
+    const socket = get(socketStore);
+    if (!socket || !socket.connected) {
+        throw new Error("Socket is not connected.");
+    }
+    const eventName = "direct_to_model";
+    // Wrap the socket emit in a Promise so we can await the backend's acknowledgment
+    socket.emit(eventName, { query: messages, aiSettings });
+}
+
+
 /**
  * Emits a stop command to the backend.
  */

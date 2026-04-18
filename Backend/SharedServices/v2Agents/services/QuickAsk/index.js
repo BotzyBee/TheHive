@@ -84,7 +84,7 @@ export class QuickAskAgent extends AiJob {
       ){
         if(routingCall.value.nextAction == "no-suitable-tool"){
           this.status.setFailed()
-          this.emitUpdateStatus("No suitable tool found for the task.");
+          this.emitUpdateStatus("No suitable tools.");
         } else {
           this.status.setAwaitingUserInput();
           this.emitUpdateStatus("Awaiting user input...");
@@ -94,6 +94,7 @@ export class QuickAskAgent extends AiJob {
           role: Services.aiAgents.Constants.Roles.Agent, textData: routingCall.value.message});
         this.messageHistory.addMessage(msg);
         this.taskOutput.push(msg);
+        this.emitFinalResult();
         return Services.v2Core.Helpers.Ok("Agent has messaged the user.");
       }
 
@@ -183,6 +184,8 @@ export class QuickAskAgent extends AiJob {
         this.setFailed();
         this.emitUpdateStatus("Quick Ask Agent has failed :(");
         this.isRunning = false;
+        this.errors.push(loopErrors);
+        this.emitFailed();
         return Services.v2Core.Helpers.Err(`Error ( Quick Task Agent (Param/ Tool loop) ) : ${JSON.stringify(loopErrors)}`);
       }
 

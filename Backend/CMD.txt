@@ -45,5 +45,4 @@ npm run tauri build (builds the tauri app)
 // Madge (Get circular dependencies)
 madge --circular ./
 
-// Dashboards
-https://platform.inceptionlabs.ai/dashboard/api-keys
+

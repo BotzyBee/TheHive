@@ -12,6 +12,7 @@ import { handleTAMessage } from './SharedServices/v2Agents/engine/taskAgent.js';
 import { handleQAMessage } from './SharedServices/v2Agents/engine/quickAsk.js';
 import { log } from './SharedServices/v2Core/core/helperFunctions.js';
 import { isMainThread } from 'node:worker_threads';
+import { directToModel } from './ApiHelpers/directToModel/callModel.js';
 
 // [][] -------------------------------------- [][]
 //                init server
@@ -101,6 +102,20 @@ io.value.on('connection', (socket) => {
         if (!jobID) return callback({ error: "JobID missing" });
         let res = stopJob(jobID);
         callback(res);
+    });
+
+    // --- FRONTEND SPEECH SERVICE ---
+    socket.on('chat_botzy', (ws) => {
+        handleFrontendConnection(ws).catch(err => {
+            console.error('Chat Botzy Socket Failed:', err);
+            ws.close();
+        });
+    });
+
+    // --- CALL MODEL DIRECTLY ---
+    socket.on('direct_to_model', async (data, callback) => {
+      console.log("Direct to Model Call...");
+      await directToModel(data.query, data.aiSettings, socket.id);
     });
 
     // Existing rust logic

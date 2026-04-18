@@ -76,8 +76,28 @@ export const MODEL_REGISTRY = [
     maxContext: 200000,
     quality: AiQuality.Base,
   },
+  {
+    model: 'sonar',
+    provider: AiProviders.perplexity,
+    capabilities: [
+      ModelTypes.deepResearch,
+      ModelTypes.websearch,
+    ],
+    maxContext: 127072,
+    quality: AiQuality.Base,
+  },
 
   // [][] --- ADVANCED MODELS --- [][]
+  {
+    model: 'sonar-pro',
+    provider: AiProviders.perplexity,
+    capabilities: [
+      ModelTypes.deepResearch,
+      ModelTypes.websearch,
+    ],
+    maxContext: 200000,
+    quality: AiQuality.Advanced,
+  },
   {
     model: 'gpt-5.4-mini',
     provider: AiProviders.openAI,
@@ -110,16 +130,6 @@ export const MODEL_REGISTRY = [
       ModelTypes.code,
     ],
     maxContext: 200000,
-    quality: AiQuality.Advanced,
-  },
-  {
-    model: 'sonar',
-    provider: AiProviders.perplexity,
-    capabilities: [
-      ModelTypes.deepResearch,
-      ModelTypes.websearch,
-    ],
-    maxContext: 127072,
     quality: AiQuality.Advanced,
   },
   {
@@ -199,7 +209,17 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 400000,
     quality: AiQuality.Pro,
-  }
+  },
+  {
+    model: 'sonar-reasoning-pro',
+    provider: AiProviders.perplexity,
+    capabilities: [
+      ModelTypes.deepResearch,
+      ModelTypes.websearch,
+    ],
+    maxContext: 128000,
+    quality: AiQuality.Pro,
+  },
 
   // {
   //     model:        "sonar-reasoning-pro",

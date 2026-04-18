@@ -144,7 +144,7 @@ export async function generateText(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callGemini -> generateText): No model provided in options.');
+    return Services.v2Core.Helpers.Err('Error (callGemini -> generateText 1): No model provided in options.');
   }
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
@@ -187,7 +187,15 @@ export async function generateText(
         },
       });
 
-      return Services.v2Core.Helpers.Ok(JSON.parse(secondResponse.text));
+      let parsed;
+      // Parse JSON
+      try {
+        parsed = JSON.parse(secondResponse.text);
+      } catch (error) {
+        return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 2): JSON Parse failed ${parsed}`);
+      }
+
+      return Services.v2Core.Helpers.Ok(parsed);
     }
 
     // ------------------------------------------------------------------
@@ -251,7 +259,7 @@ export async function generateText(
     return Services.v2Core.Helpers.Ok(fullText);
 
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): ${error}`);
   }
 }
 

@@ -112,11 +112,10 @@ export class ResearchChunk {
         // loop over claims. 
         for (let fact of this.factsOrAssumptions){
             let prompt = `Fact-check the following claim: "${fact.claim}". Identify if it's a fact or an assumption. Find sources to back up or refute the claim. Aim for factual accuracy and provide detail on why the claim is verified or refuted.`;
-            let searchCall = this.Shared.aiAgents.AgentTools.aiWebSearch.run(
-                this.Shared,
+            let searchCall = await this.Shared.aiAgents.AgentTools.aiWebSearch.run(
+                this.Shared, 
                 { taskDescription: prompt, domains: domains }
             ); // Returns DataMessage with data: { result: string , sources: [ref, url] }
-            console.log(JSON.stringify(searchCall));
             if (searchCall.isErr()){ return this.Shared.v2Core.Helpers.Err(`Error in ResearchChunk -> factCheckClaims -> aiWebSearch : ${searchCall.value}`)};
             stats.aiCount += 1;
             // Evaluate the claim based on the evidence found. Return a confidence score and clarification. 
@@ -252,6 +251,11 @@ export async function run(Shared, params = {}, agent = {}) {
     stats.aiCount = 0; // Reset AI call count at the start of each run.
     const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID } = params;
     const { aiSettings = {} } = agent || {};
+    
+    // Set minimum quality level for this tool. 
+    if(aiSettings?.quality){
+        if(aiSettings.quality < 2) aiSettings.quality = 2;
+    }
     
     if (!topic || typeof topic !== 'string') {
         return Shared.v2Core.Helpers.Err("Error (deepResearchTool) requires a valid 'topic' string.");

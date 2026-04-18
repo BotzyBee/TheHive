@@ -1,7 +1,7 @@
 // $lib/code/aiJobs/chatStore.js
 import { writable, get } from 'svelte/store';
 import { socketStore } from './socketStore.js';
-import { emitTask, emitStopTask } from '../aiJobs/socketEmitters.js';
+import { emitTask, emitStopTask, emitDirectToModel } from '../aiJobs/socketEmitters.js';
 import { parseAndSanitizeMarkdown, processApiMessagesToClasses, parseStatus, getConfig } from '../utils.js';
 import { TextMessage, Roles } from '../classes.js';
 import { parse } from 'svelte/compiler';
@@ -35,6 +35,31 @@ function createChatStore() {
         socket.off('job_update');
         socket.off('job_complete');
         socket.off('job_error');
+        socket.off('direct_to_model_response');
+
+        // Handle direct to model responses
+        socket.on('direct_to_model_response', (data) => {
+            if(data.outcome == "Error"){
+            update(s => ({
+                    ...s,
+                    isLoading: false,
+                    jobDone: true,
+                    errorMessage: data.value,
+                    lastStatus: null,
+                })); 
+            } else {
+                let sanitised = parseAndSanitizeMarkdown(data.value);
+                let responseMsg = new TextMessage({ role: Roles.Agent, textData: sanitised });
+                update(s => ({
+                    ...s,
+                    isLoading: false,
+                    jobDone: true,
+                    errorMessage: '',
+                    lastStatus: null,
+                    messageHistory: [...s.messageHistory, responseMsg]
+                }));                
+            }
+        });
 
         // Handles interim updates (e.g., streaming status or partial text)
         socket.on('job_update', (data) => {
@@ -119,6 +144,26 @@ function createChatStore() {
             config: cfgcall
         }));
         return cfgcall;
+    }
+
+    async function submitDirectToModel({ promptText } = {}){
+        const userPrompt = promptText.trim();
+        let userMsg = new TextMessage({ role: Roles.User, textData: userPrompt });
+        update(s => ({
+            ...s,
+            isLoading: true,
+            jobDone: false,
+            errorMessage: '',
+            lastStatus: null,
+            messageHistory: [...s.messageHistory, userMsg]
+        }));
+        const currentState = get({ subscribe });
+        // simplify messages
+        let msgs = [];
+        for(let message of currentState.messageHistory){
+            msgs.push(`Role: ${message.role} , Message: ${message.textData}`)
+        }
+        emitDirectToModel(msgs, currentState.aiSettings);
     }
 
     async function submitPrompt({ promptText } = {}) {
@@ -216,7 +261,8 @@ function createChatStore() {
                 ...s.aiSettings,
                 ...newSettings
             }
-        }))
+        })),
+        submitDirectToModel
     };
 }
 

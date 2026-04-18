@@ -44,9 +44,12 @@ function safeEmit(agent, message){
 export async function run(Shared, params = {}, agent = {}) {
     const { taskDescription, codeForProcessing = "", contextOrGuides = "" } = params;
     const { aiSettings = {} } = agent || {};
-    let aiCount = 0;
-    console.log("AI SETTINGS ", JSON.stringify(aiSettings, null, 2));
+    // Set minimum quality level for this tool. 
+    if(aiSettings?.quality){
+        if(aiSettings.quality < 2) aiSettings.quality = 2;
+    }
 
+    let aiCount = 0;
     const aiCall = Shared.callAI.aiFactory();
     const superEditor = Shared.aiAgents.AgentTools.superEditor.run; 
     let retAR = [];

@@ -13,13 +13,19 @@ import { addAnyDirectData } from './inputParser.js';
  * @returns {Result[object]} - { key: [messageId], [messageId] : { ...Message content } }
  */
 export async function processMessageForContext( messageObject, summaryDataSizeThreshold = 500, aiOptions = {}, jobObject ) {
-    if (!(messageObject instanceof BaseMessage)) {
-            return Services.v2Core.Helpers.Err(
-            'Error (processMessageForContext) : messageObject must be an instance of BaseMessage or a class that extends it.');
-        }
+  if (!(messageObject instanceof BaseMessage)) {
+      return Services.v2Core.Helpers.Err(
+      'Error (processMessageForContext) : messageObject must be an instance of BaseMessage or a class that extends it.');
+  }
 
   // Init
-  const stringRes = JSON.stringify(messageObject);
+  let stringRes
+  try {
+    stringRes = JSON.stringify(messageObject);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error : (processMessageForContext) - Error performing stringify : ${error}`);
+  }
+  
   const dataSize = stringRes.length ?? 0;
   const returnData = {
         key: messageObject.id,

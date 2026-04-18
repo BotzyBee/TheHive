@@ -17,7 +17,7 @@ import { generateLongID } from "../SharedServices/v2Core/core/utils.js";
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
-    console.log("1")
+
     const db = new Surreal();
     console.log("DB :: ", db);
 
@@ -36,7 +36,7 @@ export async function setupFolderBotDB() {
             username: dbUser,
             password: dbPass,
         });
-        console.log("3")
+
         // --- Create Namespace if it doesn't exist ---
         await db.query(`DEFINE NAMESPACE IF NOT EXISTS ${namespaceName};`);
         await db.use({ namespace: namespaceName });
@@ -99,8 +99,7 @@ export async function setupFolderBotDB() {
         `);
 
         // Add Root Dir Record
-        let encodedURL = encodeURIComponent(URL);
-        
+        let encodedURL = encodeURIComponent(rootDirUrl);
         const dirRef = generateLongID('DIR');
             let result = await db.query(
             `INSERT INTO ${dirTableName} {
@@ -111,15 +110,12 @@ export async function setupFolderBotDB() {
                         Meta: $mo
                         }`,
             {
-                pdr: rootDirUrl,
+                pdr: 'N/A',
                 u: encodedURL,
                 lu: 999,
                 mo: {},
             }
         );
-
-
-        //await addDirectoryToDB(db, rootDirUrl,"N/A", 999, {});
 
         // Define the schema for the File Vector Table
         await db.query(`

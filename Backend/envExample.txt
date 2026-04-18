@@ -25,6 +25,8 @@ ANT_KEY=
 PXY_KEY=
 # Inception
 ICPTN_KEY=
+# Eleven Labs
+EVNLBS_KEY=
 
 # Google Calendar API KEYS
 G_CLIENT_EMAIL=
