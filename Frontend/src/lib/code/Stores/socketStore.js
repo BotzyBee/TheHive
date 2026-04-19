@@ -29,7 +29,7 @@ function createSocketStore(routesArray) {
                 isConnected: () => get(connectedStore),
                 subscribe,
                 /**
-                 * Initializes the connection for this specific route
+                 * Initializes the connection for this specific route and returns instance
                  */
                 connect: (opts = {}) => {
                     // Prevent duplicate connections if one already exists
