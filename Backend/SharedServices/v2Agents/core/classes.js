@@ -1,6 +1,8 @@
 import { Services } from "../../index.js";
 import { emitToSocket } from '../../../ApiHelpers/socketHelpers.js';
 import { Roles } from "./constants.js";
+import { botzyMemory } from "../../../ApiHelpers/speechService/memory.js";
+
 /**
  * Main Holder of Messages from user, agent and tools. 
  */
@@ -250,7 +252,11 @@ export class ContextTemplate {
     constructor(jobID) {
         this.globalData = {
             timeAndDate: "",
-            jobID: jobID  || "Job ID not set"
+            jobID: jobID  || "Job ID not set",
+            partOfProject: false,
+            projectTaskId: "",
+            projectIndexUrl: "", // relative url where files are located eg. UserFiles/Projects/ProjectName
+            workingDirectory: "/UserFiles/", // relative url 
         };
         this.toolData = {}; 
         this.updateDateTime();
@@ -323,6 +329,22 @@ export class ContextTemplate {
         return this;
     }
 
+    addProjectIndexUrl(relativeIndexUrl){ 
+        if(typeof relativeIndexUrl === "string" && relativeIndexUrl != ""){
+            this.globalData.isProject = true;
+            this.globalData.projectIndexUrl = relativeIndexUrl;
+        }
+    }
+    removeProjectIndexUrl(){
+        this.globalData.isProject = false;
+        this.globalData.projectIndexUrl = ""
+    }
+    updateWorkingDirectory(relativeUrl){
+        if(typeof relativeUrl === "string" && relativeUrl != ""){
+            this.globalData.workingDirectory = relativeUrl;
+        }
+    }
+
     /**
      * Import a Context Template object - useful for passing between threads
      * @param {object} data - Context object 
@@ -345,14 +367,18 @@ export class ContextTemplate {
 // Base Class for all AI Jobs / Agents 
 // NOTE emitToSocketFunction can be found here - "../../ApiHelpers/socketHelpers.js";
 export class AiJob {
-  constructor({ idPrefix = "AI", aiSettings, socketId } = {}){ 
+  constructor({ idPrefix = "AI", aiSettings, socketId, whoGetsUpdates, emitFunction = null } = {}){ 
     /**@type {string} */
     this.id = Services.v2Core.Utils.generateLongID(idPrefix);
 
     /**@type {string | null} - Socket ID for linking to the correct user for updates */
     this.socketId = socketId || null; 
 
-    this.emitToSocket = emitToSocket;
+    // 'User' = updates emitted to frontend, 
+    // 'BotzyVoice' = updates sent to botzy voice's memory manager.
+    this.whoGetsUpdates = whoGetsUpdates || "User"; 
+
+    this.emitToSocket = emitFunction || emitToSocket; // any function must take ({socketId: , event:, data: }) as params; 
 
     /**@type {string} - used to differentiate between base class and classes that extend AiJob*/
     this.agentType = "AiJob";
@@ -403,31 +429,54 @@ export class AiJob {
    * @param {string} statusMessage - Status text to send to the user.
    */
   emitUpdateStatus(statusMessage){
-    console.log(`Emitting: ${statusMessage}`);
-    if(this.socketId && this.isRunning == true){
-        let status = new TaskStatus();
-        status.setCustomStatus(statusMessage);
-        let fmf = new FrontendMessageFormat({
-            aiJobId: this.id,
-            status: status,
-            isRunning: this.isRunning,
-            messages: [],
-            metadata: this.stats
-        });
-        this.emitToSocket(this.socketId, 'job_update', fmf);
+    console.log(`Emitting: ${statusMessage} to ${this.whoGetsUpdates}`);
+
+    switch (this.whoGetsUpdates) {
+        case 'User':
+            if(this.socketId && this.isRunning == true){
+                let status = new TaskStatus();
+                status.setCustomStatus(statusMessage);
+                let fmf = new FrontendMessageFormat({
+                    aiJobId: this.id,
+                    status: status,
+                    isRunning: this.isRunning,
+                    messages: [],
+                    metadata: this.stats
+                });
+                this.emitToSocket({socketId: this.socketId, event:'job_update', data:fmf});
+            }
+            break;
+        case 'BotzyVoice':
+            botzyMemory.push({ type: 'jobUpdate', id: this.id,  message: `[ Job Update ] : ${statusMessage}` });
+            break;
     }
+
   }
 
   emitFinalResult(){
-    if(this.socketId){
-        let res = new FrontendMessageFormat({ 
-            aiJobId: this.id, 
-            status: this.status, 
-            isRunning: this.isRunning,
-            messages: this.taskOutput, 
-            metadata: this.stats
-        });
-        this.emitToSocket(this.socketId, 'job_complete', res);
+    switch (this.whoGetsUpdates) {
+        case 'User':
+            if(this.socketId){
+                let res = new FrontendMessageFormat({ 
+                    aiJobId: this.id, 
+                    status: this.status, 
+                    isRunning: this.isRunning,
+                    messages: this.taskOutput, 
+                    metadata: this.stats
+                });
+                this.emitToSocket({socketId: this.socketId, event:'job_complete', data:res});
+            }
+            break;
+        case 'BotzyVoice':
+            // Only output data or text messages
+            let filtered = this.taskOutput.filter((message) => message.type == 'text' || message.type == 'data');
+            //
+            botzyMemory.push({ 
+                type: 'jobOutcome', 
+                id: this.id,
+                message: `[ Job Result ] : status: ${this.status} , stats: ${this.stats} , Output : ${filtered}` 
+            });
+            break;
     }
   }
 

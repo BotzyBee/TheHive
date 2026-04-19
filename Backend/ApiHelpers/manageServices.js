@@ -1,13 +1,12 @@
 import { initRegistry } from "./buildRegistry.js";
 import { isMainThread } from 'node:worker_threads';
 import { initDatabaseConnection, closeDatabaseConnection } from "../SharedServices/v2Database/services/manageDb.js";
-import { setupPool, pool, indexTimerActive } from "../SharedServices/v2Core/engine/workers.js";
+import { setupPool, pool } from "../SharedServices/v2Core/engine/setupPool.js";
 import { log } from "../SharedServices/v2Core/core/helperFunctions.js";
 import { initToolIndex } from "../SharedServices/v2Database/services/toolIndexing.js";
 import { initGuideIndex } from "../SharedServices/v2Database/services/guideIndexing.js";
 import { addNewTimer, stopAndClearAllTimers } from "../SharedServices/v2Core/services/timers.js";
 import { JOBS } from "../SharedServices/v2Agents/engine/jobManager.js";
-
 
 let servicesStarted = false;
 
@@ -65,10 +64,8 @@ export const initServices = async (threadOveride = false) => {
       addNewTimer(
         'KB_Indexing_Timer',
         async () => {
-          if (!indexTimerActive) {
             console.log("Running KB Indexing...");
-            await pool.run({}, {name: 'poolIndexKnowledgebase'})
-          }
+            await pool.run({}, {name: 'poolIndexKnowledgebase'}) // handles it's own 'is already active'
         },
         { delay: 0, intervalMs: 60000, isOneOff : false }
       );

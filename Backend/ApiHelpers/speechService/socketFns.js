@@ -1,7 +1,7 @@
 // socketFns.js
 import { SpeechService } from './elevenLabs.js';
 import { convertToMp3Buffer } from './processAudio.js';
-import { TestBotzyAgent } from './botzy.js';
+import { TestBotzyAgent } from './botzyBee/main.js';
 
 export async function handleFrontendConnection(socket) {
     let chunks        = [];   // raw WebM/Ogg chunks from the browser
@@ -47,6 +47,7 @@ export async function handleFrontendConnection(socket) {
             console.log(`[STT] MP3 ready — ${mp3Buffer.length} bytes`);
 
             // 3. Send to ElevenLabs batch STT
+            // if mp3 > X size.. give pre-generated 'working on that..' response.
             console.log('[STT] Sending to ElevenLabs batch transcription...');
             const text = await SpeechService.transcribeFile(mp3Buffer, 'audio/mpeg');
             console.log('[STT] Transcript:', text);

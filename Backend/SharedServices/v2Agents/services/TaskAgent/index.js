@@ -34,9 +34,11 @@ export class TaskAgent extends AiJob {
             toolRetryCount = 2,
             maxLoopBuffer = 5,
             summaryDataSizeThreshold = 500,
-            socketId = null
+            socketId = null,
+            emitFunction = null,
+            whoGetsUpdates = null
         } = {}){
-        super({aiSettings, socketId}) // setup parent class
+        super({aiSettings, socketId, emitFunction, whoGetsUpdates}) // setup parent class
         this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ role: Services.aiAgents.Constants.Roles.User, textData: task}));
         this.task = task;
         this.agentType = "TaskAgent"; 
@@ -844,30 +846,6 @@ export class TaskAgent extends AiJob {
         }
     }
 }// end Task Agent
-
-export class TaskContextTemplate extends ContextTemplate {
-    constructor() {
-        super(); // setup global & tool data objects.
-        this.globalData.isProject = false;
-        this.globalData.projectIndexUrl = ""; // relative url where files are located eg. UserFiles/Projects/ProjectName
-        this.globalData.workingDirectory = "/UserFiles/"; // relative url 
-    }
-    addProjectIndexUrl(relativeIndexUrl){ 
-        if(typeof relativeIndexUrl === "string" && relativeIndexUrl != ""){
-            this.globalData.isProject = true;
-            this.globalData.projectIndexUrl = relativeIndexUrl;
-        }
-    }
-    removeProjectIndexUrl(){
-        this.globalData.isProject = false;
-        this.globalData.projectIndexUrl = ""
-    }
-    updateWorkingDirectory(relativeUrl){
-        if(typeof relativeUrl === "string" && relativeUrl != ""){
-            this.globalData.workingDirectory = relativeUrl;
-        }
-    }
-}
 
 const PromptsAndSchemas = {
     planning: {
