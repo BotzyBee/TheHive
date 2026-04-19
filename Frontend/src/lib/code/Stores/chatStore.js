@@ -69,7 +69,6 @@ function createChatStore() {
 
         // Handles interim updates (e.g., streaming status or partial text)
         socket.on('job_update', (data) => {
-            console.log("Received job_update event:", data);
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
             let parsedStatus = parseStatus(data.status);
@@ -89,7 +88,6 @@ function createChatStore() {
 
         // Handles the final payload when a job finishes
         socket.on('job_complete', (data) => {
-            console.log("Received job_complete event:", data);
             const currentStore = get({ subscribe });
 
             // Ensure this update is for the current job
@@ -98,7 +96,6 @@ function createChatStore() {
             const { messages, metadata } = data;
             
             let processedMessages = processApiMessagesToClasses(messages || []);
-            console.log("Processed messages:", processedMessages);
             let sanitisedMessages = [];
             
             for(let i=0; i<processedMessages.length; i++){
@@ -113,7 +110,6 @@ function createChatStore() {
                 }
                 sanitisedMessages.push(msg);
             }
-            console.log("Sanitised messages:", sanitisedMessages);
             update(s => ({
                 ...s,
                 isLoading: false,

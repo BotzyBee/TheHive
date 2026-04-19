@@ -1,7 +1,7 @@
 import { Services } from "../../index.js";
 import { emitToSocket } from '../../../ApiHelpers/socketHelpers.js';
 import { Roles } from "./constants.js";
-import { botzyMemory } from "../../../ApiHelpers/speechService/memory.js";
+import { botzyMemory } from "../../../ApiHelpers/BotzyAssistant/memory.js";
 
 /**
  * Main Holder of Messages from user, agent and tools. 

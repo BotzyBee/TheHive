@@ -7,7 +7,7 @@ import { emitToSocket } from "../socketHelpers.js";
  * @param {object} aiSettings - Ai Settings object (Same as used in agents)
  * @returns {Result} - Result ( string | string ) - depending if structured OP or not.
  */
-export async function directToModel(userQuery, aiSettings, webGrounding, socketID, ){
+export async function directToModel(userQuery, aiSettings, webGrounding, socketID ){
     try {
         if(!userQuery){
             throw new Error('Missing a user input!');
@@ -20,13 +20,12 @@ export async function directToModel(userQuery, aiSettings, webGrounding, socketI
         let ai = Services.callAI.aiFactory();
         let call;
         if(webGrounding == false){
-            console.log("Direct To Model");
             call = await ai.generateText(systemMessage, prompt, { ...aiSettings } );
-            emitToSocket(socketID, "direct_to_model_response", call);
+            emitToSocket({socketId: socketID, event: "direct_to_model_response", data: call});
         } else {
             console.log("Direct To Model & WebGrounding");
             call = await ai.webSearch(systemMessage, prompt, { ...aiSettings } );
-            emitToSocket(socketID, "direct_to_model_response", {outcome: "Ok", value: call.value.text});
+            emitToSocket({sockedId: socketID, event: "direct_to_model_response", data: {outcome: "Ok", value: call.value.text}});
         }
         if(call.isErr()){
             throw new Error(`AI Call threw and error : ${call.value}`);

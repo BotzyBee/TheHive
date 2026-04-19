@@ -112,3 +112,27 @@ pub fn check_window_exists(app: &AppHandle, window_label: &str) -> bool {
     app.get_window(window_label).is_some()
 }
 
+#[tauri::command]
+pub async fn open_n8n_window(app: AppHandle) -> Result<(), String> {
+    let window_label = "localhost-app-window";
+
+    // 1. Check if the window already exists. If it does, focus it and return.
+    if let Some(existing_window) = app.get_webview_window(window_label) {
+        let _ = existing_window.set_focus();
+        return Ok(());
+    }
+
+    // 2. Define the external URL
+    let url = WebviewUrl::External("http://localhost:5678/".parse().map_err(|e| format!("Invalid URL: {}", e))?);
+
+    // 3. Build the new window
+    let window = tauri::WebviewWindowBuilder::new(&app, window_label, url)
+        .title("The Hive : N8N")
+        .inner_size(1200.0, 700.0)
+        .build();
+
+    match window {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Error creating localhost window: {}", e)),
+    }
+}

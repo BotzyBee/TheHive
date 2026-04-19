@@ -11,7 +11,7 @@ import { handleQAMessage } from './SharedServices/v2Agents/engine/quickAsk.js';
 import { log } from './SharedServices/v2Core/core/helperFunctions.js';
 import { isMainThread } from 'node:worker_threads';
 import { directToModel } from './ApiHelpers/directToModel/callModel.js';
-import { handleFrontendConnection } from './ApiHelpers/speechService/socketFns.js';
+import { handleFrontendConnection } from './ApiHelpers/BotzyAssistant/voice/socketFns.js';
 
 // [][] -------------------------------------- [][]
 //                init server
@@ -72,7 +72,7 @@ app.get("/getModels", async (req, res) => {
 //Handle Socket.io.value connections
 
 io.value.on('connection', (socket) => {
-    log(`User joined: ${socket.id}`);
+    log(`Main Route Active '/': ${socket.id}`);
 
     // --- TASK AGENT JOB ---
     socket.on('submit_task', async (data, callback) => {
@@ -105,7 +105,7 @@ io.value.on('connection', (socket) => {
 
     // --- CALL MODEL DIRECTLY ---
     socket.on('direct_to_model', async (data, callback) => {
-      console.log("Direct to Model Call...");
+      console.log("Direct to model called...");
       await directToModel(data.query, data.aiSettings, data.webGrounding, socket.id);
     });
 
@@ -122,12 +122,16 @@ io.value.on('connection', (socket) => {
 
 // [][] --- CHAT BOTZY WS ROUTE --- [][]
 io.value.of('/chat_botzy').on('connection', (socket) => {
-  console.log("Chat Botzy Active");
+  console.log(`Chat Botzy Active :: ${socket.id}`);
     handleFrontendConnection(socket).catch(err => {
         console.error('Chat Botzy Socket Failed:', err);
         socket.disconnect(true);
     });
 });
+
+io.value.of('/chat_botzy').on('disconnect', (socket) => {
+  console.log(`User Left (chat_botzy) : ${socket.id}`)
+})
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

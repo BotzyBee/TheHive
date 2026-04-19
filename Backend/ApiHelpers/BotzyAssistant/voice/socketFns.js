@@ -1,7 +1,7 @@
 // socketFns.js
 import { SpeechService } from './elevenLabs.js';
-import { convertToMp3Buffer } from './processAudio.js';
-import { TestBotzyAgent } from './botzyBee/main.js';
+import { convertToMp3Buffer } from './processAudio.js'; 
+import { TestBotzyAgent } from '../main.js';
 
 export async function handleFrontendConnection(socket) {
     let chunks        = [];   // raw WebM/Ogg chunks from the browser

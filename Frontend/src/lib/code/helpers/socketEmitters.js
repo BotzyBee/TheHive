@@ -7,7 +7,6 @@ import { FrontendMessageFormat } from '../classes.js';
  */
 export async function emitTask(messages = [], jobId = null, settings = {}) {
     const socket = sockets['/'];
-    socket.connect();
     if (!socket) {
         throw new Error("Socket is not connected.");
     }
@@ -37,13 +36,12 @@ export async function emitTask(messages = [], jobId = null, settings = {}) {
 // Sends an array of strings & returns { outcome: 'Ok' | 'Error' value: string }
 export async function emitDirectToModel(messages = [], aiSettings, webGrounding) {
     const socket = sockets['/'];
-    socket.connect();
     if (!socket) {
         throw new Error("Socket is not connected.");
     }
     const eventName = "direct_to_model";
     // Wrap the socket emit in a Promise so we can await the backend's acknowledgment
-    socket.send(eventName, { query: messages, aiSettings, webGrounding }, null);
+    console.log(socket.send(eventName, { query: messages, aiSettings, webGrounding }, null));
 }
 
 
@@ -52,7 +50,6 @@ export async function emitDirectToModel(messages = [], aiSettings, webGrounding)
  */
 export function emitStopTask(jobId) {
     const socket = sockets['/'];
-    socket.connect();
     if (!socket) return;
 
     // Use an acknowledgment to confirm it was cancelled successfully
@@ -69,7 +66,6 @@ export function emitStopTask(jobId) {
  */
 export function emitAmendTask(prompt, jobId) {
     const socket = sockets['/'];
-    socket.connect();
     if (!socket) return;
 
     return new Promise((resolve, reject) => {

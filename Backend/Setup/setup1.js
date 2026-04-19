@@ -15,6 +15,7 @@ export async function setupFilesAndFolders(){
             '/AppFiles/Plugins/Guides',
             '/AppFiles/Plugins/Tools',
             '/AppFiles/surreal.db', 
+            'AppFiles/n8n_data',
             '/AppFiles/Logging',
             '/UserFiles/'
         ];

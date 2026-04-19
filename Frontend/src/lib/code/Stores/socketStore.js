@@ -1,81 +1,65 @@
 import { writable, get } from 'svelte/store';
 import { io } from 'socket.io-client';
 
-/**
- * Factory for creating a collection of socket stores based on routes.
- * @param {string[]} routesArray - Example: ['/', '/chat_botzy']
- * @param {string} baseUrl - The base URL of your socket server
- */
 function createSocketStore(routesArray) {
     const baseUrl = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
     let socketCollection = {};
 
-    // Fix: Use routesArray.length for the loop condition
-    for (let i = 0; i < routesArray.length; i++) {
-        const route = routesArray[i];
+    for (const route of routesArray) {
+        // The actual Svelte store holding the socket instance
+        const { subscribe, set } = writable(null);
+        const connectedStore = writable(false);
+        
+        // Private variable to track the instance inside this closure
+        let instance = null;
 
-        const socketStore = () => {
-            // This store will hold the actual socket instance
-            const { subscribe, set, update } = writable(null);
-            let connectedStore = writable(false);
-            return {
-                // 2. Expose the connection store for Svelte reactivity ($ prefix)
-                connected: { subscribe: connectedStore.subscribe },
+        socketCollection[route] = {
+            subscribe,
+            connected: { subscribe: connectedStore.subscribe },
+            isConnected: () => get(connectedStore),
 
-                /**
-                 * 3. ADDED METHOD: Returns the current raw boolean value
-                 * Useful for logic inside non-Svelte files or event handlers
-                 */
-                isConnected: () => get(connectedStore),
-                subscribe,
-                /**
-                 * Initializes the connection for this specific route and returns instance
-                 */
-                connect: (opts = {}) => {
-                    // Prevent duplicate connections if one already exists
-                    if (get({ subscribe })) return;
+            connect: (opts = {}) => {
+                // 1. Immediate check: if instance exists, don't create another
+                if (instance) return instance;
+                
+                // 2. Create instance immediately
+                instance = io(`${baseUrl}${route}`, {
+                    ...opts,
+                    autoConnect: true // socket.io connects by default
+                });
 
-                    const socket = io(`${baseUrl}${route}`, opts);
+                instance.on('connect', () => {
+                    connectedStore.set(true);
+                    set(instance); // Update the store for Svelte components
+                });
 
-                    socket.on('connect', () => {
-                        connectedStore.set(true);
-                        set(socket);
-                    });
+                instance.on('disconnect', () => {
+                    connectedStore.set(false);
+                    // We don't set(null) here because the instance still exists 
+                    // and will try to auto-reconnect.
+                });
 
-                    socket.on('disconnect', () => {
-                        connectedStore.set(false);
-                        set(null);
-                    });
+                return instance;
+            },
 
-                    return socket;
-                },
-                /**
-                 * Generic emit helper
-                 */
-                send: (event, data, response) => {
-                    const socket = get({ subscribe });
-                    if (socket) {
-                        socket.emit(event, data, response);
-                    } else {
-                        console.warn(`Socket for ${route} is not connected.`);
-                    }
-                },
-                /**
-                 * Manually close the connection
-                 */
-                close: () => {
-                    const socket = get({ subscribe });
-                    if (socket) {
-                        socket.close();
-                        connectedStore.set(false);
-                        set(null);
-                    }
+            send: (event, data, callback) => {
+                // Use the closure instance directly
+                if (instance && instance.connected) {
+                    instance.emit(event, data, callback);
+                } else {
+                    console.warn(`Socket for ${route} is not ready. State: ${instance?.connected}`);
                 }
-            };
-        };
+            },
 
-        // Initialize the handler for this route
-        socketCollection[route] = socketStore();
+            close: () => {
+                if (instance) {
+                    instance.close();
+                    instance = null;
+                    set(null);
+                    connectedStore.set(false);
+                }
+            }
+        };
     }
 
     return socketCollection;
@@ -83,13 +67,3 @@ function createSocketStore(routesArray) {
 
 export const socketRoutes = ['/', '/chat_botzy'];
 export const sockets = createSocketStore(socketRoutes);
-
-// USAGE
-// const chatSocket = sockets['/chat_botzy'];
-//     // Start the connection
-//     chatSocket.connect();
-//     function sendMessage() {
-//         chatSocket.send('message', 'Hello Botzy!');
-//     }
-
-
