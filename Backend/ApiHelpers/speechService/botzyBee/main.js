@@ -1,4 +1,4 @@
-import { Services } from "../../SharedServices/index.js";
+import { Services } from "../../../SharedServices/index.js";
 
 
 export async function TestBotzyAgent(userText){
@@ -19,7 +19,9 @@ export async function TestBotzyAgent(userText){
 // general chit chat (Use inception as it's quick.. or Gemini 2.0)
 // if asked for something that it doesn't know how to answer - raise a job (Must be on a 2nd thread...)
 
-// keep track of jobs
+// develop a personalisation file - Phase 2
+// handle learning and guide generation - Phase 2
+// keep track of jobs (Botzy Memory Manager)
 // deliver outcomes
 // check progress 
 // stop jobs
