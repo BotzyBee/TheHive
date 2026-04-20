@@ -12,6 +12,7 @@ import { log } from './SharedServices/v2Core/core/helperFunctions.js';
 import { isMainThread } from 'node:worker_threads';
 import { directToModel } from './ApiHelpers/directToModel/callModel.js';
 import { handleFrontendConnection } from './ApiHelpers/BotzyAssistant/voice/socketFns.js';
+import { handleN8N_message } from './ApiHelpers/N8N/main.js';
 
 // [][] -------------------------------------- [][]
 //                init server
@@ -48,6 +49,11 @@ app.get("/getConfig", async (req, res) => {
 app.get("/getModels", async (req, res) => {
   let msg = getFormattedModelRegistry();
   res.status(200).json(msg);
+});
+
+app.post("/handleN8N", async (req, res) => {
+  handleN8N_message(req)
+  res.status(200).json({result: "Ok"});
 });
 
 // app.get("/test", async (req, res) => {

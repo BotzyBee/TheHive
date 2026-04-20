@@ -1,6 +1,6 @@
 import * as coreToolCollection from '../../v2Agents/tools/AgentCompatible/index.js';
 
-import { toolTableName, vectorEmbedSize } from '../core/constants.js';
+import { toolTableName, vectorEmbedSize, N8N_ToolDirectoryUrl } from '../core/constants.js';
 import { getDbAgent } from './manageDb.js';
 import path from 'path';
 import { Services } from '../../index.js';
@@ -58,12 +58,38 @@ export async function fetchPluginAgentTools(){
     return Services.v2Core.Helpers.Ok(results);
 }
 
+export async function fetchN8NAgentTools(){
+    try {
+        // Get available tools from N8N directory
+        let axios = Services.aiAgents.ToolHelpers.axiosHelper;
+        let dir = await axios.get(N8N_ToolDirectoryUrl);
+        let ToolDirectory = dir.data; // [{ toolName, version, url }]
+        //Fetch Tools
+        let results = [];
+        for(let i=0; i< ToolDirectory.length ?? 0; i++){
+            // read
+            let toolDetails = await axios.get(`${ToolDirectory[i].url}/details`); // array [ Hive Tool Standard (+ pollForResult: bool) ]
+            results.push({
+                filePath: ToolDirectory[i].url,
+                toolName: toolDetails.data[0].toolName,
+                version: toolDetails.data[0].version,
+                overview: toolDetails.data[0].overview
+            })
+        }
+        return Services.v2Core.Helpers.Ok(results);
+    } catch (error) {
+        return Services.v2Core.Helpers.Err(`Error (fetchN8NAgentTools) : ${error}`);
+    }
+}
+
 export async function initToolIndex(){
     // Find all tools and extract details (Plugin & Core)
     let builtIn = fetchCoreAgentTools(); // doesn't need Err catch! 
     let plugIn = await fetchPluginAgentTools();
     if(plugIn.isErr()){ return Services.v2Core.Helpers.Err(`Error ( initToolIndex -> fetchPluginAgentTools ) : ${plugIn.value}`) }
-    let merge = [...builtIn.value, ...plugIn.value];
+    let n8n = await fetchN8NAgentTools();
+    if(n8n.isErr()){ return n8n }
+    let merge = [...builtIn.value, ...plugIn.value, ...n8n.value];
     let combined = deduplicateByToolName(merge);
     // Process them into the DB (check if exist, check new version, add if needed);
     const cLen = combined.length ?? 0;

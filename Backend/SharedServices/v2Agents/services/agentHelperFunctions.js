@@ -1,4 +1,5 @@
 import { Services } from "../../index.js";
+import { processApiMessagesToClasses } from "./processMessages.js";
 import path from 'path';
 
 /**
@@ -10,30 +11,46 @@ import path from 'path';
  * @returns {Result(any)} - returns the output from the agent tool.
  */
 export async function callAgentTool(toolName, filePath, params, agentDependencies = {}){
-    if(toolName == null || filePath == null){
-        return Services.v2Core.Helpers.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
+  if(toolName == null || filePath == null){
+      return Services.v2Core.Helpers.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
+  }
+
+  if(filePath == Services.fileSystem.Constants.builtInFilePath){
+    // built-in tool
+    let injectedDependencies = {
+      ...Services,
+    };
+    // Not sure if this is needed anymore ??
+    injectedDependencies.Helpers = {
+        saveMessageContent,
+        processBase64Audio_ToWavBuffer,
+        callAgentTool
+    };
+    return await Services.aiAgents.AgentTools[toolName].run(injectedDependencies, params, agentDependencies ); // tools must return Ok/ Err.
+  } else if(filePath.includes(Services.database.Constants.N8N_Url)){
+    let axios = Services.aiAgents.ToolHelpers.axiosHelper;
+    try {
+      let toolDetails = await axios.get(`${filePath}/details`);
+      if(toolDetails.data[0].pollForResult == true || toolDetails.data[0].pollForResult == "true"){
+        // Need to poll to get the tool result
+        // TODO!
+      } else {
+        let call = await axios.post(`${filePath}/run`, params);
+        let processedMsgs = processApiMessagesToClasses(call.data);
+        if(processedMsgs.isErr()){ Services.v2Core.Helpers.Err(`Error ( callTool -> (N8N) ) : - ${filePath} - ${processedMsgs.value}`);  }
+        return Services.v2Core.Helpers.Ok(processedMsgs.value);
+      }
+    } catch (error) {
+      return Services.v2Core.Helpers.Err(`Error ( callTool -> N8N ) : Could not use N8N tool - ${filePath} - ${error}`); 
     }
-    if (filePath == Services.fileSystem.Constants.builtInFilePath){
-        // built-in tool
-        let injectedDependencies = {
-          ...Services,
-        };
-        // Not sure if this is needed anymore ??
-        injectedDependencies.Helpers = {
-            saveMessageContent,
-            processBase64Audio_ToWavBuffer,
-            callAgentTool
-        };
-        return Services.aiAgents.AgentTools[toolName].run(injectedDependencies, params, agentDependencies ); // tools must return Ok/ Err.
+  } else {
+    let readFile = await import(/* @vite-ignore */ filePath);
+    if(readFile){
+        return await readFile.run(injectedDependencies, params, agentDependencies);
     } else {
-        // plug-in tool
-        let readFile = await import(/* @vite-ignore */ filePath);
-        if(readFile){
-            return readFile.run(injectedDependencies, params, agentDependencies);
-        } else {
-           return Services.v2Core.Helpers.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
-        }
+        return Services.v2Core.Helpers.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
     }
+  }
 }
 
 /**

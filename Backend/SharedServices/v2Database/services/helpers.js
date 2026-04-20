@@ -57,14 +57,23 @@ export async function getToolDetails(toolName){
     if(resLen == 0){ return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> getRecords 2 ) : DB returned no results `);}
     // Get tool object
     const fp = search.value[0][0].FilePath;
+    let decodedFP;
+    // built in path isn't proper URL.. so can only decode it's N8N or plugin.
+    if(fp != Services.fileSystem.Constants.builtInFilePath){
+        decodedFP = decodeURIComponent(fp);
+    }
     let toolObj; 
     if(fp == Services.fileSystem.Constants.builtInFilePath){
         // Built in tool
         toolObj = CoreTools[toolName].details;
-    } else {
+    } else if(decodedFP.includes(Services.database.Constants.N8N_Url)) {
+        // N8N Tool
+        let axios = Services.aiAgents.ToolHelpers.axiosHelper;
+        let call = await axios.get(`${decodedFP}/details`);
+        toolObj = call.data[0]; // comes back in an array [{...details...}]
+    } 
+    else {
         // Plugin tool
-        let decodedFP = decodeURIComponent(fp);
-        fp = decodedFP;
         let readFile = await import(/* @vite-ignore */ decodedFP);
         if(readFile){
             toolObj = readFile.details;
@@ -72,5 +81,6 @@ export async function getToolDetails(toolName){
            return Services.v2Core.Helpers.Err(`Error ( getToolDetails -> import ) : Could not read file - ${fp}`); 
         }
     }
-    return Services.v2Core.Helpers.Ok({filePath: fp, details: toolObj})
+    
+    return Services.v2Core.Helpers.Ok({filePath: decodedFP ? decodedFP : fp, details: toolObj})
 }
