@@ -429,7 +429,7 @@ export class AiJob {
    * @param {string} statusMessage - Status text to send to the user.
    */
   emitUpdateStatus(statusMessage){
-    console.log(`Emitting: ${statusMessage} to ${this.whoGetsUpdates}`);
+    console.log(`Emitting: ${statusMessage} [to ${this.whoGetsUpdates}]` );
 
     switch (this.whoGetsUpdates) {
         case 'User':

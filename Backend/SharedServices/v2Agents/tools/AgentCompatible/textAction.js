@@ -82,7 +82,7 @@ export async function run(
         role: Shared.aiAgents.Constants.Roles.Tool,  
         textData: call.value.textOutput,
         ext: call.value.ext,
-        toolName: "AiTextAction",
+        toolName: "aiTextAction",
         instructions: taskDescription
     });
     return Shared.v2Core.Helpers.Ok([message]);

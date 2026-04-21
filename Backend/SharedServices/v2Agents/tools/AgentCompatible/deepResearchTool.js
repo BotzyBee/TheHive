@@ -292,8 +292,9 @@ export async function run(Shared, params = {}, agent = {}) {
     // reverse order as first chunk is just definitions and terms.
     let latestPlan = ""; 
     safeEmit(agent, `Starting writing phase - creating report plan 🤖🐝`);
+    let chunk = 1;
     for (let i = chunkLength - 1; i >= 0; i--){
-        safeEmit(agent, `Generating report plan based on research chunk ${((i + 2)-chunkLength)}/${chunkLength}`);
+        safeEmit(agent, `Generating report plan based on research chunk ${chunk}/${chunkLength}`);
         let planCall = await callAI.generateText(
             PromptsAndSchemas.reportPlan.sys,
             PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
@@ -302,6 +303,7 @@ export async function run(Shared, params = {}, agent = {}) {
         if (planCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> reportPlan : ${planCall.value}`)}
         stats.aiCount += 1;
         latestPlan = planCall.value; // Update the latest plan with the current plan call result
+        chunk++;
     }
     // turn plan into array of actions
     let planArray = [];

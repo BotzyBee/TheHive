@@ -1,4 +1,4 @@
-export const useMultipleThreads = true;
+export const useMultipleThreads = false;
 
 export const Roles = {
     User: "User",    // Messages from the user

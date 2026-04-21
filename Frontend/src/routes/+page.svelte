@@ -38,7 +38,7 @@
                     <img src={BotzyLogo} alt="Botzy Logo" width="300px" class="drop-shadow-2xl hover:scale-105 transition-transform duration-500 ease-out" />
                 </div>
                 
-                <div class="w-full lg:w-2/3 max-w-4xl p-8 lg:mr-10 mx-auto rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md custom-min-height flex flex-col" 
+                <div class="w-[98%] lg:w-2/3 max-w-4xl p-8 lg:mr-10 mx-auto rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md custom-min-height flex flex-col" 
                      style="background-color: rgba(30, 30, 30, 0.4);">
                     
                     <div class="mb-8">

@@ -1,0 +1,97 @@
+{
+  "name": "n8n_tool_registry",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ToolDirectory",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        -48
+      ],
+      "id": "ad694c66-849c-42af-bbb0-d5df671363f9",
+      "name": "Webhook",
+      "webhookId": "9a96bbe0-6e9c-4db8-87b5-65c53358530b"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// [][] -- Registry for available N8N Tools -- [][]\n// Return high level - URL endpoint, name, and version\n// NOTE! - Use internal container mapping - http://n8n:5678/\n\nconst N8N_REGISTRY = [\n  { toolName: 'testTool', version: '2026.1.1', url: 'http://n8n:5678/webhook/test-tool' }\n];\n\nreturn N8N_REGISTRY;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "1f12fe71-8756-4ac6-aa36-b9f2eb3e0318",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        64,
+        -48
+      ],
+      "id": "ad0a481d-6455-4af0-bcf2-4e26db40f069",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {
+    "Code in JavaScript": [
+      {
+        "json": {
+          "toolName": "testing",
+          "version": "2026.1.1",
+          "url": "http://Potato.com"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e2d6f279-b81c-4811-b013-a71139941291",
+  "meta": {
+    "instanceId": "998e6576d86398afe97ec502c190b3dccd5d6627abe265080980e1775be4062c"
+  },
+  "id": "ISYJKYhjNb3TUxNa",
+  "tags": []
+}
