@@ -1,9 +1,8 @@
 <script>
-    import { chatStore } from '$lib/code/agentChat/chatStore.js';
+    import { chatStore } from '$lib/code/Stores/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
     import { slide } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
-    import { socketStore, refreshSocket } from '../../lib/code/agentChat/socketStore.js';
     import { onMount, tick } from 'svelte';
     import { invoke } from '@tauri-apps/api/core';
     import { open } from '@tauri-apps/plugin-dialog';
@@ -22,12 +21,8 @@
     let filteredOptions = [];
     let selectedIndex = 0;
 
-    onMount(() => {
-        // refresh the socket if it doesn't exist. 
+    onMount(() =>{
         chatStore.reset();
-        if (!socketStore.socket) {
-            refreshSocket();
-        }
     });
 
     function toggleSidebar() {
@@ -376,6 +371,33 @@
     .dropdown li.active {
         background: #333;
         color: white;
+    }
+
+    /* Crucial CSS for the button within each list item */
+    .dropdown button {
+        display: flex; /* Use flexbox to align icon and label nicely */
+        align-items: center; /* Vertically centres content */
+        width: 100%; /* THIS IS KEY: Makes the button span the full width of its parent <li> */
+        padding: 8px 12px; /* Adjust padding as needed for item height and spacing */
+        border: none; /* Removes default button border */
+        background-color: transparent; /* Ensures no default button background */
+        text-align: left; /* Aligns text to the left */
+        cursor: pointer; /* Applies the pointer cursor to the entire button area */
+        font-size: inherit; /* Inherit font size from parent */
+        color: #f0f0f0; /* Default text colour */
+        outline: none; /* Removes default focus outline for better aesthetics, but consider a custom focus style for accessibility */
+        transition: background-color 0.2s ease; /* Smooth hover transition */
+    }
+    
+    /* Styling for the icon and label spans */
+    .dropdown button .icon {
+        margin-right: 8px; /* Space between icon and label */
+        /* Remove inline 'cursor: pointer;' from here */
+    }
+
+    .dropdown button .label {
+        flex-grow: 1; /* Allows the label to take up remaining space */
+        /* Remove inline 'cursor: pointer;' from here */
     }
 
     .icon { opacity: 0.7; }

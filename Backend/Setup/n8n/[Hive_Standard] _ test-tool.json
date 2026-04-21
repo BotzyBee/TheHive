@@ -1,0 +1,247 @@
+{
+  "name": "[Hive_Standard] : test-tool",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "test-tool/details",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -272,
+        -208
+      ],
+      "id": "48f6d0be-d638-428d-86ba-2a06815fbe53",
+      "name": "Details",
+      "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FOLLOWS HIVE PLUGIN STANDARD\n\nconst details = {\n    toolName:   \"n8nTestTool\",\n    pollForResult: false,\n    version:    \"2026.0.3\",\n    creator:    \"Botzy Bee\",\n    overview:   \"This is a test tool to see if N8N Plays nice with Botzy Bee.\",\n    guide:      \"No Guide\",  \n    inputSchema: {\n        \"type\": \"object\",\n        \"properties\": {\n            \"echo\": {\n            \"type\": \"string\",\n            \"description\": \"Write something here and have N8N echo it back.\"\n            }\n        },\n        \"required\": [\"echo\"]\n        }\n    };\n\nreturn details;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -208
+      ],
+      "id": "b2efa92e-0b8d-485d-b3b2-454cb96465c4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        144,
+        -208
+      ],
+      "id": "ff01c697-48ee-4df9-b4bb-44c531c6c3a9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "content": "## /test-tool/details\nreturns as an array! [{  .. tool details .. }]",
+        "height": 80,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -256,
+        -320
+      ],
+      "typeVersion": 1,
+      "id": "9922d8e3-ba19-44d0-84c2-23b4cb4915a1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-tool/run",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -272,
+        192
+      ],
+      "id": "46ec9d66-4db5-4574-ab26-b5ad58c5ec5f",
+      "name": "Details1",
+      "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "let input = $input.first().json.body.echo;\nlet OP = `You said : ${input}`;\n\n// Text Message Format\nlet TM =  {\n    id: `N8N_Test-Tool`,\n    role: 'Tool', \n    timestamp: new Date(),\n    metadata: {}, \n    type: 'text',\n    mime: \"text/plain\",\n    ext: \"txt\",\n    textData: OP,\n    toolName: \"N8N_Test-Tool\",\n    instructions: \"Bla bla bla\"\n  };\n\nreturn [TM];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        192
+      ],
+      "id": "2b0905ed-2f58-4c08-8bb0-9692604cd614",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "content": "## /test-tool/run\nInput - echo: String\nreturns Text Message Format [{.. text message class ..}]",
+        "height": 96,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -256,
+        48
+      ],
+      "typeVersion": 1,
+      "id": "42379d5d-404d-499f-9f72-484937dd54d2",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        144,
+        192
+      ],
+      "id": "44c77d20-e11c-4969-94a9-5cc80c8b3504",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-tool/pollForResult",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -272,
+        544
+      ],
+      "id": "8201757f-c764-4543-a657-b69020b67c2f",
+      "name": "Details2",
+      "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "content": "## /test-tool/pollForResult\nTODO!",
+        "height": 96,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -272,
+        416
+      ],
+      "typeVersion": 1,
+      "id": "b9c4f157-60d2-4b42-b12d-cd46bc71e4d0",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {
+    "Details1": [
+      {
+        "json": {
+          "headers": {
+            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json",
+            "user-agent": "axios/1.15.0",
+            "content-length": "22",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "host": "n8n:5678",
+            "connection": "keep-alive"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "echo": "Hello World"
+          },
+          "webhookUrl": "http://localhost:5678/webhook/test-tool/run",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Details": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Details1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "68a9b2c8-933b-4d54-ac78-b38f05d8e05e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "998e6576d86398afe97ec502c190b3dccd5d6627abe265080980e1775be4062c"
+  },
+  "id": "c28QtQkSpa8oITjN",
+  "tags": [
+    {
+      "updatedAt": "2026-04-20T21:44:38.160Z",
+      "createdAt": "2026-04-20T21:44:38.160Z",
+      "id": "zNPx6VbtAXhqf3xg",
+      "name": "HiveStandard"
+    }
+  ]
+}

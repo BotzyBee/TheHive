@@ -37,6 +37,7 @@
         <li><a href="/agents">Agents</a></li>
         <li><a href="/dashboard">Dashboard</a></li>
         <li><a href="/directToModel">Direct to Provider</a></li>
+        <li><a href="/speech">Talk to Botzy</a></li>
     </ul>
 </aside>
 {/if}

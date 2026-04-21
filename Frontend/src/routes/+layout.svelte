@@ -2,16 +2,17 @@
 	import "../app.css";
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-    import { initSocket, socketStore } from '$lib/code/agentChat/socketStore.js';
+    import { socketRoutes, sockets } from "$lib/code/Stores/socketStore";
+
     
     onMount(() => {
         if (browser) {
-			const backendUrl = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
-            const socket = initSocket(backendUrl); 
-            socket.connect();
-            return () => {
-                socket.disconnect(); 
-            };
+            // Setup / Connect all socket routes.
+            for(let i=0; i<socketRoutes.length ?? 0; i++){
+                console.log("Setting Up : ", socketRoutes[i])
+                const chatSocket = sockets[socketRoutes[i]];
+                chatSocket.connect();
+            }
         }
     });
 </script>

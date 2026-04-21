@@ -1,18 +1,18 @@
-import { initRegistry } from './ApiHelpers/buildRegistry.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import { initServices, shutdownServices } from './ApiHelpers/manageServices.js';
-import { connectedSockets, io } from './ApiHelpers/socketHelpers.js'; 
+import { io } from './ApiHelpers/socketHelpers.js'; 
 import { getConfigForFrontend, stopJob } from './ApiHelpers/miscHelpers.js';
 import { getFormattedModelRegistry } from './SharedServices/v2CallAI/core/utils.js';
-import { FrontendMessageFormat } from './SharedServices/v2Agents/core/classes.js';
 import { handleTAMessage } from './SharedServices/v2Agents/engine/taskAgent.js';
 import { handleQAMessage } from './SharedServices/v2Agents/engine/quickAsk.js';
 import { log } from './SharedServices/v2Core/core/helperFunctions.js';
 import { isMainThread } from 'node:worker_threads';
 import { directToModel } from './ApiHelpers/directToModel/callModel.js';
+import { handleFrontendConnection } from './ApiHelpers/BotzyAssistant/voice/socketFns.js';
+import { handleN8N_message } from './ApiHelpers/N8N/main.js';
 
 // [][] -------------------------------------- [][]
 //                init server
@@ -51,6 +51,11 @@ app.get("/getModels", async (req, res) => {
   res.status(200).json(msg);
 });
 
+app.post("/handleN8N", async (req, res) => {
+  handleN8N_message(req)
+  res.status(200).json({result: "Ok"});
+});
+
 // app.get("/test", async (req, res) => {
 //   let prompt = res.req.query?.prompt || null;
 //   let webUrl = res.req.query?.webUrl || null;
@@ -73,7 +78,7 @@ app.get("/getModels", async (req, res) => {
 //Handle Socket.io.value connections
 
 io.value.on('connection', (socket) => {
-    log(`User joined: ${socket.id}`);
+    log(`Main Route Active '/': ${socket.id}`);
 
     // --- TASK AGENT JOB ---
     socket.on('submit_task', async (data, callback) => {
@@ -104,17 +109,9 @@ io.value.on('connection', (socket) => {
         callback(res);
     });
 
-    // --- FRONTEND SPEECH SERVICE ---
-    socket.on('chat_botzy', (ws) => {
-        handleFrontendConnection(ws).catch(err => {
-            console.error('Chat Botzy Socket Failed:', err);
-            ws.close();
-        });
-    });
-
     // --- CALL MODEL DIRECTLY ---
     socket.on('direct_to_model', async (data, callback) => {
-      console.log("Direct to Model Call...");
+      console.log("Direct to model called...");
       await directToModel(data.query, data.aiSettings, data.webGrounding, socket.id);
     });
 
@@ -129,6 +126,18 @@ io.value.on('connection', (socket) => {
     });
 });
 
+// [][] --- CHAT BOTZY WS ROUTE --- [][]
+io.value.of('/chat_botzy').on('connection', (socket) => {
+  console.log(`Chat Botzy Active :: ${socket.id}`);
+    handleFrontendConnection(socket).catch(err => {
+        console.error('Chat Botzy Socket Failed:', err);
+        socket.disconnect(true);
+    });
+});
+
+io.value.of('/chat_botzy').on('disconnect', (socket) => {
+  console.log(`User Left (chat_botzy) : ${socket.id}`)
+})
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

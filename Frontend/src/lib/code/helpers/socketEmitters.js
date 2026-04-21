@@ -1,14 +1,13 @@
 // $lib/code/aiJobs/socketEmitters.js
-import { get } from 'svelte/store';
-import { socketStore } from '../agentChat/socketStore.js';
+import { sockets } from '../Stores/socketStore.js';
 import { FrontendMessageFormat } from '../classes.js';
 
 /**
  * Emits a prompt to the backend and waits for an acknowledgment containing the Job ID.
  */
 export async function emitTask(messages = [], jobId = null, settings = {}) {
-    const socket = get(socketStore);
-    if (!socket || !socket.connected) {
+    const socket = sockets['/'];
+    if (!socket) {
         throw new Error("Socket is not connected.");
     }
 
@@ -22,7 +21,7 @@ export async function emitTask(messages = [], jobId = null, settings = {}) {
 
     // Wrap the socket emit in a Promise so we can await the backend's acknowledgment
     return new Promise((resolve, reject) => {
-        socket.emit(eventName, { fmf: { ...payload } }, (response) => {
+        socket.send(eventName, { fmf: { ...payload } }, (response) => {
             if (response?.error) {
                 reject(new Error(response.error));
             } else if (response?.aiJobId) {
@@ -36,13 +35,13 @@ export async function emitTask(messages = [], jobId = null, settings = {}) {
 
 // Sends an array of strings & returns { outcome: 'Ok' | 'Error' value: string }
 export async function emitDirectToModel(messages = [], aiSettings, webGrounding) {
-    const socket = get(socketStore);
-    if (!socket || !socket.connected) {
+    const socket = sockets['/'];
+    if (!socket) {
         throw new Error("Socket is not connected.");
     }
     const eventName = "direct_to_model";
     // Wrap the socket emit in a Promise so we can await the backend's acknowledgment
-    socket.emit(eventName, { query: messages, aiSettings, webGrounding });
+    console.log(socket.send(eventName, { query: messages, aiSettings, webGrounding }, null));
 }
 
 
@@ -50,12 +49,12 @@ export async function emitDirectToModel(messages = [], aiSettings, webGrounding)
  * Emits a stop command to the backend.
  */
 export function emitStopTask(jobId) {
-    const socket = get(socketStore);
-    if (!socket || !socket.connected) return;
+    const socket = sockets['/'];
+    if (!socket) return;
 
     // Use an acknowledgment to confirm it was cancelled successfully
     return new Promise((resolve, reject) => {
-        socket.emit('stop_task', { jobID: jobId }, (response) => {
+        socket.send('stop_task', { jobID: jobId }, (response) => {
             if (response?.error) reject(new Error(response.error));
             else resolve(response);
         });
@@ -66,11 +65,11 @@ export function emitStopTask(jobId) {
  * Emits an amendment or authorisation to the backend
  */
 export function emitAmendTask(prompt, jobId) {
-    const socket = get(socketStore);
-    if (!socket || !socket.connected) return;
+    const socket = sockets['/'];
+    if (!socket) return;
 
     return new Promise((resolve, reject) => {
-        socket.emit('amend_task', { amend: { prompt, jobID: jobId } }, (response) => {
+        socket.send('amend_task', { amend: { prompt, jobID: jobId } }, (response) => {
             if (response?.error) reject(new Error(response.error));
             else resolve(response);
         });

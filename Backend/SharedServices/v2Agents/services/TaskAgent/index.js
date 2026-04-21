@@ -34,9 +34,12 @@ export class TaskAgent extends AiJob {
             toolRetryCount = 2,
             maxLoopBuffer = 5,
             summaryDataSizeThreshold = 500,
-            socketId = null
+            socketId = null,
+            emitFunction = null,
+            whoGetsUpdates = null,
+            skipReviewTools
         } = {}){
-        super({aiSettings, socketId}) // setup parent class
+        super({aiSettings, socketId, emitFunction, whoGetsUpdates}) // setup parent class
         this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ role: Services.aiAgents.Constants.Roles.User, textData: task}));
         this.task = task;
         this.agentType = "TaskAgent"; 
@@ -56,6 +59,7 @@ export class TaskAgent extends AiJob {
         this.summaryDataSizeThreshold = summaryDataSizeThreshold; // How many characters before context summarisation
         this.toolOutputData = []; // temp holds tool output prior to review;
         this.debugParams = []; // used to store params crafted for tools for debugging and improvement purposes.
+        this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'aiTextAction']; // Outputs from these tools aren't critiqued
     }
 
     // [][] ---- PLAN MANAGEMENT FUNCTIONS ---- [][]
@@ -661,9 +665,16 @@ export class TaskAgent extends AiJob {
             return Services.v2Core.Helpers.Err(`Error ( reviewAndReturn -> stripOutAudioAndImageData ) : ${processedToolMessages.value}`);     
         }
 
-        // Check if complete 
+        // Switch system prompt if the tool doesn't need review (skip review list)
+        let sysMessage; 
+        if(this.skipReviewTools.includes(toolOutput[0].toolName)){
+            sysMessage = PromptsAndSchemas.completeCheck.sysAlt;
+        } else {
+            sysMessage = PromptsAndSchemas.completeCheck.sys;
+        }
+        // Check if complete
         let completeCheck = await this.#generateText(
-            PromptsAndSchemas.completeCheck.sys,
+            sysMessage,
             PromptsAndSchemas.completeCheck.usr(
                 actionObj.action,
                 JSON.stringify(processedToolMessages.value), // tool output with audio and image data stripped out.
@@ -844,30 +855,6 @@ export class TaskAgent extends AiJob {
         }
     }
 }// end Task Agent
-
-export class TaskContextTemplate extends ContextTemplate {
-    constructor() {
-        super(); // setup global & tool data objects.
-        this.globalData.isProject = false;
-        this.globalData.projectIndexUrl = ""; // relative url where files are located eg. UserFiles/Projects/ProjectName
-        this.globalData.workingDirectory = "/UserFiles/"; // relative url 
-    }
-    addProjectIndexUrl(relativeIndexUrl){ 
-        if(typeof relativeIndexUrl === "string" && relativeIndexUrl != ""){
-            this.globalData.isProject = true;
-            this.globalData.projectIndexUrl = relativeIndexUrl;
-        }
-    }
-    removeProjectIndexUrl(){
-        this.globalData.isProject = false;
-        this.globalData.projectIndexUrl = ""
-    }
-    updateWorkingDirectory(relativeUrl){
-        if(typeof relativeUrl === "string" && relativeUrl != ""){
-            this.globalData.workingDirectory = relativeUrl;
-        }
-    }
-}
 
 const PromptsAndSchemas = {
     planning: {
@@ -1144,6 +1131,19 @@ Critical Gap: Briefly identify the "make-or-break" missing piece of data or the 
 Required Fix: Provide a clear, one-sentence instruction for what needs to change to make the result acceptable.
 
 Avoid commenting on style, tone, or non-essential formatting unless it prevents the user from achieving their goal.
+
+Replan: (default = false) You must review the plan and consider if it needs updating due to the tool output - this check must always be completed regardless of the tool being COMPLETE or INCOMPLETE. Setting replan to true will trigger a re-planning cycle.  
+Re-planning could be needed for a number of reasons, for example the wrong tool was used or the tool doesn't / cant output what was expected. 
+It could be that the tool has completed however the plan needs to be updated to account for the returned data. 
+Any tool used will be marked complete / not complete at a later stage. Do not trigger a replan to update this field.
+Only set replan to true when it's clear the current plan will not work.`,
+        
+        // Alternative system message (for tools that skip content review) 
+        sysAlt: `Role: Your task is to review the progress of the task and consider if the plan needs updating as a result of the tool output.
+You are NOT tasked with quality checking or commenting on the quality, accuracy or content of the tool output - simply if the plan needs an update.
+
+Evaluation Framework:
+Status: This should always be set to COMPLETE. 
 
 Replan: (default = false) You must review the plan and consider if it needs updating due to the tool output - this check must always be completed regardless of the tool being COMPLETE or INCOMPLETE. Setting replan to true will trigger a re-planning cycle.  
 Re-planning could be needed for a number of reasons, for example the wrong tool was used or the tool doesn't / cant output what was expected. 

@@ -1,11 +1,8 @@
-
-// import { pool, processObjectToClass } from "../../v2Core/engine/workers.js";
-
 import path from 'path';
 import { AiJob } from '../core/classes.js';
-import { useMultipleThreads } from '../core/constants.js';
-import { Services } from '../../index.js';
+import { useMultipleThreads } from "../core/constants.js";
 import { Status } from '../core/classes.js';
+import { Services } from "../../index.js";
 
 // Flow overview
 // CreateJob (individual Routes) -> Push to JOB_LIST & ID to NON_ALLOC -> timer(checkNonAlloc)
@@ -18,7 +15,7 @@ class AI_JOB_MANAGER{
         this.AI_JOBS = []; // aiJob Objects
         this.NON_ALLOCATED = []; // id's of non-allocated jobs.
         this.#allocatingJobs = false; // if true the allocTimer is processing a job. Stops timer stacking multiple calls!
-        this.#workerThreads = false; // useMultipleThreads; // if true, job manager will use multiple threads to progress jobs.
+        this.#workerThreads = useMultipleThreads; // if true, job manager will use multiple threads to progress jobs.
     }
     /**
      * Adds a new AI Job to the queue.
@@ -97,23 +94,33 @@ class AI_JOB_MANAGER{
             }   
         } else {
         // Offload to own thread
-            // // Check pool is active
-            // if(Services.v2Core.WorkerThreads.pool.threads?.length == 0 || Services.v2Core.WorkerThreads.pool.closed){
-            //     return Services.v2Core.Helpers.Err('Error (allocateAndProgress) : Worker Pool is offline!')
-            // }
-            // processCall = await Services.v2Core.WorkerThreads.pool.run({ jobClassObject }, { name: 'poolRunAiJob' }); 
-            // //processCall ERROR
-            // if(processCall.outcome == 'Error'){ // cant use .isErr() as pool is stringifying the result!
-            //     // NOTE - Non-standard error {errorText: string, jobObject: object }
-            //     const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
-            //     FileSystem.saveFile(
-            //         targetDirectoryInContainer, 
-            //         JSON.stringify(processCall.value.jobObject, null, 2), 
-            //         `${processCall.value.jobObject.id}_Failed.txt`
-            //     );
-            //     return Err(`Error (allocateAndProgress -> pool run() ) ${processCall.value.errorText}`)
-            // }
-            // // Process back to class
+            // Check pool is active
+            
+            if(Services.v2Core.WorkerPool.threads?.length == 0 || Services.v2Core.WorkerPool.closed){
+                return Services.v2Core.Helpers.Err('Error (allocateAndProgress) : Worker Pool is offline!')
+            }
+
+            // take remove functions prior to passing to thread.
+            jobClassObject.emitToSocket = null;
+            jobClassObject.aiCall = null;
+            processCall = await Services.v2Core.WorkerPool.run(
+                { jobClassObject: jobClassObject, agentType: jobClassObject.agentType }, 
+                { name: 'poolRunAiJob' }
+            ); 
+            //processCall ERROR
+            if(processCall.outcome == 'Error'){ // cant use .isErr() as pool is stringifying the result!
+                // *** NOTE - Non-standard error {outcome: 'Error' value: {errorText: string, jobObject: object }} ***
+                const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/FailedJobs/');
+                FileSystem.saveFile(
+                    targetDirectoryInContainer, 
+                    JSON.stringify(processCall.value.jobObject, null, 2), 
+                    `${processCall.value.jobObject.id}_Failed.txt`
+                );
+                return Err(`Error (allocateAndProgress -> pool run() ) ${processCall.value.errorText}`)
+            }
+            // Process back to class
+            // TODO !! 
+            
             // let jobOutcome = Services.v2Core.WorkerThreads.processObjectToClass(processCall.value);
             // // Push update to job (doesn't update directly due to handoff to thread)
             // let update = this.jobListManager({ replaceJob: jobOutcome })

@@ -2,7 +2,6 @@
     import Sidebar from '$lib/componants/Sidebar.svelte';
     import BotzyLogo from '$lib/logoSml.png';
     import LayoutCombine from '$lib/componants/layoutCombine.svelte';
-    import { callTaskApi, checkForUpdate, postAmendApi, stopTask } from '$lib/code/aiJobs/call.js';
     import { marked } from 'marked';
     import DOMPurify from 'dompurify';
     import { getModels } from '$lib/code/utils.js';

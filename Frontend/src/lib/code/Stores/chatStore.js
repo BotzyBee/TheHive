@@ -1,7 +1,7 @@
 // $lib/code/aiJobs/chatStore.js
 import { writable, get } from 'svelte/store';
-import { socketStore } from './socketStore.js';
-import { emitTask, emitStopTask, emitDirectToModel } from '../aiJobs/socketEmitters.js';
+import { sockets } from './socketStore.js';
+import { emitTask, emitStopTask, emitDirectToModel } from '../helpers/socketEmitters.js';
 import { parseAndSanitizeMarkdown, processApiMessagesToClasses, parseStatus, getConfig } from '../utils.js';
 import { TextMessage, Roles } from '../classes.js';
 import { parse } from 'svelte/compiler';
@@ -25,11 +25,16 @@ function createChatStore() {
     const { subscribe, set, update } = writable(state);
 
     // Watch the socketStore so we can attach listeners as soon as the socket initializes
-    socketStore.subscribe(socket => {
+    sockets['/'].subscribe(socket => {
         if (socket) {
             setupSocketListeners(socket);
         }
-    });
+    })
+    // socketStore.subscribe(socket => {
+    //     if (socket) {
+    //         setupSocketListeners(socket);
+    //     }
+    // });
 
     function setupSocketListeners(socket) {
         // Clear previous listeners to prevent duplicates during hot reloads
@@ -64,7 +69,6 @@ function createChatStore() {
 
         // Handles interim updates (e.g., streaming status or partial text)
         socket.on('job_update', (data) => {
-            console.log("Received job_update event:", data);
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
             let parsedStatus = parseStatus(data.status);
@@ -84,7 +88,6 @@ function createChatStore() {
 
         // Handles the final payload when a job finishes
         socket.on('job_complete', (data) => {
-            console.log("Received job_complete event:", data);
             const currentStore = get({ subscribe });
 
             // Ensure this update is for the current job
@@ -93,7 +96,6 @@ function createChatStore() {
             const { messages, metadata } = data;
             
             let processedMessages = processApiMessagesToClasses(messages || []);
-            console.log("Processed messages:", processedMessages);
             let sanitisedMessages = [];
             
             for(let i=0; i<processedMessages.length; i++){
@@ -108,7 +110,6 @@ function createChatStore() {
                 }
                 sanitisedMessages.push(msg);
             }
-            console.log("Sanitised messages:", sanitisedMessages);
             update(s => ({
                 ...s,
                 isLoading: false,

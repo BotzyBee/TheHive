@@ -219,7 +219,8 @@ pub fn start_socket() {
         .invoke_handler(tauri::generate_handler![
             return_dom_to_express,
             submit_metrics,
-            list_directory_contents
+            list_directory_contents,
+            window_actions::open_n8n_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
