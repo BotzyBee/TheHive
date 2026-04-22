@@ -35,7 +35,6 @@ export const MODEL_REGISTRY = [
     capabilities: [
       ModelTypes.text,
       ModelTypes.structuredOutputs,
-      ModelTypes.websearch,
     ],
     maxContext: 400000,
     quality: AiQuality.Base,
@@ -53,7 +52,6 @@ export const MODEL_REGISTRY = [
     capabilities: [
       ModelTypes.text,
       ModelTypes.structuredOutputs,
-      ModelTypes.websearch,
       ModelTypes.maps,
     ],
     maxContext: 1048576,
@@ -104,7 +102,6 @@ export const MODEL_REGISTRY = [
     capabilities: [
       ModelTypes.text,
       ModelTypes.structuredOutputs,
-      ModelTypes.websearch,
     ],
     maxContext: 400000,
     quality: AiQuality.Advanced,
@@ -169,7 +166,6 @@ export const MODEL_REGISTRY = [
     capabilities: [
       ModelTypes.text,
       ModelTypes.structuredOutputs,
-      ModelTypes.websearch,
     ],
     maxContext: 1050000,
     quality: AiQuality.Pro,

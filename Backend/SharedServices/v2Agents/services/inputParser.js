@@ -190,14 +190,13 @@ param output = [
     { key : 'key_from_schema' , type: 'ref', value: '{{ context.ACT_XXXX.data.b }}' },
     { key : 'key_from_schema2' , type: 'ref', value: '{{ context.ACT_XXXX.data.a }} can be combined in the output.' }
 ]`,
-    usr: (task, contextObject, toolSchema, toolGuide, errors) => {
+    usr: (task, contextObject, toolSchema, toolGuide) => {
         return `<task> ${task} </task>
 If there is any context to help you it will be here: <context> ${contextObject} </context>
 Here is the tool input parameters schema <tool>${toolSchema}</tool>
 Here is a guide on how to use the tool (may be empty if no guide provided): <guide> ${toolGuide} </guide>
 Remember you can use property access paths or direct responses when crafting the input params.
 Check you are providing params for all inputs specified in the schema - do not miss any that are required.
-If there are any errors from previous steps, they will be provided here: <errors> ${errors} </errors>
 Your output must be an array of { key: string, type: string, value: any } objects`;
     },
         schema: {

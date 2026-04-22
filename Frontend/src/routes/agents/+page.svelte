@@ -81,7 +81,8 @@
         // 1. Initial Categories
         let options = [
             { label: 'folder', icon: '📁', type: 'cmd' },
-            { label: 'file', icon: '📄', type: 'cmd' }
+            { label: 'file', icon: '📄', type: 'cmd' },
+            { label: 'Plan Needs Approved', icon: '👌', type: 'flag', flagText: '!!plans-need-approved' }
         ];
 
         // 2. If user typed "/folder " or similar, we could trigger Rust here
@@ -156,7 +157,11 @@
             }
         } else {
             // It's a tool or a specific command
-            replacement = `[${option.label}]`;
+            if(option.type == 'flag'){
+                replacement = `[ ${option.flagText} ]`; 
+            } else {
+                replacement = `[ ${option.label} ]`;
+            }
         }
 
         // Combine: everything before slash + the new text + everything after cursor

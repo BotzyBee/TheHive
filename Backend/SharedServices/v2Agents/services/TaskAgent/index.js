@@ -1,6 +1,8 @@
 import path from 'path';
 import { Services } from '../../../index.js';
 import { AiJob, ContextTemplate } from '../../core/classes.js';
+import { ne } from 'surrealdb';
+import { Err } from '../../../v2Core/core/helperFunctions.js';
 
 export const TaskPhases = {
     Plan: "Planning Phase",
@@ -31,7 +33,7 @@ export class TaskAgent extends AiJob {
     constructor({ 
             task = "", 
             aiSettings = {}, 
-            toolRetryCount = 2,
+            toolRetryCount = 1,
             maxLoopBuffer = 5,
             summaryDataSizeThreshold = 500,
             socketId = null,
@@ -69,6 +71,16 @@ export class TaskAgent extends AiJob {
         for(let i=0; i<actionLen; i++){
             if(this.plan[i]?.complete == false){
                 return this.plan[i];
+            }
+        }
+        return null;
+    }
+    #updateAction(actionID, actionText, tool){
+        let actionLen = this.plan.length ?? 0; 
+        for(let i=0; i<actionLen; i++){
+            if(this.plan[i]?.id == actionID){
+                if(actionText) this.plan[i].action = actionText;
+                if(tool) this.plan[i].tool = tool;
             }
         }
         return null;
@@ -186,7 +198,9 @@ export class TaskAgent extends AiJob {
         console.log(statusLabel);
         this.emitUpdateStatus(statusLabel);
 
-        // Get Planning / Task Guides. 
+        // [][]  ------------------ [][]
+        // [][]  -- Fetch Guides -- [][]
+        // [][]  ------------------ [][]
         let guideText = ""
         if(useTaskPlanGuides === true){
             this.emitUpdateStatus("Fetching Guides...");
@@ -248,7 +262,9 @@ export class TaskAgent extends AiJob {
             return Services.v2Core.Helpers.Err(`Error (planningEngine) - ${actionResponse.failText}`);
         }
 
-        // Get tools
+        // [][]  --------------------------- [][]
+        // [][]  -- Fetch Available Tools -- [][]
+        // [][]  --------------------------- [][]
         this.emitUpdateStatus("Getting available tools... 🛠️🐝");
         if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user.");
         let Step1PlanMerged = actionStep.value.plan.map(item => item.action).join('\n') 
@@ -295,17 +311,17 @@ export class TaskAgent extends AiJob {
         const completedOldActions = oldPlan.filter(p => p.complete);
         this.plan = isUpdate ? [...completedOldActions, ...newActions] : newActions;
 
-        // Set control flow properties
-        this.planUpdateNeeded = false;
+        // [][]  --------------------------------- [][]
+        // [][]  -- Set Control Flow Properties -- [][]
+        // [][]  --------------------------------- [][]
+
+        // Check for flags (!!Flag)
+        this.plansNeedApproved = this.task.toLowerCase().includes("!!plans-need-approved");
         if (this.plansNeedApproved) {
             this.status.setAwaitingUserInput();
             this.nextPhase = TaskPhases.Review; // skip to review stage & return to user.
             this.phaseMessage = "Plan requires user approval."; 
-            this.taskOutput.push(
-                new Services.aiAgents.Classes.TextMessage({ 
-                    role: Services.aiAgents.Constants.Roles.Agent, 
-                    textData: `The task plan has been created and is awaiting your approval. \n` 
-                    +`${JSON.stringify(this.plan, null, 2)}` }))
+            // Review stage will pick this up and add the plan details.
         } else {
             this.nextPhase = TaskPhases.Action; // continue to action phase
             this.phaseMessage = "";
@@ -358,7 +374,9 @@ export class TaskAgent extends AiJob {
             return Services.v2Core.Helpers.Ok("All actions complete");
         }
         this.actionReviewID = nextAction.id; // setup for next review 
-        // Catch Built-in Tool requests
+        // [][]  -------------------------- [][]
+        // [][]  -- Catch built in tools -- [][]
+        // [][]  -------------------------- [][]
         if(nextAction.tool == 'rePlanTool'){ 
             this.phaseMessage = `The tool call has triggered a re-plan request. Action: ${nextAction.action}`;
             let rp = await this.#planningEngine({updatePlan: true})
@@ -383,7 +401,9 @@ export class TaskAgent extends AiJob {
             return Services.v2Core.Helpers.Ok("Return to user tool was called");
         }
 
-        // Get full tool object for next tool.
+        // [][]  ----------------------- [][]
+        // [][]  -- Fetch tool object -- [][]
+        // [][]  ----------------------- [][]
         if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
         let toolObj = await Services.database.Helpers.getToolDetails(nextAction.tool);
         if(toolObj.isErr()){
@@ -391,54 +411,48 @@ export class TaskAgent extends AiJob {
             return Services.v2Core.Helpers.Err(`Error (Task Agent -> getToolDetails) : ${toolObj.value}`)
         };
 
-        let toolErrorText = "";
-        let toolCall;
-        for(let i=0; i< this.toolRetryCount; i++){
-            if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
-            // Craft input params AI Calls
-            let craftedParams = await this.#generateText(
-                Services.aiAgents.InputParse.parserPrompts.craftParams.sys,
-                Services.aiAgents.InputParse.parserPrompts.craftParams.usr(
-                    nextAction.action, 
-                    this.getAllContextSummaryString(), 
-                    JSON.stringify(toolObj.value.details.inputSchema),
-                    toolObj.value.details.guide || "no guide provided",
-                    toolErrorText
-                ),
-                { ...this.aiSettings, structuredOutput: Services.aiAgents.InputParse.parserPrompts.craftParams.schema }           
-            )// @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] }
-            if(craftedParams.isErr()){ 
-                this.errors.push(`Error (performAction -> craft input params) : ${craftedParams.value}`)
-                return Services.v2Core.Helpers.Err(`Error (performAction -> craft input params) : ${craftedParams.value}`)
-            }
+        if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
 
-            // Build params into object (injecting data if needed)
-            let fullContext = this.getAllContextRaw();
-            let resolvedParams = Services.aiAgents.InputParse.parseNunjucksTemplate(craftedParams.value.params, fullContext );
-            if(resolvedParams.isErr()){ 
-            return Services.v2Core.Helpers.Err(`Error (performAction -> parseNunjucksTemplate ) : ${JSON.stringify(resolvedParams)}`)
-            }
-            // save params for debugging/improvement purposes.
-            this.debugParams.push({tool: nextAction.tool, paramsCrafted: craftedParams.value.params, paramsResolved: resolvedParams.value, toolInputSchema: toolObj.value.details.inputSchema });
-
-            // Call Tool
-            if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
-            this.emitUpdateStatus(`Using Tool: ${toolObj.value.details.toolName}`);
-            console.log(`Calling tool ${toolObj.value.details.toolName}`);
-            toolCall = await Services.aiAgents.AgentHelpers.callAgentTool(
-                toolObj.value.details.toolName,
-                toolObj.value.filePath,
-                resolvedParams.value,
-                this, // give the tool access to agent functions. 
-            ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
-            if(toolCall.isErr()){
-                toolErrorText = toolCall.value;
-            }
-            if(toolCall.isOk()) break; // exit retry loop if successful
+        // [][]  ------------------ [][]
+        // [][]  -- Craft Params -- [][]
+        // [][]  ------------------ [][]
+        let craftedParams = await this.#generateText(
+            Services.aiAgents.InputParse.parserPrompts.craftParams.sys,
+            Services.aiAgents.InputParse.parserPrompts.craftParams.usr(
+                nextAction.action, 
+                this.getAllContextSummaryString(), 
+                JSON.stringify(toolObj.value.details.inputSchema),
+                toolObj.value.details.guide || "no guide provided"
+            ),
+            { ...this.aiSettings, structuredOutput: Services.aiAgents.InputParse.parserPrompts.craftParams.schema }           
+        )// @returns {Result(array(object))} - Returns { params: [ {key: string, type: string, value: any}, ... ] }
+        if(craftedParams.isErr()){ 
+            this.errors.push(`Error (performAction -> craft input params) : ${craftedParams.value}`)
+            return Services.v2Core.Helpers.Err(`Error (performAction -> craft input params) : ${craftedParams.value}`)
         }
-        // If we have an error after retrying, return the error.
+        // Build params into object (injecting data if needed)
+        let fullContext = this.getAllContextRaw();
+        let resolvedParams = Services.aiAgents.InputParse.parseNunjucksTemplate(craftedParams.value.params, fullContext );
+        if(resolvedParams.isErr()){ 
+        return Services.v2Core.Helpers.Err(`Error (performAction -> parseNunjucksTemplate ) : ${JSON.stringify(resolvedParams)}`)
+        }
+        // save params for debugging/improvement purposes.
+        this.debugParams.push({tool: nextAction.tool, paramsCrafted: craftedParams.value.params, paramsResolved: resolvedParams.value, toolInputSchema: toolObj.value.details.inputSchema });
+
+        // [][]  --------------- [][]
+        // [][]  -- Call Tool -- [][]
+        // [][]  --------------- [][]
+        if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
+        this.emitUpdateStatus(`Using Tool: ${toolObj.value.details.toolName}`);
+        console.log(`Calling tool ${toolObj.value.details.toolName}`);
+        let toolCall = await Services.aiAgents.AgentHelpers.callAgentTool(
+            toolObj.value.details.toolName,
+            toolObj.value.filePath,
+            resolvedParams.value,
+            this, // give the tool access to agent functions. 
+        ); // @returns Result( [TextMessage | ImageMessage | AudioMessage | DataMessage] | string )
         if(toolCall.isErr()){
-        return Services.v2Core.Helpers.Err(`Error (performAction -> toolCall ) : ${toolCall.value}`);    
+            return Services.v2Core.Helpers.Err(`Error (performAction -> toolCall ) : ${toolCall.value}`);    
         }
 
         // Inject actionID as metadata
@@ -450,6 +464,50 @@ export class TaskAgent extends AiJob {
         this.nextPhase = TaskPhases.Review;
         this.addToolCount(1);
         return Services.v2Core.Helpers.Ok(`Tool ${nextAction.tool} has completed and the output is awaiting review.`);
+    }
+
+    async #attemptToHeal(error){
+        let nextAction = this.#getNextAction();
+        if(nextAction.attempt >= this.toolRetryCount){
+            return Services.v2Core.Helpers.Err(`Error (attemptToHeal) : Max heal attempts reached. Main Error ${error}`);
+        }
+        this.#incrimentActionCount(nextAction.id);
+        let toolObj = await Services.database.Helpers.getToolDetails(nextAction.tool);
+        if(toolObj.isErr()){
+            this.errors.push(`Error (Task Agent -> getToolDetails) : ${toolObj.value}`);
+            return Services.v2Core.Helpers.Err(`Error (AttemptToHeal -> getToolDetails) : ${toolObj.value}`)
+        };
+        let healCall = await this.#generateText(
+            PromptsAndSchemas.healError.sys,
+            PromptsAndSchemas.healError.usr(
+                error,
+                JSON.stringify(toolObj.value.details),
+                JSON.stringify(this.plan),
+                this.task
+            ),
+            { ...this.aiSettings, structuredOutput: PromptsAndSchemas.healError.schema }           
+        )// @returns {Result(array(object))} - Returns { action: ["retry_tool", "re_plan", "return_to_user"], additionalPrompt: "string" }
+        if(healCall.isErr()){
+            return Services.v2Core.Helpers.Err(`Error (AttemptToHeal -> healCall) : ${healCall.value}`)
+        }
+
+        // Re-Run Tool Call
+        if(healCall.value.action == "retry_tool"){
+            this.#updateAction(nextAction.id, `${nextAction.action} \n \n Additional Guidance following error : ${healCall.value.additionalPrompt}`, null);
+            return Services.v2Core.Helpers.Ok("Attempting Heal...");
+        }
+
+        // Re-Plan
+        if(healCall.value.action == "retry_tool"){
+            this.task = `${this.task} \n \n Additional Guidance following error : ${healCall.value.additionalPrompt}`;
+            this.#updateAction(nextAction.id, null, "rePlanTool"); 
+            return Services.v2Core.Helpers.Ok("Attempting Heal...");
+        }
+
+        // Hard Stop Error 
+        if(healCall.value.action == "return_to_user"){
+            return Services.v2Core.Helpers.Err(`Error (attemptToHeal) : Attempt to heal error not performed. (Major Error) Error : ${error}`);
+        }
     }
 
     #getOustandingActionCount(){ 
@@ -525,8 +583,9 @@ export class TaskAgent extends AiJob {
                 return Services.v2Core.Helpers.Ok("Agent stopped by user.");
             }
             // update task & plan 
-            if(processUserMessage.value.action == "update task & plan"){
+            if(processUserMessage.value.action == "update_task_plan"){
                 this.emitUpdateStatus("Updating Plan...");
+                this.status.setInProgress();
                 // Craft new task
                 let newTaskWording = await this.#generateText(
                     PromptsAndSchemas.newTaskWording.sys,
@@ -548,20 +607,23 @@ export class TaskAgent extends AiJob {
                 return Services.v2Core.Helpers.Ok("The plan needs updated following user feedback. The task has been updated.")
             }
             // update plan only 
-            if(processUserMessage.value.action == "update plan only"){
+            if(processUserMessage.value.action == "update_task_only"){
+                this.status.setInProgress();
                 this.nextPhase = TaskPhases.Plan;
                 this.planUpdateNeeded = true;
                 this.phaseMessage = `The plan needs updated following user feedback: ${processUserMessage.value.instruction}`;
                 return Services.v2Core.Helpers.Ok("The plan needs updated following user feedback")
             }
             // approve existing plan 
-            if(processUserMessage.value.action == "approve existing plan"){
+            if(processUserMessage.value.action == "approve_existing_plan"){
+                this.status.setInProgress();
+                this.plansNeedApproved = false;
                 this.nextPhase = TaskPhases.Action;
                 this.phaseMessage = "";
-                Services.v2Core.Helpers.Ok("Plan approved, continuing to action phase.");
+                return Services.v2Core.Helpers.Ok("Plan approved, continuing to action phase.");
             }
             // clarify user message 
-            if(processUserMessage.value.action == "clarify user message"){
+            if(processUserMessage.value.action == "clarify_user_message"){
                 this.isRunning = false; 
                 this.status.setAwaitingUserInput();
                 this.nextPhase = TaskPhases.Review;
@@ -573,6 +635,7 @@ export class TaskAgent extends AiJob {
                 this.emitFinalResult();
                 return Services.v2Core.Helpers.Ok("Last user message needs clarification.")
             }
+            this.status.setFailed();
             this.errors.push("Error: reviewAndReturn -> Catch new message from User : User message could not be parsed into a known output.");
             return Services.v2Core.Helpers.Err("Error: reviewAndReturn -> Catch new message from User : User message could not be parsed into a known output.")
         }
@@ -602,7 +665,6 @@ export class TaskAgent extends AiJob {
             this.messageHistory.addMessage(msg);
             this.taskOutput.push(msg);
             this.phaseMessage = "";
-            this.emitFinalResult();
             return Services.v2Core.Helpers.Ok("Agent has crafted message to user.");
         }
 
@@ -796,17 +858,28 @@ export class TaskAgent extends AiJob {
                     }
                 }
                 
-                // ACTION
-                if(this.nextPhase == TaskPhases.Action){
+                // ACTION (Inc self-heal attempt)
+                try {
+                    if(this.nextPhase == TaskPhases.Action){
                     let action = await this.#performNextAction();
-                    console.log(JSON.stringify(action.value));
+                    if(action.isErr()){ 
+                        let e = `Error in action phase: ${action.value}`;
+                        this.errors.push(e);
+                        console.log(e);
+                        throw new Error(e); // move to catch and attempt to heal.
+                        //return Services.v2Core.Helpers.Err(`Error (Run -> action) : ${action.value}`);
+                        }
+                    }
+                } catch (error) {
+                    this.emitUpdateStatus("Tool call has thrown an error. Attempting to heal... 🩺💔")
+                    let action = await this.#attemptToHeal(error);
                     if(action.isErr()){ 
                         let e = `Error in action phase: ${action.value}`;
                         this.errors.push(e);
                         console.log(e);
                         this.status.setFailed(); // sets isRunning to false
                         this.emitFailed();
-                        return Services.v2Core.Helpers.Err(`Error (Run -> action) : ${action.value}`);
+                        return Services.v2Core.Helpers.Err(`Error (Run -> Action -> Heal) : ${action.value}`);
                     }
                 }
 
@@ -1065,7 +1138,7 @@ Operational Decisions You must choose exactly one of the following paths based o
 STOP: Use only when the user specifically and explicitly directs the termination of the task (e.g., "Stop," "Cancel," "I'm done"). 
 Update Task & Plan: Use when the user’s request fundamentally changes the core objective or the primary scope defined in the first message. 
 Update Plan Only: Use when the main goal remains the same, but the user suggests a new method, changes the order of actions, or the current plan is no longer efficient. 
-Approve Existing Plan: Use when the user provides affirmative feedback or when the message is a "social" closing that requires no structural changes to the current workflow. 
+Approve Existing Plan: Use when the user gives any indication that they are happy to proceed without any changes. This could as simple as 'Ok', 'Go for it', 'Good plan' etc.  
 Clarify User Message: Use only when the user response is blank, nonsensical, or provides directions that do not fit into the other categories. 
 
 Instruction Field Requirements When crafting the text for the ‘instruction’ field, provide a detailed, action-oriented directive for the executing Agent. You must: 
@@ -1085,10 +1158,10 @@ Maintain Scope: Ensure the instruction is a direct reflection of the user's inte
             "description": "The specific operation to perform.",
             "enum": [
                 "stop",
-                "update task & plan",
-                "update plan only",
-                "approve existing plan",
-                "clarify user message"
+                "update_task_plan",
+                "update_task_only",
+                "approve_existing_plan",
+                "clarify_user_message"
             ]
             },
             "instruction": {
@@ -1109,9 +1182,9 @@ Maintain Scope: Ensure the instruction is a direct reflection of the user's inte
     },
     returnMessage: {
         sys: `You are a helpful AI Agent. Your task is to draft a comprehensive response to a user based on the context provided. Your goal is to move the project forward without requiring unnecessary back-and-forth. 
-        Your communication style is professional, proactive, and polished. 
+        Your communication style is professional, proactive, and polished - the message format is a 'standard text message'. Don't output the message in an email or letter format. 
         The topic or reason you are messaging the user will be detailed in <phaseMessage>. You will be given other context to help you craft a response message.
-        Focus on clarity. If sending the action plan for approval - ensure to include the full plan to allow the user to review it. Use UK English. Format and structure your messages for readability.`,
+        Focus on clarity. If sending the action plan for approval - ensure to include the full plan including details of tools and exact action text. Use UK English. Format and structure your messages for readability.`,
         usr: (phaseMessage, convoHistory, worldContext, plan) => { return `Here is the phaseMessage which details the reason for messaging the user <phaseMessage> ${phaseMessage} </phaseMessage>.
         Here is the conversation history with the user <history> ${convoHistory} </history>
         Here is some context data (may be empty) <context> ${worldContext} </context>
@@ -1219,4 +1292,41 @@ You can only quote the text DO NOT add string functions like .split() etc. You c
         "required": ["output", "data"]
     }
     },
+    healError: {
+        sys: `Your task is to review a provided error and decide how best to 'heal' it. 
+The error you will be given has come from a 'tool calling' action performed as part of an AI agent loop.
+
+You have several options open to you:
+- Retry the tool an updated prompt ("retry_tool"): This should be used when the tool has suffered a potentially intermittent fault (network connection etc) or an issue crafting input parameters (nunjacks).
+- Go back to the tool selection stage with an updated prompt ("re_plan") : This should be used when the tool selected is potentially the wrong one.
+- Return to user ("return_to_user"): This should be used when 'hard' errors (eg undeclared variable, code issues) happen. This will error and return to the user. 
+Parameter "additionalPrompt" will be added to the prompt during the next run of the agent. You should add clear instructions which will help the agent avoid this error or correct their mistake. If using "return_to_user" then additionalPrompt can be 'N/A'.
+`,
+    
+    usr: (error, toolObject, plan, task) => {
+        return `
+Here is the error text <error> ${error} </error>
+Here is tool object which details the tool capabilities and schema <toolObject> ${toolObject} </toolObject>
+Here is the current plan <plan> ${plan} </plan>
+Here is the overall task the agent is trying to complete <task> ${task} </task>`;
+    },
+    schema: {
+        "type": "object",
+        "description": "An object for returning the next action to take and suitable prompt",
+        "properties": {
+            "action": {
+            "type": "string",
+            "enum": ["retry_tool", "re_plan", "return_to_user"]
+            },
+            "additionalPrompt": {
+            "type": "string"
+            }
+        },
+        "required": ["action", "additionalPrompt"]
+        }
+    },
 }
+
+        // 1. Re-run tool with updated action prompt
+        // 2. Run replan tool with updated task
+        // 3. Hard Error -> Return to users/ main agent. 
