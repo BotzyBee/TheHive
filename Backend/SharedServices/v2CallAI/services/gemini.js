@@ -27,6 +27,7 @@ export async function callGemini(
   model,
   options = {}
 ) {
+    Services.v2Core.Helpers.log(`Calling Gemini : ${model}`);
   const { capability } = options;
   if(!capability){
     return Services.v2Core.Helpers.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
@@ -143,13 +144,8 @@ export async function generateText(
     return Services.v2Core.Helpers.Err('Error (callGemini -> generateText 1): No model provided in options.');
   }
 
-  const ai = new GoogleGenAI({ apiKey: gemiKey });
-
-  // FOR DEBUG
-  // let rootDir = Services.fileSystem.Constants.containerVolumeRoot;
-  // let joined = Services.aiAgents.ToolHelpers.pathHelper.join(rootDir, "UserFiles/GemiTesting/");
-  // let rndm = systemMessage.length + contentMessage.length; 
-  // Services.fileSystem.CRUD.saveFile(joined, `System Prompt: \n\n ${systemMessage} \n\n ${contentMessage}`, `File_${rndm}.txt`);
+  const ai = new GoogleGenAI({ apiKey: gemiKey }); 
+  let fullText = ""; // up here for err logging
 
   try {
     // ------------------------------------------------------------------
@@ -216,7 +212,7 @@ export async function generateText(
       config: config,
     });
 
-    let fullText = "";
+    
     let finalCandidate = null;
 
     // Consume the stream internally
@@ -255,6 +251,7 @@ export async function generateText(
     return Services.v2Core.Helpers.Ok(fullText);
 
   } catch (error) {
+    console.log(`ERROR FULL TEXT :: ${fullText}`);
     return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): ${error}`);
   }
 }

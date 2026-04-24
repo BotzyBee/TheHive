@@ -59,6 +59,8 @@ export async function run(
     // Destructure input
     let { relativeFolderPath, fileContent, fileName, mimeType, ext } = params;
 
+    fileName.replaceAll(" ", "_"); // sanitise filename to remove spaces (this breaks the readFile tool.)
+
     // Catch bad params
     if(relativeFolderPath == null || fileContent == null || fileName == null || ext == null ){
         return Shared.v2Core.Helpers.Err(`Error (writeFile) : Params missing or incorrect. Params: relativeFolderPath, fileContent, fileName, ext`);

@@ -9,7 +9,7 @@ export const details = {
                 "The tool does not perform any other task. It cannot modify the contents - it is read-only. \n"+
                 "You must know the file path in advance. If this is unknown, you can use the 'listFilesAndDirectories' tool to explore the filesystem and find the file path."+
                 " You must include the file name and extension in the file path.", 
-    guide:      null,  
+    guide:      "If the user provides a URL in their instructions you should use it exactly as provided. Never include /data/ at the start of a URL - this is automatically added later.",  
     inputSchema: {
         "description": "Input parameters schema for the readFile tool.",
         "type": "object",
@@ -40,8 +40,23 @@ export async function run(
     if(filePath == null){
         return Shared.v2Core.Helpers.Err(`Error (ReadFile Tool) - Input filePath missing or null.`);
     }
+
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(filePath);
+    } catch (e) {
+        // If decoding fails, just use the original path
+        decodedPath = filePath;
+    }
+
+    // Catch if AI has added data prefix (remove it)
+    const prefix = "/data/";
+    if (decodedPath.startsWith(prefix)) {
+    decodedPath = decodedPath.slice(prefix.length);
+    }
+
     const root = Shared.fileSystem.Constants.containerVolumeRoot 
-    const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(root, filePath.trim());
+    const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(root, decodedPath.trim());
     
     if (!targetURL.startsWith(root)) {
         return Shared.v2Core.Helpers.Err(`Error: Access denied. Path is outside of allowed directory.`);

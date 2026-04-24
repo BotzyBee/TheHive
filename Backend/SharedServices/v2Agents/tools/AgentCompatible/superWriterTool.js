@@ -7,7 +7,7 @@ export const details = {
     toolName: "superWriterTool",
     version: "1.0.0",
     creator: "Hive Architect",
-    overview: "A sophisticated AI writing tool that generates, edits, and iteratively refines text documents using context and superEditor integration.",
+    overview: "A sophisticated AI writing tool that generates, edits, and iteratively refines text documents.",
     guide: "Provide a 'taskDescription' outlining what needs to be written or edited. Provide an 'initialDocument' if modifying existing text. Provide 'contextOrGuides' for stylistic or factual references.",
     inputSchema: JSON.stringify({
         "type": "object",
@@ -71,11 +71,13 @@ export async function run(Shared, params = {}, agent = {}) {
             contexts = [""];
         }
 
+        // [][] --- LOOP OVER CONTEXT DOCUMENTS --- [][]
+
         for (let i = 0; i < contexts.length; i++) {
             const currentContext = contexts[i];
 
-            // Establish baseline content if the user hasn't provided a starting document, 
-            // ensuring the subsequent editing phase has a foundational text to critique.
+            // [][] --- INIT DOCUMENT IF NOT PROVIDED BY USER --- [][]
+
             if (i === 0 && (!workingDocument || workingDocument.trim() === "")) {
                 safeEmit(agent, "Super Writer 📝 : Generating initial base draft...");
                 
@@ -116,6 +118,7 @@ export async function run(Shared, params = {}, agent = {}) {
                 "required": ["edits"]
             };
 
+            // [][] --- GENERATE EDITS --- [][]
             const editPlanSystem = "You are a Master Editor. Analyse the provided working document against the original task and context. Break down necessary improvements into a sequence of isolated, highly specific editing instructions. If the document already meets all requirements, output an empty array.";
             const editPlanUser = `Task: ${taskDescription}\nContext/Guides: ${currentContext}\n\nCurrent Document:\n${workingDocument}`;
 
@@ -132,8 +135,8 @@ export async function run(Shared, params = {}, agent = {}) {
 
             const edits = editPlanCall.value.edits || [];
 
-            // Isolate each revision into its own execution context using superEditor to guarantee 
-            // high-fidelity contextual replacements and maintain document integrity across complex changes.
+            // [][] --- USE SUPER EDITOR TO COMPLETE EDITS --- [][]
+            
             if (edits.length > 0) {
                 safeEmit(agent, `Super Writer 📝 : Executing ${edits.length} iterative edits for context ${i + 1}...`);
                 

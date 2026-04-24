@@ -1,7 +1,7 @@
 <script>
     import { chatStore } from '$lib/code/Stores/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
-    import { slide } from 'svelte/transition';
+    import { slide, fade } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
     import { onMount, tick } from 'svelte';
     import { invoke } from '@tauri-apps/api/core';
@@ -242,9 +242,21 @@
                 </div>
             {/each}
 
-            {#if $chatStore.latestJobRef && $chatStore.jobDone === false}
-                <div class="ai-response status-update" transition:slide>
-                    <p><i>{$chatStore.lastStatus || 'Processing...'}</i></p>
+            {#if $chatStore.latestJobRef && !$chatStore.jobDone}
+                <div class="ai-response status-update-container" transition:slide>
+                    <div class="status-list">
+                        {#each $chatStore.lastStatus as status, i (status)}
+                            <p 
+                                class="status-line" 
+                                in:fade={{ duration: 200 }} 
+                                out:fade={{ duration: 200 }}
+                                style="opacity: {(i + 1) / $chatStore.lastStatus.length}"
+                            >
+                                <i>{status}</i>
+                            </p>
+                        {/each}
+                    </div>
+
                     <button on:click={chatStore.cancelTask} class="cancel-link">
                         Cancel Task
                     </button>
@@ -443,9 +455,25 @@
         padding: 0;
     }
 
-    .status-update {
-        opacity: 0.8;
+    .status-update-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+    .status-list {
+        min-height: 9em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        /* Ensures the text stays within bounds during transitions */
+        overflow: hidden; 
+    }
+
+    .status-line {
+        margin: 0;
         font-size: 0.9rem;
+        transition: opacity 0.3s ease;
     }
 
     .app-container {

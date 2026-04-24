@@ -27,6 +27,9 @@ PXY_KEY=
 ICPTN_KEY=
 # Eleven Labs
 EVNLBS_KEY=
+# Kimi 
+KIMI_KEY=
+
 
 # Google Calendar API KEYS
 G_CLIENT_EMAIL=

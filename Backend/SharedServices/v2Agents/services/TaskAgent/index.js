@@ -1,8 +1,7 @@
 import path from 'path';
 import { Services } from '../../../index.js';
-import { AiJob, ContextTemplate } from '../../core/classes.js';
-import { ne } from 'surrealdb';
-import { Err } from '../../../v2Core/core/helperFunctions.js';
+import { AiJob } from '../../core/classes.js';
+
 
 export const TaskPhases = {
     Plan: "Planning Phase",
@@ -61,7 +60,7 @@ export class TaskAgent extends AiJob {
         this.summaryDataSizeThreshold = summaryDataSizeThreshold; // How many characters before context summarisation
         this.toolOutputData = []; // temp holds tool output prior to review;
         this.debugParams = []; // used to store params crafted for tools for debugging and improvement purposes.
-        this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'aiTextAction']; // Outputs from these tools aren't critiqued
+        this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'aiTextAction', 'superWriterTool']; // Outputs from these tools aren't critiqued
     }
 
     // [][] ---- PLAN MANAGEMENT FUNCTIONS ---- [][]
@@ -245,21 +244,27 @@ export class TaskAgent extends AiJob {
         if (actionResponse.status === 'need info') {
             this.isRunning = false;
             this.status.setAwaitingUserInput();
-            let msg = new Services.aiAgents.Classes.TextMessage(
-                { role: Services.aiAgents.Constants.Roles.Agent, textData: actionResponse.failText })
-            this.messageHistory.addMessage(msg);
-            this.taskOutput.push(msg);
+            this.nextPhase = TaskPhases.Review;
+            this.phaseMessage = actionResponse.failText;
+            // pass to review stage to respond to user.
+            // let msg = new Services.aiAgents.Classes.TextMessage(
+            //     { role: Services.aiAgents.Constants.Roles.Agent, textData: actionResponse.failText })
+            // this.messageHistory.addMessage(msg);
+            // this.taskOutput.push(msg);
             return Services.v2Core.Helpers.Ok('Agent Needs More Information from the User.');
         }
 
         if (actionResponse.status === 'cant plan' || actionResponse?.plan.length == 0) {
             this.isRunning = false;
-            this.status.setFailed();
-            let msg = new Services.aiAgents.Classes.TextMessage(
-                { role: Services.aiAgents.Constants.Roles.Agent, textData: actionResponse.failText });
-            this.messageHistory.addMessage(msg);
-            this.taskOutput.push(msg);
-            return Services.v2Core.Helpers.Err(`Error (planningEngine) - ${actionResponse.failText}`);
+            this.status.setAwaitingUserInput();
+            this.nextPhase = TaskPhases.Review;
+            this.phaseMessage = actionResponse.failText;
+            // this.status.setFailed();
+            // let msg = new Services.aiAgents.Classes.TextMessage(
+            //     { role: Services.aiAgents.Constants.Roles.Agent, textData: actionResponse.failText });
+            // this.messageHistory.addMessage(msg);
+            // this.taskOutput.push(msg);
+            return Services.v2Core.Helpers.Ok(`Error (planningEngine) - ${actionResponse.failText}`);
         }
 
         // [][]  --------------------------- [][]

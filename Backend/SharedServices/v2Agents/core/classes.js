@@ -484,7 +484,7 @@ export class AiJob {
     if(this.socketId){
         let res = new FrontendMessageFormat({ 
             aiJobId: this.id, 
-            status: this.status, 
+            status: this.status.setFailed(), 
             isRunning: this.isRunning,
             messages: this.taskOutput, 
             metadata: this.stats

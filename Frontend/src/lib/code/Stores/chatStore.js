@@ -14,7 +14,7 @@ function createChatStore() {
         stats: { toolCount: 0, aiCount: 0, loopNumber: 0 }, 
         errorMessage: '',
         latestJobRef: null,
-        lastStatus: null,
+        lastStatus: ['Processing...'],
         aiSettings: {
             agent: "Task_Agent"
         },
@@ -51,7 +51,7 @@ function createChatStore() {
                     isLoading: false,
                     jobDone: true,
                     errorMessage: data.value,
-                    lastStatus: null,
+                    lastStatus: ['Processing...'],
                 })); 
             } else {
                 let sanitised = parseAndSanitizeMarkdown(data.value);
@@ -61,7 +61,7 @@ function createChatStore() {
                     isLoading: false,
                     jobDone: true,
                     errorMessage: '',
-                    lastStatus: null,
+                    lastStatus: ['Processing...'],
                     messageHistory: [...s.messageHistory, responseMsg]
                 }));                
             }
@@ -71,7 +71,11 @@ function createChatStore() {
         socket.on('job_update', (data) => {
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
-            let parsedStatus = parseStatus(data.status);
+            let parsedStatus = currentStore.lastStatus;
+            parsedStatus.push(parseStatus(data.status));
+            if(parsedStatus.length >= 4) {
+                parsedStatus = parsedStatus.slice(-4) // take the last 4 status'
+            }
             let il = true;
             let jd = false;
             if(data.status.taskStatus == "Failed") {
@@ -156,7 +160,7 @@ function createChatStore() {
             isLoading: true,
             jobDone: false,
             errorMessage: '',
-            lastStatus: null,
+            lastStatus: ['Processing...'],
             messageHistory: [...s.messageHistory, userMsg]
         }));
         const currentState = get({ subscribe });
@@ -181,7 +185,7 @@ function createChatStore() {
             isLoading: true,
             jobDone: false,
             errorMessage: '',
-            lastStatus: null,
+            lastStatus: ['Processing...'],
             messageHistory: [...s.messageHistory, userMsg]
         }));
 

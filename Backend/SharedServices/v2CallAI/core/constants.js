@@ -3,7 +3,8 @@ export const AiProviders = Object.freeze({
   gemini: 'Gemini',
   anthropic: 'Anthropic',
   perplexity: 'Perplexity',
-  inception: 'Inception'
+  inception: 'Inception',
+  kimi: 'Kimi'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <---  ** Set Default AI provider **
 export const AiQuality = Object.freeze({
@@ -158,6 +159,17 @@ export const MODEL_REGISTRY = [
     maxContext: 128000,
     quality: AiQuality.Advanced,
   },
+  {
+    model: 'kimi-k2.6',
+    provider: AiProviders.kimi,
+    capabilities: [
+      ModelTypes.code,
+      ModelTypes.structuredOutputs,
+      ModelTypes.text
+    ],
+    maxContext: 256000,
+    quality: AiQuality.Advanced,
+  },
 
   // [][] --- PRO MODELS --- [][]
   {
@@ -216,6 +228,8 @@ export const MODEL_REGISTRY = [
     maxContext: 128000,
     quality: AiQuality.Pro,
   },
+
+
 
   // {
   //     model:        "sonar-reasoning-pro",

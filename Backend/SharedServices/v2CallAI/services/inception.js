@@ -81,6 +81,7 @@ async function generateText(
   model,
   options = {}
 ) {
+    Services.v2Core.Helpers.log(`Calling Inception Labs : ${model}`);
   if (!model) {
     return Services.v2Core.Helpers.Err('Error (generateText): No model provided in options.');
   }

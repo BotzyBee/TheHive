@@ -18,6 +18,7 @@ export * as createMermaidDiagram from './createMermaidDiagram.js';
 export * as deepResearchTool from './deepResearchTool.js';
 export * as scheduleJobTool from './scheduleJobTool.js';
 export * as manageCalendar from './GoogleCalendarTool.js'; 
+export * as superWriterTool from './superWriterTool.js';
 // READ THE NOTE AT THE TOP !!
 
 

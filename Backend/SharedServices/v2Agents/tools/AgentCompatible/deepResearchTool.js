@@ -282,6 +282,9 @@ export async function run(Shared, params = {}, agent = {}) {
         safeEmit(agent, `Finalising research chunk ⚙️`);
         await chunk.finaliseResearchChunk();
         RESEARCH_CHUNKS.push(chunk); // Store each research chunk for potential later review or report generation.
+        // Save research Chunk
+        let saveContent = `${question} \n \n ${chunk.output}`;
+        Shared.fileSystem.CRUD.saveFile(`data/UserFiles/deepResearchTool/${agent.id}`, saveContent, `Research_Chunk_${i+1}.txt`);
         console.log(`Completed research for question ${i + 1}/${questionLength}`);
     }
 
