@@ -34,6 +34,8 @@ sudo docker-compose up
 // Prune 
 docker builder prune -a
 docker volume prune -a
+docker compose down --remove-orphans (if it's holding an older version of the yml file etc)
+docker compose down -v (clear the cache)
 
 // FRONTEND
 npm run dev  (starts the svelte dev server)
@@ -42,7 +44,37 @@ npm run tauri  (gives a list of tauri commands)
 npm run tauri dev (starts the tauri dev server)
 npm run tauri build (builds the tauri app)
 
-// Madge (Get circular dependencies)
+// MADGE (Get circular dependencies)
 madge --circular ./
 
+// OLLAMA (DOCKER)
+# Pull new model
+docker exec -it thehive_ollama ollama pull qwen3.5:4b
+# delete model
+docker exec -it thehive_ollama ollama rm qwen3.5:9b
 
+# List available models
+docker exec -it thehive_ollama ollama list
+
+# API Examples
+// POST http://ollama:11434/api/generate
+{
+  "model": "", // input param
+  "prompt": "", // input param
+  "stream": false
+}
+
+// POST http://ollama:11434/api/chat
+{
+  "model": "llama3",
+  "messages": [
+    { "role": "user", "content": "Hello!" }
+  ],
+  "stream": false
+}
+
+// POST http://ollama:11434/api/embeddings
+{
+  "model": "llama3",
+  "prompt": "The text you want to turn into a vector."
+}

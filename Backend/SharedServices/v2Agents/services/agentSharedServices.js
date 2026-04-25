@@ -105,7 +105,7 @@ async function shortenLargeValues(data, maxSize,  aiOptions = {}, visited = new 
 
 export async function createSummary(stringRes, aiOptions = {}){
     // summarise data
-    let ai = Services.callAI.aiFactory();
+    let ai = await Services.callAI.aiFactory();
     let dataSummary = await ai.generateText(
         PromptsAndSchemas.summarySysPrompt,
         PromptsAndSchemas.summaryUsrPrompt(stringRes),

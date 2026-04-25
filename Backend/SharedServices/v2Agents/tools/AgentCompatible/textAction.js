@@ -59,7 +59,7 @@ export async function run(
     }
     // Make the call
     safeEmit(agent, `Crafting text using AI - 🤖🐝`);
-    const aiCall =  Shared.callAI.aiFactory();
+    const aiCall =  await Shared.callAI.aiFactory();
     const sysText = "You are a tool which extracts, summarises, modifies a given text input. Focus on quality and accuracy. Use UK English."+
     "As well as your text response, you must also provide a file extension type (ext) - eg 'txt', 'md', 'js', 'html' - so the content can be saved correctly.";
     let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;

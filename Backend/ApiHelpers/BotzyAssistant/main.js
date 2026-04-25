@@ -32,7 +32,7 @@ export async function BotzyAssistant(message, source, id){
     // Triage Message
     let responseText = "";
     try {
-        let ai = Services.callAI.aiFactory();
+        let ai = await Services.callAI.aiFactory();
         let act = Actions.join('\n \n');
         let sys = PromptsAndSchemas.triage.sys;
         let usr = PromptsAndSchemas.triage.usr(message, act);
@@ -61,7 +61,7 @@ function BotzyAssistSubTaskManager(){
 }
 
 export async function TestBotzyAgent(userText){
-    let ai = Services.callAI.aiFactory();
+    let ai = await Services.callAI.aiFactory();
     let sys = 'You are a helpful aussie personal assistant called Botzy Bee. Interact with the user in a casual style. '+
     'At all times you should be laid back but never seek to flatter. You should be honest, grounded and unbiased. '+
     'Do not just agree with the user. Keep your answers short and punchy. Dont go into long dialogs unless the user has specifically asked of detail. '+

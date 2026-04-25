@@ -38,9 +38,10 @@ export class TaskAgent extends AiJob {
             socketId = null,
             emitFunction = null,
             whoGetsUpdates = null,
-            skipReviewTools
+            skipReviewTools,
+            callFactory = null
         } = {}){
-        super({aiSettings, socketId, emitFunction, whoGetsUpdates}) // setup parent class
+        super({aiSettings, socketId, emitFunction, whoGetsUpdates, callFactory}) // setup parent class
         this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ role: Services.aiAgents.Constants.Roles.User, textData: task}));
         this.task = task;
         this.agentType = "TaskAgent"; 
@@ -675,24 +676,7 @@ export class TaskAgent extends AiJob {
 
         // [][] -- TOOL REVIEW -- [][]
         if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
-        // custom status & inProgress status handled here
-        this.emitUpdateStatus("Reviewing Tool Output... 🕵️🐝");
-        if(this.actionReviewID == null || this.actionReviewID == undefined){
-            this.errors.push('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
-            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
-        }
-        // get action & tool output needing reviewed 
-        let actionObj = this.#fetchAction(this.actionReviewID); 
         let toolOutput =  this.toolOutputData || []; // Array of Messages from last tool call.
-        if(actionObj == null ){
-            this.errors.push('Error (reviewAndReturn -> Get Action & Tool Objects ) : Action Object returned null');
-            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Get Action & Tool Objects ) : Action Object returned null');
-        }
-        if(toolOutput.length === 0){
-            this.errors.push('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
-            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
-        }
-
         // Catch rePlan tool (skip review and go back to planning).. should never get here in normal circs. 
         if(toolOutput[0].toolName == 'rePlanTool'){
             this.nextPhase = TaskPhases.Plan;
@@ -714,6 +698,23 @@ export class TaskAgent extends AiJob {
             this.taskOutput = output.value;
             this.#setActionComplete(this.actionReviewID);
             return Services.v2Core.Helpers.Ok("Return to user tool called. Final output completed.")
+        }
+
+        // custom status & inProgress status handled here
+        this.emitUpdateStatus("Reviewing Tool Output... 🕵️🐝");
+        if(this.actionReviewID == null || this.actionReviewID == undefined){
+            this.errors.push('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
+            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Tool Review) : actionReviewID == null or undefined');
+        }
+        // get action & tool output needing reviewed 
+        let actionObj = this.#fetchAction(this.actionReviewID); 
+        if(actionObj == null ){
+            this.errors.push('Error (reviewAndReturn -> Get Action & Tool Objects ) : Action Object returned null');
+            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Get Action & Tool Objects ) : Action Object returned null');
+        }
+        if(toolOutput.length === 0){
+            this.errors.push('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
+            return Services.v2Core.Helpers.Err('Error (reviewAndReturn -> Get Action & Tool Objects ) : Tool Object returned null');
         }
 
         // Catch already reviewed (toolId is in context) 

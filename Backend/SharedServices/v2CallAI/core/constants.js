@@ -4,7 +4,8 @@ export const AiProviders = Object.freeze({
   anthropic: 'Anthropic',
   perplexity: 'Perplexity',
   inception: 'Inception',
-  kimi: 'Kimi'
+  kimi: 'Kimi',
+  ollama: 'Ollama'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <---  ** Set Default AI provider **
 export const AiQuality = Object.freeze({
@@ -31,6 +32,18 @@ export const MODEL_REGISTRY = [
   
   // [][] --- BASE MODELS --- [][]
   {
+    model: 'qwen3.5:0.8b',
+    provider: AiProviders.ollama,
+    capabilities: [
+      ModelTypes.text,
+      ModelTypes.structuredOutputs,
+    ],
+    maxContext: 256000,
+    quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
+  },
+  {
     model: 'gpt-5-nano',
     provider: AiProviders.openAI,
     capabilities: [
@@ -39,6 +52,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 400000,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'text-embedding-3-small',
@@ -46,6 +61,8 @@ export const MODEL_REGISTRY = [
     capabilities: [ModelTypes.embedding],
     maxContext: 8191,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gemini-2.0-flash',
@@ -57,6 +74,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 1048576,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gpt-5.1-codex-mini',
@@ -67,6 +86,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 400000,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'claude-haiku-4-5-20251001',
@@ -74,6 +95,8 @@ export const MODEL_REGISTRY = [
     capabilities: [ModelTypes.text, ModelTypes.structuredOutputs],
     maxContext: 200000,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'sonar',
@@ -84,6 +107,21 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 127072,
     quality: AiQuality.Base,
+    active: true,
+    id:"no-db-id"
+  },
+    {
+    model: 'kimi-k2.6',
+    provider: AiProviders.kimi,
+    capabilities: [
+      ModelTypes.code,
+      ModelTypes.structuredOutputs,
+      ModelTypes.text
+    ],
+    maxContext: 30000, // should be 256000 but it's hella slow !!
+    quality: AiQuality.Base, // should be Advanced.. but too slow to use.
+    active: true,
+    id:"no-db-id"
   },
 
   // [][] --- ADVANCED MODELS --- [][]
@@ -96,6 +134,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 200000,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gpt-5.4-mini',
@@ -106,6 +146,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 400000,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gemini-2.5-flash',
@@ -118,6 +160,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 1048576,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'claude-sonnet-4-6',
@@ -129,6 +173,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 200000,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gemini-2.5-flash-image',
@@ -139,6 +185,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 65536,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gemini-2.5-flash-preview-tts',
@@ -148,6 +196,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 32000,
     quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'mercury-2',
@@ -158,17 +208,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 128000,
     quality: AiQuality.Advanced,
-  },
-  {
-    model: 'kimi-k2.6',
-    provider: AiProviders.kimi,
-    capabilities: [
-      ModelTypes.code,
-      ModelTypes.structuredOutputs,
-      ModelTypes.text
-    ],
-    maxContext: 256000,
-    quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
 
   // [][] --- PRO MODELS --- [][]
@@ -181,6 +222,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 1050000,
     quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gemini-3.1-pro-preview',
@@ -195,6 +238,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 1048576,
     quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'claude-opus-4-6',
@@ -207,6 +252,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 200000,
     quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'gpt-5.3-codex',
@@ -217,6 +264,8 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 400000,
     quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
   },
   {
     model: 'sonar-reasoning-pro',
@@ -227,9 +276,9 @@ export const MODEL_REGISTRY = [
     ],
     maxContext: 128000,
     quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
   },
-
-
 
   // {
   //     model:        "sonar-reasoning-pro",

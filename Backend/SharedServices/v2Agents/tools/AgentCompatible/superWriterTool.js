@@ -50,7 +50,7 @@ export async function run(Shared, params = {}, agent = {}) {
         const aiSettings = agent?.aiSettings || {};
 
         let aiCount = 0;
-        const aiFactory = Shared.callAI.aiFactory();
+        const aiFactory = await Shared.callAI.aiFactory();
         const superEditor = Shared.aiAgents.AgentTools.superEditor.run;
 
         // Fail fast if the primary driving input is missing or empty, as the AI needs clear instructions to operate

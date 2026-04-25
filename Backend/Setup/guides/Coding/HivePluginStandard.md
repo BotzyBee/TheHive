@@ -88,7 +88,7 @@ export async function run(Shared, params = {}, agent = {}) {
         // 1. Tool Logic Here
         
         // Example AI call
-        const aiCall =  Shared.callAI.aiFactory();
+        const aiCall =  await Shared.callAI.aiFactory();
         const sysText = "System prompt";
         let usrText = `Here are your instructions <task>${taskDescription}</task>. Here is the reference text <reference>${ref}</reference>`;
         let call = await aiCall.generateText(sysText, usrText, aiSettings );

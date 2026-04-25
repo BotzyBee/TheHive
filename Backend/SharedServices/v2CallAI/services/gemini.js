@@ -244,7 +244,13 @@ export async function generateText(
 
     // Parse JSON if Structured Output
     if (structuredOutput) {
-      return Services.v2Core.Helpers.Ok(JSON.parse(fullText));
+      let parsed;
+      try {
+        parsed = JSON.parse(fullText);
+      } catch (error) {
+        return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): JSON Parse failed ${error}`);
+      }
+      return Services.v2Core.Helpers.Ok(parsed);
     }
 
     // Standard text completion
@@ -252,7 +258,7 @@ export async function generateText(
 
   } catch (error) {
     console.log(`ERROR FULL TEXT :: ${fullText}`);
-    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 4): ${error}`);
   }
 }
 

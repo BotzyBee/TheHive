@@ -13,6 +13,7 @@ import { isMainThread } from 'node:worker_threads';
 import { directToModel } from './ApiHelpers/directToModel/callModel.js';
 import { handleFrontendConnection } from './ApiHelpers/BotzyAssistant/voice/socketFns.js';
 import { handleN8N_message } from './ApiHelpers/N8N/main.js';
+import { handleModelUpdates } from './ApiHelpers/miscHelpers.js';
 
 // [][] -------------------------------------- [][]
 //                init server
@@ -47,8 +48,20 @@ app.get("/getConfig", async (req, res) => {
 });
 
 app.get("/getModels", async (req, res) => {
-  let msg = getFormattedModelRegistry();
+  let msg = await getFormattedModelRegistry();
   res.status(200).json(msg);
+});
+
+app.post("/updateModels", async (req, res) => {
+  let data = req.body;
+  console.log("Received model update request:", data);
+  let msg = await handleModelUpdates(data);
+  if(msg.isErr()){
+    console.error(`Model update failed: ${msg.value}`);
+    return res.status(400).json({outcome: 'Failed', message: msg.value});
+  }
+  console.log("Model update successful");
+  res.status(200).json({outcome: 'Success', message: msg.value});
 });
 
 app.post("/handleN8N", async (req, res) => {

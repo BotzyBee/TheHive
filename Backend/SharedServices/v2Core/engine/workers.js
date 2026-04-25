@@ -37,7 +37,7 @@ export async function poolIndexKnowledgebase(){
 
 // Process AI JOB
 export async function poolRunAiJob({jobClassObject, agentType}){
-    let job = processObjectToClass(jobClassObject, agentType); 
+    let job = await processObjectToClass(jobClassObject, agentType); 
     if(job == null){ return Services.v2Core.Helpers.Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
     // Run the Job
     let call = await job.run();
@@ -55,7 +55,7 @@ export async function poolRunAiJob({jobClassObject, agentType}){
  * @param {object} jobClassObject - Instance of AiJob or sub-class.
  * @returns - the associated class object.
  */
-export function processObjectToClass(jobClassObject, agentType){
+export async function processObjectToClass(jobClassObject, agentType){
     const poolEmitToSocket = ({socketId, event, data}) => {
         parentPort.postMessage({
         socketId: socketId,
@@ -64,18 +64,19 @@ export function processObjectToClass(jobClassObject, agentType){
         });
     };
 
-    let instance; 
+    let instance;
+    let callFactory = await Services.callAI.aiFactory(); // add aiCall function
 
     switch (agentType) {
         case "AiJob": // Base Class
-            let job = new Services.aiAgents.Classes.AiJob({emitFunction: poolEmitToSocket});
+            let job = new Services.aiAgents.Classes.AiJob({emitFunction: poolEmitToSocket, callFactory: callFactory});
             instance = job.import(jobClassObject);
             break;
         case "QuickAsk":
-            instance = new QuickAskAgent({emitFunction: poolEmitToSocket}).import(jobClassObject);
+            instance = new QuickAskAgent({emitFunction: poolEmitToSocket, callFactory: callFactory}).import(jobClassObject);
             break;
         case "TaskAgent":
-            instance = new TaskAgent({emitFunction: poolEmitToSocket}).import(jobClassObject);
+            instance = new TaskAgent({emitFunction: poolEmitToSocket, callFactory: callFactory}).import(jobClassObject);
             break;
     }
     instance.emitToSocket = poolEmitToSocket; // add pool emit function;

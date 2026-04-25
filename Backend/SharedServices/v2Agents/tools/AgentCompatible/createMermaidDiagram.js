@@ -112,7 +112,7 @@ export async function run(Shared, params = {}, agent = {}) {
     try {
         safeEmit(agent, `Charting and drawing...`);
         // Instantiate the standard AI Caller service
-        const aiCall = Shared.callAI.aiFactory();
+        const aiCall = await Shared.callAI.aiFactory();
 
         // Step 1: Generate initial diagram
         const userPrompt = `Here are your instructions: <prompt>${prompt}</prompt>\nReturn only the Mermaid code.`;

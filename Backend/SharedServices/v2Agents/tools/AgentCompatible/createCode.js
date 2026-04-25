@@ -50,7 +50,7 @@ export async function run(Shared, params = {}, agent = {}) {
     }
 
     let aiCount = 0;
-    const aiCall = Shared.callAI.aiFactory();
+    const aiCall = await Shared.callAI.aiFactory();
     const superEditor = Shared.aiAgents.AgentTools.superEditor.run; 
     let retAR = [];
 

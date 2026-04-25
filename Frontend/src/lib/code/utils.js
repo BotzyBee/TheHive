@@ -82,6 +82,7 @@ export async function getConfig() {
         capabilities: ['text', 'structuredOutputs', 'websearch'],
         maxContext: 400000,
         quality: 'Base',
+        active: true
         },
         // More models...
     ],
@@ -96,6 +97,19 @@ export async function getModels() {
   const url = `${domain}/getModels`;
   try {
     const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    return error.response
+      ? `Server Error: ${error.response.status} - ${error.response.data.error}`
+      : `Request Error: ${error.message || 'Unknown error'} - Check if docker server is running.`;
+    }
+  }
+
+  export async function updateModels(updateData) {
+  const domain = import.meta.env.VITE_BACKEND_DOMAIN || 'http://localhost:3000';
+  const url = `${domain}/updateModels`;
+  try {
+    const response = await axios.post(url, updateData);
     return response.data;
   } catch (error) {
     return error.response

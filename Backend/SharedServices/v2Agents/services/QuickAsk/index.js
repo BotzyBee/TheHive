@@ -8,8 +8,8 @@ import { AiJob } from '../../core/classes.js';
  *  This agent doesn't plan, loop or check outputs. It acts as simple router to one of the model providers.
  */
 export class QuickAskAgent extends AiJob {
-  constructor({ task = "", aiSettings = {}, socketId = null, emitFunction = null, whoGetsUpdates = null } = {}){
-    super({aiSettings, socketId, emitFunction, whoGetsUpdates}) // setup parent class
+  constructor({ task = "", aiSettings = {}, socketId = null, emitFunction = null, whoGetsUpdates = null, callFactory = null } = {}){
+    super({aiSettings, socketId, emitFunction, whoGetsUpdates, callFactory}) // setup parent class
     this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ 
       role: Services.aiAgents.Constants.Roles.User, textData: task }));
     this.task = task;

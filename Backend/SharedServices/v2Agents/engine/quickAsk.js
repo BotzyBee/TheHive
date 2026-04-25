@@ -23,10 +23,12 @@ export async function createQuickAskJob(frontendMessage, socketId = null){
             'Error (createQuickAskJob) : frontendMessage.messages[0] is not a TextMessage Class'
         );
     }
+    let factory = await Services.callAI.aiFactory();
     let job = new QuickAskAgent({
         task: message,
         aiSettings: frontendMessage.aiSettings,
         socketId: socketId,
+        callFactory: factory
     });
     // add to queue
     JOBS.addNewJob(job);

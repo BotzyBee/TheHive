@@ -11,15 +11,21 @@ import {
     mgmtTableName,
     toolTableName,
     guideTableName,
+    modelTableName,
 } from '../SharedServices/v2Database/core/constants.js'
 
 import { generateLongID } from "../SharedServices/v2Core/core/utils.js";
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
-
-    const db = new Surreal();
-    console.log("DB :: ", db);
+    let db;
+    try {
+        db = new Surreal();
+        console.log("Setting Up DB...");
+    } catch(e){
+        console.log("DB Setup Error : ", e);
+        return;
+    }
 
     const dbUser = process.env.dbRootUser;
     const dbPass = process.env.dbRootPass;
@@ -74,6 +80,18 @@ export async function setupFolderBotDB() {
             DEFINE FIELD FileType ON TABLE ${fileTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD LastUpdate ON TABLE ${fileTableName} TYPE int ASSERT $value >= 0;
             DEFINE FIELD Meta ON TABLE ${fileTableName} TYPE object;
+        `);
+
+        // Define the schema for the 'modelTableName' table
+        await db.query(`
+            DEFINE TABLE ${modelTableName} SCHEMAFULL;
+            DEFINE FIELD active ON TABLE ${modelTableName} TYPE bool ASSERT $value != NONE;
+            DEFINE FIELD model ON TABLE ${modelTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD provider ON TABLE ${modelTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD capabilities ON TABLE ${modelTableName} TYPE array ASSERT $value != NONE;
+            DEFINE FIELD capabilities.* ON TABLE ${modelTableName} TYPE string;
+            DEFINE FIELD maxContext ON TABLE ${modelTableName} TYPE number ASSERT $value != NONE;
+            DEFINE FIELD quality ON TABLE ${modelTableName} TYPE number ASSERT $value != NONE;
         `);
 
         // Create an index on FILES table

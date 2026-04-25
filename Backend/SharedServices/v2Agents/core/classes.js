@@ -367,7 +367,7 @@ export class ContextTemplate {
 // Base Class for all AI Jobs / Agents 
 // NOTE emitToSocketFunction can be found here - "../../ApiHelpers/socketHelpers.js";
 export class AiJob {
-  constructor({ idPrefix = "AI", aiSettings, socketId, whoGetsUpdates, emitFunction = null } = {}){ 
+  constructor({ idPrefix = "AI", aiSettings, socketId, whoGetsUpdates, emitFunction = null, callFactory = null } = {}){ 
     /**@type {string} */
     this.id = Services.v2Core.Utils.generateLongID(idPrefix);
 
@@ -386,7 +386,7 @@ export class AiJob {
     /**@type {string}  - for managing the overall user task. */
     this.task = "";
 
-    this.aiCall = Services.callAI.aiFactory(); // for making aiCalls.
+    this.aiCall = callFactory; 
 
     /**@type {TaskStatus} */
     this.status = new TaskStatus();

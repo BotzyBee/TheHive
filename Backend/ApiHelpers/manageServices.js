@@ -7,6 +7,7 @@ import { initToolIndex } from "../SharedServices/v2Database/services/toolIndexin
 import { initGuideIndex } from "../SharedServices/v2Database/services/guideIndexing.js";
 import { addNewTimer, stopAndClearAllTimers } from "../SharedServices/v2Core/services/timers.js";
 import { JOBS } from "../SharedServices/v2Agents/engine/jobManager.js";
+import { initModelRegistry } from "../SharedServices/v2Database/services/modelRegistry.js";
 
 let servicesStarted = false;
 
@@ -59,7 +60,12 @@ export const initServices = async (threadOveride = false) => {
         `${guides.value.added} new. \n`+
         `${guides.value.updated} updated \n`+
         `${guides.value.removed} removed.`)
-
+      
+      // Init Model Registry
+      console.log(' \n\n'+ '[][] ---------------------- [][] \n\n');
+      log(`Loading Model Registry...`);
+      await initModelRegistry();
+      
       //Knowledgebase re-indexing timer (every 60 seconds)
       addNewTimer(
         'KB_Indexing_Timer',

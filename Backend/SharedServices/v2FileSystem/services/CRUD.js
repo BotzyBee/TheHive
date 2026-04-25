@@ -202,7 +202,7 @@ export function getFileExtensionAndSize(filePath) {
     const stats = fs.statSync(filePath);
     
     if (!stats.isFile()) {
-        return Err(`Target is a directory, not a file: ${filePath}`);
+        return Services.v2Core.Helpers.Err(`Target is a directory, not a file: ${filePath}`);
     }
 
     const sizeBytes = stats.size;

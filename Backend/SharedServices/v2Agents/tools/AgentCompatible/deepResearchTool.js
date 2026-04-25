@@ -29,16 +29,17 @@ export const details = {
         "type": "string",
         "description": "Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/' ",
         },
-        "jobID": {
-        "type": "string",
-        "description": "The ID of the agent job for passing updates."
+        "scopeSources": {
+        "type": "boolean",
+        "default": true,
+        "description": "If true, the tool will perform additional searches to locate the best sources."
         }
     },
     "required": [
         "topic",
         "breadth",
         "savePath",
-        "jobID"
+        "scopeSources"
     ],
     "additionalProperties": false
     }
@@ -96,7 +97,7 @@ export class ResearchChunk {
     async factCheckClaims(domains = []){
         console.log("Starting fact-checking of claims.");
         // Create a list of claims or 'claimed facts' from the firstResponse to be fact-checked. This is a critical step to ensure we are building on accurate information.
-        let aiCall = this.Shared.callAI.aiFactory()
+        let aiCall = await this.Shared.callAI.aiFactory()
         let call = await aiCall.generateText(
             PromptsAndSchemas.factCheck.sys,
             PromptsAndSchemas.factCheck.usr(this.firstResponse),
@@ -136,7 +137,7 @@ export class ResearchChunk {
 
     async finaliseResearchChunk(){
         
-        let aiCall = this.Shared.callAI.aiFactory();
+        let aiCall = await this.Shared.callAI.aiFactory();
         let clarifications = this.factsOrAssumptions.map(f => f.getSummary()).join(`\n \n`);
         // use the initial result and all fact checking results to generate a final output.
         let prompt = `
@@ -180,8 +181,8 @@ Focus on factual accuracy, actionable information, and clarity. Keep all referen
     }
 }
 
-export async function scopeTopic(Shared, topic, breadth = 5, aiSettings){
-    const callAI = Shared.callAI.aiFactory();
+export async function scopeTopic(Shared, topic, breadth = 5, aiSettings, scopeSources = false){
+    const callAI = await Shared.callAI.aiFactory();
     console.log("Scoping Research Task.")
     // Resolve any terms or acronyms in the topic.
     let termscall = await callAI.webSearch(
@@ -213,25 +214,29 @@ export async function scopeTopic(Shared, topic, breadth = 5, aiSettings){
     let combined = questionCall.value.questions.map((q, i) => ({ question: q, rating: rankedCall.value.ratings[i] }));
     combined.sort((a, b) => b.rating - a.rating); // Sort by rating descending
     let topQuestions = combined.slice(0, breadth).map(q => q.question); // Take top questions based on breadth
+    stats.aiCount += 3; // Increment AI call count for this function
 
     // Research Sources
-    let sourcesCall = await callAI.webSearch(
-        PromptsAndSchemas.getSources.sys,
-        PromptsAndSchemas.getSources.usr(topic, topQuestions, JSON.stringify(INGORE_DOMAINS)),
-        { ...aiSettings, structuredOutput: PromptsAndSchemas.getSources.schema }
-    ); // domains: [ 'domain1.com', 'domain2.com', ... ]
-    if (sourcesCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall.value}`)}
+    let sourcesCall, sourcesCall2;
+    if(scopeSources == true){
+        sourcesCall = await callAI.webSearch(
+            PromptsAndSchemas.getSources.sys,
+            PromptsAndSchemas.getSources.usr(topic, topQuestions, JSON.stringify(INGORE_DOMAINS)),
+            { ...aiSettings, structuredOutput: PromptsAndSchemas.getSources.schema }
+        ); // domains: [ 'domain1.com', 'domain2.com', ... ]
+        if (sourcesCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall.value}`)}
 
-    // 2nd Run at sources (get widest range of sources)
-    let sourcesCall2 = await callAI.webSearch(
-        PromptsAndSchemas.getSources.sys,
-        PromptsAndSchemas.getSources.usr(topic, topQuestions, sourcesCall.value.domains.join(", ")),
-        { ...aiSettings, structuredOutput: PromptsAndSchemas.getSources.schema }
-    ); // domains: [ 'domain1.com', 'domain2.com', ... ]
-    if (sourcesCall2.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall2.value}`)}
-
-    stats.aiCount += 5; // Increment AI call count for this function
-    return Shared.v2Core.Helpers.Ok({ terms: defs, questions: topQuestions, sources: sourcesCall2.value.domains });
+        // 2nd Run at sources (get widest range of sources)
+        sourcesCall2 = await callAI.webSearch(
+            PromptsAndSchemas.getSources.sys,
+            PromptsAndSchemas.getSources.usr(topic, topQuestions, sourcesCall.value.domains.join(", ")),
+            { ...aiSettings, structuredOutput: PromptsAndSchemas.getSources.schema }
+        ); // domains: [ 'domain1.com', 'domain2.com', ... ]
+        if (sourcesCall2.isErr()){ return Shared.v2Core.Helpers.Err(`Error in scopeTopic -> getSources : ${sourcesCall2.value}`)}
+        stats.aiCount += 2; 
+    }
+    
+    return Shared.v2Core.Helpers.Ok({ terms: defs, questions: topQuestions, sources: scopeSources ? sourcesCall2?.value?.domains : [] });
 }
 
 let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the entire research process. Each chunk represents a question, its response, and related data.
@@ -249,7 +254,7 @@ let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the en
  */
 export async function run(Shared, params = {}, agent = {}) {
     stats.aiCount = 0; // Reset AI call count at the start of each run.
-    const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID } = params;
+    const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID, scopeSources = true } = params;
     const { aiSettings = {} } = agent || {};
     
     // Set minimum quality level for this tool. 
@@ -264,7 +269,7 @@ export async function run(Shared, params = {}, agent = {}) {
     // [][] ----- RESEARCH PHASE ------ [][]
     // Scope the topic, find best questions and sources to research.
     safeEmit(agent, `Scoping research task and gathering sources - 🤖🐝`);
-    let scoping = await scopeTopic(Shared, topic, breadth, aiSettings); 
+    let scoping = await scopeTopic(Shared, topic, breadth, aiSettings, scopeSources); 
     if (scoping.isErr()){ return Shared.v2Core.Helpers.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
     let firstChunk = new ResearchChunk();
     firstChunk.output = scoping.value.terms;
@@ -276,21 +281,31 @@ export async function run(Shared, params = {}, agent = {}) {
         let question = scoping.value.questions[i];
         let chunk = new ResearchChunk({ Shared: Shared, question: question, aiSettings });
         safeEmit(agent, `Conducting research for question ${i + 1}/${questionLength} - 🤖🐝`);
-        await chunk.getInitialResearch();
+        await chunk.getInitialResearch(scoping.value.sources);
         safeEmit(agent, `Doing a little fact checking 🕵️`);
         await chunk.factCheckClaims();
         safeEmit(agent, `Finalising research chunk ⚙️`);
         await chunk.finaliseResearchChunk();
         RESEARCH_CHUNKS.push(chunk); // Store each research chunk for potential later review or report generation.
         // Save research Chunk
+        console.log("Saving Resaerch Chunk")
         let saveContent = `${question} \n \n ${chunk.output}`;
-        Shared.fileSystem.CRUD.saveFile(`data/UserFiles/deepResearchTool/${agent.id}`, saveContent, `Research_Chunk_${i+1}.txt`);
+        let saveTool = Shared.aiAgents.AgentTools.writeFile;
+        let save = await saveTool.run(
+            Shared,
+            {
+                relativeFolderPath: `UserFiles/deepResearchTool/${agent.id}`,
+                fileContent: saveContent,
+                fileName: `Research_Chunk_${i+1}`,
+                ext: 'txt'
+            }
+        );
         console.log(`Completed research for question ${i + 1}/${questionLength}`);
     }
 
     // [][] ----- WRITING PHASE - CREATE REPORT PLAN ------ [][]
     // Create a final report plan (layout, sections, structure) based on the research chunks and user task.
-    let callAI = Shared.callAI.aiFactory();
+    let callAI = await Shared.callAI.aiFactory();
     let chunkLength = RESEARCH_CHUNKS.length ?? 0;
     // reverse order as first chunk is just definitions and terms.
     let latestPlan = ""; 

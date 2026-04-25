@@ -106,7 +106,7 @@ export async function run(
 
     // Make the call
     safeEmit(agent, `Creating image using AI - 🤖🐝`);
-    const aiCall = Shared.callAI.aiFactory();
+    const aiCall = await Shared.callAI.aiFactory();
     let call = await aiCall.generateImage(contentMessage, {...aiSettings, ...options})
     if(call.isErr()){
         return Shared.v2Core.Helpers.Err(`Error (aiImageTool -> Generate Image) : ${call.value}`);

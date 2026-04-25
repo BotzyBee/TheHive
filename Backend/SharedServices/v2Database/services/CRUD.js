@@ -1,7 +1,44 @@
-import { dirTableName, fileTableName, mgmtTableName } from "../core/constants.js";
+import { dirTableName, fileTableName, mgmtTableName, modelTableName } from "../core/constants.js";
 import { Services } from "../../index.js";
 
 // [][] -- CREATE -- [][]
+
+// Add Model to DB
+export async function addModelToDB(
+  dbAgent,
+  active,
+  model,
+  provider,
+  capabilities,
+  maxContext,
+  quality
+) {
+  try {
+    let result = await dbAgent.query(
+      `INSERT INTO ${modelTableName} {
+        active: $active,
+        model: $model,
+        provider: $provider,
+        capabilities: $capabilities,
+        maxContext: $maxContext,
+        quality: $quality
+      }`,
+      {
+        active,
+        model,
+        provider,
+        capabilities,
+        maxContext,
+        quality,
+      }
+    );
+    return Services.v2Core.Helpers.Ok(result);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error (addModelToDB) : ${error}`);
+  }
+}
+
+
 // Directory Index - add directory to index
 export async function addDirectoryToDB(
   dbAgent,
@@ -216,7 +253,7 @@ export async function getAllRecordsFromTable(dbAgent, tableName) {
     const rows = result?.[0] || [];
     
     const decodedRows = rows.map(row => {
-      if (row.Url) {
+      if (row?.Url) {
         return {
           ...row,
           Url: decodeURIComponent(row.Url)
@@ -425,6 +462,25 @@ export async function getDirsAndFilesRecursive(dbAgent, Url) {
 }
 
 // [][] -- UPDATE -- [][]
+// Note idRef is just the 2nd half of the full ref - eg f4639pd6zvvftrgqb9u2 from Vectors:f4639pd6zvvftrgqb9u2
+export async function updateRecordById(dbAgent, tableName, idRef, updateData) {
+  // updateData = object of keys/values to be updated
+  // eg { LastUpdate: 123, Meta: { tags: ["cheese", "potato"] } }
+  try {
+    const query = `
+      UPDATE ${tableName}:${idRef}
+      SET ${Object.keys(updateData)
+        .map((key) => `${key} = $${key}`)
+        .join(', ')}
+      RETURN AFTER
+    `;
+    const result = await dbAgent.query(query, updateData);
+    return Services.v2Core.Helpers.Ok(result);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error (updateRecordById) : ${error}`);
+  }
+}
+
 export async function updateRecords(
   dbAgent,
   tableName,

@@ -47,6 +47,18 @@ async function runSetup() {
     console.log("Giving the DB 8 secs to fully boot up...");
     await new Promise(res => setTimeout(res, 8000));
     await waitForSurreal();
+
+    console.log("N8N Instance.. ");
+    try {
+        console.log('🚀 Starting Server Build...');
+        execAsync('docker-compose up -d n8n', { stdio: 'inherit' });
+    } catch (error) {
+        console.log("❌ Failed to setup n8n in docker")
+        throw new Error("Failed to setup n8n in docker"); 
+    }
+
+    console.log("Giving the N8N 10 secs to fully boot up...");
+    await new Promise(res => setTimeout(res, 10000));
     
     console.log("Starting Express Server.. ");
     try {

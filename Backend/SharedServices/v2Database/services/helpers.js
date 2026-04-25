@@ -22,7 +22,7 @@ export async function getToolsOrGuidesForTask(task, limit, modeTools = true){
     }
     const db = getDB.value;
     // Create embedding of task
-    let ai = Services.callAI.aiFactory();
+    let ai = await Services.callAI.aiFactory();
     let vec = await ai.generateEmbeddings(
     {inputDataVec: [task], dimensionSize: vectorEmbedSize, quality: 1 });
     if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( getToolsOrGuidesForTask -> generateEmbeddings ) : ${vec.value}`); }

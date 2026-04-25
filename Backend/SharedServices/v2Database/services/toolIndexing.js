@@ -144,7 +144,7 @@ export async function initToolIndex(){
  * @param {object} toolObject - { toolName: string, overview: string, version: string, filePath: string } 
  */
 async function addToolToDB(dbObject, toolObject){
-    let ai = Services.callAI.aiFactory();
+    let ai = await Services.callAI.aiFactory();
     let vec = await ai.generateEmbeddings(
         {inputDataVec: [toolObject.overview], dimensionSize: vectorEmbedSize, quality: 1 });
     if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( addToolToDB -> generateEmbeddings ) : ${vec.value}`); }

@@ -1,4 +1,5 @@
 import { AiQuality, MODEL_REGISTRY } from "./constants.js";
+import { Services } from "../../index.js";
 
 /**
  * Recursively adds additionalProperties: false to all object nodes in a JSON schema,
@@ -46,6 +47,7 @@ export function makeSchemaStrict(schema) {
         capabilities: ['text', 'structuredOutputs', 'websearch'],
         maxContext: 400000,
         quality: 'Base',
+        active: true
         },
         // More models...
     ],
@@ -55,8 +57,10 @@ export function makeSchemaStrict(schema) {
     // Other providers...
     }
  */
-export function getFormattedModelRegistry() {
+export async function getFormattedModelRegistry() {
     let models = MODEL_REGISTRY;
+    let getDBModels = await Services.database.ModelRegistry.getAllModels();
+    if(getDBModels.isOk()) models = getDBModels.value;
     // 1. Map for internal sorting logic
     const QUALITY_WEIGHTS = {
         [AiQuality.Pro]: 3,

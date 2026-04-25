@@ -97,7 +97,7 @@ async function addGuideToDB(dbObject, guideObject){
     if(summary.isErr()){
         return Services.v2Core.Helpers.Err(`Error ( addGuideToDB -> createSummary ) : ${summary.value}`);
     }
-    let ai = Services.callAI.aiFactory();
+    let ai = await Services.callAI.aiFactory();
     let vec = await ai.generateEmbeddings(
         {inputDataVec: [summary.value], dimensionSize: vectorEmbedSize, quality: 1 });
     if( vec.isErr() ){ return Services.v2Core.Helpers.Err(`Error ( addGuideToDB -> generateEmbeddings ) : ${vec.value}`); }

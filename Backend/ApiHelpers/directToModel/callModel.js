@@ -17,7 +17,7 @@ export async function directToModel(userQuery, aiSettings, webGrounding, socketI
         let systemMessage = 'You are a professional AI assistant. Answer the users query to the best of your ability'+
         'Focus on quality and accuracy. Do not try to flatter the user - be polite and direct. Do not be sycophantic in your replies.'+
         'Answer in UK English and use markdown formatting. Your replies should be well structured.';
-        let ai = Services.callAI.aiFactory();
+        let ai = await Services.callAI.aiFactory();
         let call;
         if(webGrounding == false){
             call = await ai.generateText(systemMessage, prompt, { ...aiSettings } );

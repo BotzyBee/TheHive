@@ -24,10 +24,12 @@ export async function createTaskAgentJob(frontendMessage, socketId){
             'Error (createTaskAgentJob) : frontendMessage.messages[0] is not a TextMessage Class'
         );
     }
+    let factory = await Services.callAI.aiFactory();
     let job = new TaskAgent({
         task: message, 
         aiSettings: frontendMessage.aiSettings, 
         socketId: socketId,
+        callFactory: factory,
         // All below are optional
         //toolRetryCount, 
         //maxLoopBuffer, 

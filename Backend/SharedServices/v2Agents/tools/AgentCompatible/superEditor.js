@@ -97,7 +97,7 @@ export async function run(Shared, params = {}, agent = {}) {
 
     // Edit document with existing content
     try {
-        const aiService = new Shared.callAI.aiFactory();
+        const aiService = await Shared.callAI.aiFactory();
         const mutator = new DocumentMutator();
         
         // 1. Chunking
@@ -160,7 +160,7 @@ ${currentChunk}
  * Logic for handling completely new files
  */
 async function handleNewDocument(Shared, prompt, context, aiSettings) {
-    const aiService = new Shared.callAI.aiFactory();
+    const aiService = await Shared.callAI.aiFactory();
     const response = await aiService.generateText(SYSTEM_PROMPT, `TASK: ${prompt}\nCONTEXT: ${context}\nDOCUMENT IS EMPTY. USE REPLACE_ALL.`, aiSettings);
     aiCount++;
     if (response.isErr()) return response;

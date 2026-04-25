@@ -81,7 +81,7 @@ export async function run(
 
     safeEmit(agent, `Performing web-search via Gemini and Perplexity - 🐝🔍`);
     let providers = Shared.callAI.Constants.AiProviders;
-    let ai = Shared.callAI.aiFactory();
+    let ai = await Shared.callAI.aiFactory();
     let allCalls = [
         ai.webSearch(sysText, usrText, { provider: providers.gemini }),
         ai.webSearch(sysText, usrText, { provider: providers.perplexity }),
