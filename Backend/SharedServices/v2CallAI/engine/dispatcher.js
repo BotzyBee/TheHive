@@ -5,6 +5,7 @@ import { callPerplexity } from "../services/perplexity.js";
 import { callInception } from "../services/inception.js";
 import { callKimi } from "../services/kimiProvider.js";
 import { callOllama } from "../services/callOllama.js";
+import { callDeepseek } from "../services/deepseek.js";
 import { AiProviders } from "../core/constants.js";
 
 export const PROVIDER_DISPATCH = {
@@ -14,6 +15,6 @@ export const PROVIDER_DISPATCH = {
   [AiProviders.perplexity]: callPerplexity,
   [AiProviders.inception]: callInception,
   [AiProviders.kimi]: callKimi,
-  [AiProviders.ollama]: callOllama
-
+  [AiProviders.ollama]: callOllama,
+  [AiProviders.deepseek]: callDeepseek
 };

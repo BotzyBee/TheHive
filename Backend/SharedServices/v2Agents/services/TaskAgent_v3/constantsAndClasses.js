@@ -4,7 +4,7 @@ import { Services } from '../../../index.js';
 export const TaskFlow = {
     Loading: {
         main: "Loading::main", // using main as default is a reserved word.
-    }
+    },
     Plan: {
         createPlan: "Plan::createPlan",
         rePlan: "Plan::rePlanning",
@@ -12,6 +12,7 @@ export const TaskFlow = {
     Action: {
         craftParams: "Action::craftParameters",
         callTool: "Action::callAgentTool",
+        messageUser: "Action::messageUser"
     },
     Review: {
         newMessage: "Review::newMessageFromUser",
@@ -21,7 +22,7 @@ export const TaskFlow = {
     Stopped: {
         Failed: "Stopped::failed",
         AwaitUser: "Stopped::awaitingUser",
-        Stopped: "Stopped:stoppedByUser"
+        Stopped: "Stopped:stoppedByUser",
         FinalOutput: "Stopped::draftingFinalOutput",
         Complete: "Stopped::complete"
     },

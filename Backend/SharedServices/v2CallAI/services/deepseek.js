@@ -1,5 +1,4 @@
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import OpenAI from 'openai';
 import { makeSchemaStrict } from '../core/utils.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
@@ -82,19 +81,27 @@ export async function generateEmbeddings(model, options = {}) {
   }
 
   try {
-    const embeddings = new OpenAIEmbeddings({
-      model: model,
-      dimensions: dimensionSize,
-      openAIApiKey: apiKey,
-      configuration: {
-        baseURL: 'https://api.deepseek.com'
-      }
+    const client = new OpenAI({
+      apiKey: apiKey,
+      baseURL: 'https://api.deepseek.com'
     });
 
-    const vectors = await embeddings.embedDocuments(inputDataVec);
+    const payload = {
+      model: model,
+      input: inputDataVec
+    };
+
+    if (dimensionSize) {
+      payload.dimensions = dimensionSize;
+    }
+
+    const response = await client.embeddings.create(payload);
+    
+    // Extract the vector arrays from the response data
+    const vectors = response.data.map((item) => item.embedding);
     return Services.v2Core.Helpers.Ok(vectors);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateEmbeddings): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateEmbeddings): ${error.message || error}`);
   }
 }
 
@@ -120,60 +127,84 @@ export async function generateText(
   const apiKey = process.env.DPSK_KEY;
   const { structuredOutput } = options;
 
-  const chatModel = new ChatOpenAI({
-    model: model,
-    openAIApiKey: apiKey,
-    configuration: {
-      baseURL: 'https://api.deepseek.com'
-    },
-    streaming: options.stream === true
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: 'https://api.deepseek.com'
   });
 
   const hasImage = contentMessage?.imageUrl != null;
   let humanContent;
 
   if (hasImage) {
-    humanContent = [
-      ...(contentMessage.text
-        ? [{ type: 'text', text: contentMessage.text }]
-        : []),
-      { type: 'image_url', image_url: { url: contentMessage.imageUrl } },
-    ];
+    humanContent = [];
+    if (contentMessage.text) {
+      humanContent.push({ type: 'text', text: contentMessage.text });
+    }
+    humanContent.push({
+      type: 'image_url',
+      image_url: { url: contentMessage.imageUrl }
+    });
   } else {
     humanContent = contentMessage;
   }
 
   const messages = [
-    new SystemMessage(systemMessage),
-    new HumanMessage(hasImage ? { content: humanContent } : humanContent),
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: humanContent }
   ];
 
+  const requestPayload = {
+    model: model,
+    messages: messages,
+  };
+
+  // Configure structured outputs using the json_object approach
+  if (structuredOutput) {
+    const schemaWithStrictness = makeSchemaStrict(structuredOutput);
+    
+    // Deepseek requires explicit instructions in the prompt to output JSON
+    const jsonInstructions = `\n\nYou must output your response in JSON format. Please ensure your response adheres to the following JSON schema:\n${JSON.stringify(schemaWithStrictness)}`;
+    
+    // Append instructions and schema to the system message
+    messages[0].content += jsonInstructions;
+
+    // Use the json_object response format
+    requestPayload.response_format = {
+      type: 'json_object'
+    };
+  }
+
   try {
-    if (structuredOutput) {
-      const schemaWithStrictness = makeSchemaStrict(structuredOutput);
-      const structured = chatModel.withStructuredOutput(schemaWithStrictness);
-      const res = await structured.invoke(messages);
-      return Services.v2Core.Helpers.Ok(res);
-    } else {
-      if (options.stream) {
-        const stream = await chatModel.stream(messages);
-        let fullContent = '';
-        for await (const chunk of stream) {
-          const content = chunk.content;
-          if (content) {
-            fullContent += content;
-            if (options.onChunk) {
-              options.onChunk(content);
-            }
+    if (options.stream === true) {
+      requestPayload.stream = true;
+      const stream = await client.chat.completions.create(requestPayload);
+      
+      let fullContent = '';
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+          if (options.onChunk) {
+            options.onChunk(content);
           }
         }
-        return Services.v2Core.Helpers.Ok(fullContent);
-      } else {
-        const res = await chatModel.invoke(messages);
-        return Services.v2Core.Helpers.Ok(res.content);
       }
+
+      if (structuredOutput) {
+        return Services.v2Core.Helpers.Ok(JSON.parse(fullContent));
+      }
+      return Services.v2Core.Helpers.Ok(fullContent);
+
+    } else {
+      const response = await client.chat.completions.create(requestPayload);
+      const responseContent = response.choices[0]?.message?.content || '';
+
+      if (structuredOutput) {
+        return Services.v2Core.Helpers.Ok(JSON.parse(responseContent));
+      }
+      return Services.v2Core.Helpers.Ok(responseContent);
     }
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateText): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateText): ${error.message || error}`);
   }
 }

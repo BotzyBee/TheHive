@@ -1,5 +1,4 @@
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import OpenAI from 'openai';
 import { makeSchemaStrict } from '../core/utils.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
@@ -9,7 +8,7 @@ import { ModelTypes } from '../core/constants.js';
 /**
  * Unified Kimi (Moonshot AI) call handler.
  * @param {string} systemMessage - Not needed for embeddings mode
- * @param {string | { text?: string, imageUrl?: string }} contentMessage  - not needed for embeddings mode
+ * @param {string | { text?: string, imageUrl?: string }} contentMessage  - Not needed for embeddings mode
  * @param {string} model            - Target model
  * @param {object} options
  * @param {object} [options.structuredOutput]   - If provided, uses structured output
@@ -82,19 +81,27 @@ export async function generateEmbeddings(model, options = {}) {
   }
 
   try {
-    const embeddings = new OpenAIEmbeddings({
-      model: model,
-      dimensions: dimensionSize,
-      openAIApiKey: apiKey,
-      configuration: {
-        baseURL: 'https://api.moonshot.ai/v1'
-      }
+    const client = new OpenAI({
+      apiKey: apiKey,
+      baseURL: 'https://api.moonshot.ai/v1'
     });
 
-    const vectors = await embeddings.embedDocuments(inputDataVec);
+    const payload = {
+      model: model,
+      input: inputDataVec
+    };
+
+    if (dimensionSize) {
+      payload.dimensions = dimensionSize;
+    }
+
+    const response = await client.embeddings.create(payload);
+    
+    // Extract the vector arrays from the response data
+    const vectors = response.data.map((item) => item.embedding);
     return Services.v2Core.Helpers.Ok(vectors);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callKimi -> generateEmbeddings): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callKimi -> generateEmbeddings): ${error.message || error}`);
   }
 }
 
@@ -120,60 +127,82 @@ export async function generateText(
   const apiKey = process.env.KIMI_KEY;
   const { structuredOutput } = options;
 
-  const chatModel = new ChatOpenAI({
-    model: model,
-    openAIApiKey: apiKey,
-    configuration: {
-      baseURL: 'https://api.moonshot.ai/v1'
-    },
-    streaming: options.stream === true
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: 'https://api.moonshot.ai/v1'
   });
 
   const hasImage = contentMessage?.imageUrl != null;
   let humanContent;
 
   if (hasImage) {
-    humanContent = [
-      ...(contentMessage.text
-        ? [{ type: 'text', text: contentMessage.text }]
-        : []),
-      { type: 'image_url', image_url: { url: contentMessage.imageUrl } },
-    ];
+    humanContent = [];
+    if (contentMessage.text) {
+      humanContent.push({ type: 'text', text: contentMessage.text });
+    }
+    humanContent.push({
+      type: 'image_url',
+      image_url: { url: contentMessage.imageUrl }
+    });
   } else {
     humanContent = contentMessage;
   }
 
   const messages = [
-    new SystemMessage(systemMessage),
-    new HumanMessage(hasImage ? { content: humanContent } : humanContent),
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: humanContent }
   ];
 
+  const requestPayload = {
+    model: model,
+    messages: messages,
+  };
+
+  // Configure structured outputs using the standard JSON schema approach
+  if (structuredOutput) {
+    const schemaWithStrictness = makeSchemaStrict(structuredOutput);
+    requestPayload.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'structured_response',
+        strict: true,
+        schema: schemaWithStrictness
+      }
+    };
+  }
+
   try {
-    if (structuredOutput) {
-      const schemaWithStrictness = makeSchemaStrict(structuredOutput);
-      const structured = chatModel.withStructuredOutput(schemaWithStrictness);
-      const res = await structured.invoke(messages);
-      return Services.v2Core.Helpers.Ok(res);
-    } else {
-      if (options.stream) {
-        const stream = await chatModel.stream(messages);
-        let fullContent = '';
-        for await (const chunk of stream) {
-          const content = chunk.content;
-          if (content) {
-            fullContent += content;
-            if (options.onChunk) {
-              options.onChunk(content);
-            }
+    if (options.stream === true) {
+      requestPayload.stream = true;
+      const stream = await client.chat.completions.create(requestPayload);
+      
+      let fullContent = '';
+      for await (const chunk of stream) {
+        // Delta content can be undefined when the stream finishes
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+          if (options.onChunk) {
+            options.onChunk(content);
           }
         }
-        return Services.v2Core.Helpers.Ok(fullContent);
-      } else {
-        const res = await chatModel.invoke(messages);
-        return Services.v2Core.Helpers.Ok(res.content);
       }
+
+      if (structuredOutput) {
+        return Services.v2Core.Helpers.Ok(JSON.parse(fullContent));
+      }
+      return Services.v2Core.Helpers.Ok(fullContent);
+
+    } else {
+      const response = await client.chat.completions.create(requestPayload);
+      const responseContent = response.choices[0]?.message?.content || '';
+
+      if (structuredOutput) {
+        return Services.v2Core.Helpers.Ok(JSON.parse(responseContent));
+      }
+      return Services.v2Core.Helpers.Ok(responseContent);
     }
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callKimi -> generateText): ${error}`);
+    return Services.v2Core.Helpers.Err(`Error (callKimi -> generateText): ${error.message || error}`);
   }
 }

@@ -676,9 +676,12 @@ export class TaskAgent extends AiJob {
 
         // [][] -- TOOL REVIEW -- [][]
         if (!this.isRunning) return Services.v2Core.Helpers.Ok("Job stopped by user."); 
+         console.log("Review - Tool Review");
         let toolOutput =  this.toolOutputData || []; // Array of Messages from last tool call.
+        console.log("ToP :: ", toolOutput);
         // Catch rePlan tool (skip review and go back to planning).. should never get here in normal circs. 
-        if(toolOutput[0].toolName == 'rePlanTool'){
+        if(toolOutput[0]?.toolName == 'rePlanTool' || toolOutput == []){
+            console.log("Review - replan tool");
             this.nextPhase = TaskPhases.Plan;
             this.planUpdateNeeded = true;
             this.#setActionComplete(this.actionReviewID); // mark complete so it's included in 'old plan' and merged with new plan.
@@ -686,6 +689,7 @@ export class TaskAgent extends AiJob {
         }
         // Catch return to user tool (tool to end task) 
         if(toolOutput[0].toolName == 'returnToUser'){
+            console.log("Review - RTU tool");
             this.emitUpdateStatus('Processing final output...');
             this.isRunning = false;
             this.phaseMessage = "";
@@ -1257,7 +1261,8 @@ Only set replan to true when it's clear the current plan will not work.`,
         },
         "required": [
             "status",
-            "replan"
+            "replan",
+            "feedback"
         ]
         }
     },

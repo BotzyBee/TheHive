@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { makeSchemaStrict } from '../core/utils.js';
 import { ModelTypes } from '../core/constants.js';
 import { Services } from '../../index.js';
+import { parseDirtyJson } from '../core/helpers.js';
 
 // Uses Google API not Langchain interface
 // https://ai.google.dev/gemini-api/docs#javascript
@@ -185,7 +186,13 @@ export async function generateText(
       try {
         parsed = JSON.parse(secondResponse.text);
       } catch (error) {
-        return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 2): JSON Parse failed ${parsed}`);
+         // attempt dirty fix
+        let fixed = parseDirtyJson(secondResponse.text)
+        if(fixed.ok){
+          parsed = fixed.data;
+        } else {
+          return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 2): JSON Parse failed ${error}`);
+        }
       }
       return Services.v2Core.Helpers.Ok(parsed);
     }
@@ -248,7 +255,13 @@ export async function generateText(
       try {
         parsed = JSON.parse(fullText);
       } catch (error) {
-        return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): JSON Parse failed ${error}`);
+        // attempt dirty fix
+        let fixed = parseDirtyJson(fullText)
+        if(fixed.ok){
+          parsed = fixed.data;
+        } else {
+          return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): JSON Parse failed ${error}`);
+        }
       }
       return Services.v2Core.Helpers.Ok(parsed);
     }

@@ -5,7 +5,8 @@ export const AiProviders = Object.freeze({
   perplexity: 'Perplexity',
   inception: 'Inception',
   kimi: 'Kimi',
-  ollama: 'Ollama'
+  ollama: 'Ollama',
+  deepseek: 'DeepSeek'
 });
 export const DEFAULT_PROVIDER = AiProviders.gemini; // <---  ** Set Default AI provider **
 export const AiQuality = Object.freeze({
@@ -210,8 +211,20 @@ export const MODEL_REGISTRY = [
     quality: AiQuality.Advanced,
     active: true,
     id:"no-db-id"
+  }, // 
+  {
+    model: 'deepseek-v4-flash',
+    provider: AiProviders.deepseek,
+    capabilities: [
+      ModelTypes.text,
+      ModelTypes.structuredOutputs,
+      ModelTypes.code
+    ],
+    maxContext: 1000000,
+    quality: AiQuality.Advanced,
+    active: true,
+    id:"no-db-id"
   },
-
   // [][] --- PRO MODELS --- [][]
   {
     model: 'gpt-5.4',
@@ -275,6 +288,19 @@ export const MODEL_REGISTRY = [
       ModelTypes.websearch,
     ],
     maxContext: 128000,
+    quality: AiQuality.Pro,
+    active: true,
+    id:"no-db-id"
+  },
+  {
+    model: 'deepseek-v4-pro',
+    provider: AiProviders.deepseek,
+    capabilities: [
+      ModelTypes.text,
+      ModelTypes.structuredOutputs,
+      ModelTypes.code
+    ],
+    maxContext: 1000000,
     quality: AiQuality.Pro,
     active: true,
     id:"no-db-id"
