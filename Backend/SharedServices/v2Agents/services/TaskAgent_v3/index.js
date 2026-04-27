@@ -3,8 +3,6 @@ import { Services } from '../../../index.js';
 import { AiJob } from '../../core/classes.js';
 import { TaskFlow } from './constantsAndClasses.js';
 
-
-
 export class TaskAgent extends AiJob {
     constructor({ 
             task = "", 
@@ -37,9 +35,8 @@ export class TaskAgent extends AiJob {
         this.maxLoopBuffer = maxLoopBuffer; // Gives the agent X number of extra loops to ask questions/ attempt fixes etc.
         this.maxLoops = 10; // this is updated when a plan is created.
         this.summaryDataSizeThreshold = summaryDataSizeThreshold; // How many characters before context summarisation
-        this.toolOutputData = []; // temp holds tool output prior to review;
         this.debugParams = []; // used to store params crafted for tools for debugging and improvement purposes.
-        this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'superWriterTool']; // Outputs from these tools aren't critiqued (they have their own QA process!)
+        this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'superWriterTool', 'rePlanTool', 'returnToUser']; // Outputs from these tools aren't critiqued (they have their own QA process!)
     }
 
     // [][] -- HELPER FUNCTIONS -- [][]
@@ -233,9 +230,6 @@ export class TaskAgent extends AiJob {
                 break;
 
                 // [][] -- AGENT ACTIONS -- [][]
-                case TaskFlow.Action.craftParams:
-                // function(this)
-                break;
                 case TaskFlow.Action.callTool:
                 // function(this)
                 break;
@@ -259,14 +253,17 @@ export class TaskAgent extends AiJob {
                 // function(this)
                 break;
                 case TaskFlow.Stopped.Stopped:
-                // function(this)
-                break;  
+                    this.isRunning = false;
+                    return;
                 case TaskFlow.Stopped.FinalOutput:
-                // function(this)
-                break;  
+                    // create final message..
+                    this.TaskState.currentFlowState = TaskFlow.Stopped.Complete;
+                    break;
                 case TaskFlow.Stopped.Complete:
-                // function(this)
-                break;
+                    this.isRunning = false;
+                    this.emitFinalResult();
+                    return; 
+                
 
                 // [][] -- HEALING / FIXES -- [][]
                 case TaskFlow.Healing.main:

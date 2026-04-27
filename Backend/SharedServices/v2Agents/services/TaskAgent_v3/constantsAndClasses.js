@@ -10,7 +10,6 @@ export const TaskFlow = {
         rePlan: "Plan::rePlanning",
     },
     Action: {
-        craftParams: "Action::craftParameters",
         callTool: "Action::callAgentTool",
         messageUser: "Action::messageUser"
     },
