@@ -1,9 +1,6 @@
-import { TaskAgent } from "./index.js";
 import { Services } from "../../../index.js";
-import { TaskFlow } from "./constantsAndClasses.js";
+import { TaskFlow, TaskAction } from "./constantsAndClasses.js";
 import { TA_PromptsAndSchemas as PromptsAndSchemas } from './prompts.js';
-
-let thisT = new TaskAgent(); // for intelisense help
 
 // [][] -- LOADING FUNCTIONS -- [][]
 export function loadingMain(agentObject){
@@ -165,7 +162,6 @@ export async function createPlan(agentObject){
     // [][]  -- Set Control Flow Properties -- [][]
     // [][]  --------------------------------- [][]
     agentObject.healPrompt = "";
-
     // Check for flags (!!Flag)
     agentObject.plansNeedApproved = agentObject.task.toLowerCase().includes("!!plans-need-approved");
     if (agentObject.plansNeedApproved) {
@@ -175,15 +171,15 @@ export async function createPlan(agentObject){
         agentObject.TaskState.handoverData = agentObject.plan; // already is an array.
     } else {
         // Flow to Craft Params / Tool Calling
-        agentObject.setFlowState(TaskFlow.Action.craftParams);
+        agentObject.setFlowState(TaskFlow.Action.callTool);
         agentObject.TaskState.handoverMessage = "Planning step completed - continue to tool calling.";
         agentObject.TaskState.handoverData = [];
     }
-    agentObject.maxLoops = agentObject.maxLoopBuffer + agentObject.plan.length;
+    agentObject.maxLoops = (agentObject.maxLoopBuffer + agentObject.plan.length)*3;
     return;
 }
 
-async function performNextAction(agentObject){ 
+export async function performNextAction(agentObject){ 
     if (!agentObject.isRunning) {
         agentObject.setFlowState(TaskFlow.Stopped.Stopped);
         return;
@@ -324,7 +320,7 @@ async function performNextAction(agentObject){
     return;
 }
 
-async function messageUser(agentObject){
+export async function messageUser(agentObject){
     // Send Messaage to user
     let hvrMsg = `Message : ${agentObject.TaskState.handoverMessage} . Any other data : ${JSON.stringify(agentObject.TaskState.handoverData)}` 
     let returnMessage = await agentObject.generateText(
@@ -356,7 +352,7 @@ async function messageUser(agentObject){
     return;
 }
 
-async function reviewUserMessage(agentObject){
+export async function reviewUserMessage(agentObject){
     
     agentObject.emitUpdateStatus("Got your message..."); 
     // user message will have been added to message history by jobManager
@@ -454,7 +450,7 @@ async function reviewUserMessage(agentObject){
     return;    
 }
 
-async function reviewToolOutput(agentObject){
+export async function reviewToolOutput(agentObject){
     agentObject.healPrompt = "";
     if (!agentObject.isRunning) {
         agentObject.setFlowState(TaskFlow.Stopped.Stopped);
@@ -567,6 +563,8 @@ async function reviewToolOutput(agentObject){
         return;  
     }
     console.log("REVIEW :: "+JSON.stringify(completeCheck.value.status, null, 2));
+    console.log("Replan: ", completeCheck.value.replan);
+    console.log("Feedback: ", completeCheck.value?.feedback);
     // Action did not complete 
     let fb = completeCheck.value?.feedback ?? "No feedback given!";
     if(completeCheck.value.status == "INCOMPLETE"){ 
@@ -647,7 +645,7 @@ async function reviewToolOutput(agentObject){
     }
 }
 
-async function processFinalOutput(agentObject){
+export async function processFinalOutput(agentObject){
     agentObject.healPrompt = "";
     let saveFolder = agentObject.contextData.globalData.isProject 
         ? agentObject.contextData.globalData.projectIndexUrl
@@ -662,9 +660,10 @@ async function processFinalOutput(agentObject){
         return;          
     }
     agentObject.taskOutput = output.value;
+    agentObject.setFlowState(TaskFlow.Stopped.Complete);
 }
 
-async function healing(agentObject){
+export async function healing(agentObject){
     agentObject.emitUpdateStatus("Entering healing phase... 🩹🐝");
     let history = agentObject.TaskState.stateHistory;
     let multiFail = hasFailedMultipleTimes(history);
@@ -691,7 +690,7 @@ async function healing(agentObject){
     // Set Flow Control 
     agentObject.TaskState.handoverData = [];
     agentObject.TaskState.handoverMessage = "";
-    this.healPrompt = nextStep.value.additionalPrompt;
+    agentObject.healPrompt = nextStep.value.additionalPrompt;
 
     switch (nextStep.value.action) {
         case "Loading::main" :

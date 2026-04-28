@@ -481,16 +481,31 @@ export class AiJob {
   }
 
     emitFailed(){
-    if(this.socketId){
-        let res = new FrontendMessageFormat({ 
-            aiJobId: this.id, 
-            status: this.status.setFailed(), 
-            isRunning: this.isRunning,
-            messages: this.taskOutput, 
-            metadata: this.stats
-        });
-        console.error("Job failed:", this.errors);
-        this.emitToSocket(this.socketId, 'job_error', res);
+    this.status.setFailed();
+    switch (this.whoGetsUpdates) {
+        case 'User':
+            if(this.socketId){
+                let res = new FrontendMessageFormat({ 
+                    aiJobId: this.id, 
+                    status: this.status, 
+                    isRunning: this.isRunning,
+                    messages: this.taskOutput || [], 
+                    metadata: this.stats
+                });
+                
+                this.emitToSocket({socketId: this.socketId, event:'job_error', data:res});
+            }
+            break;
+        case 'BotzyVoice':
+            // Only output data or text messages
+            let filtered = this.taskOutput.filter((message) => message.type == 'text' || message.type == 'data');
+            //
+            botzyMemory.push({ 
+                type: 'jobOutcome', 
+                id: this.id,
+                message: `[ Job Result ] : status: ${this.status} , stats: ${this.stats} , Output : ${filtered}` 
+            });
+            break;
     }
   }
 

@@ -7,7 +7,7 @@ REMEMBER - Threads cannot access the global vars on the main thread... they have
 
 import { initRegistry } from '../../../ApiHelpers/buildRegistry.js';
 import { Services } from '../../index.js';
-import { TaskAgent } from '../../v2Agents/services/TaskAgent/index.js';
+import { TaskAgent } from '../../v2Agents/services/TaskAgent_v3/index.js'; 
 import { QuickAskAgent } from '../../v2Agents/services/QuickAsk/index.js';
 import { parentPort } from 'worker_threads';
 

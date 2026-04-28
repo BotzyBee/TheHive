@@ -14,7 +14,7 @@
     let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Botzy Bee";
-    let providerName = "Default"
+    let providerName = 'Default';
 
     // For slash command menu
     let menuOpen = false;

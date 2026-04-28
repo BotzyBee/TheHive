@@ -26,6 +26,7 @@ export class TaskAgent extends AiJob {
             skipReviewTools,
             callFactory = null
         } = {}){
+
         super({aiSettings, socketId, emitFunction, whoGetsUpdates, callFactory}) // setup parent class
         this.messageHistory.addMessage(new Services.aiAgents.Classes.TextMessage({ role: Services.aiAgents.Constants.Roles.User, textData: task}));
         this.task = task;
@@ -98,6 +99,7 @@ export class TaskAgent extends AiJob {
         return null;     
     }
     setFlowState(state){
+        console.log(" \n *** FLOW *** -> ", state);
         this.TaskState.currentFlowState = state;
         this.TaskState.stateHistory.push(state)
     }
@@ -219,81 +221,90 @@ export class TaskAgent extends AiJob {
     // [][] --- MAIN ENTRY POINT --- [][]
     async run(){
 
-        console.log("Starting Task Agent Job")
-        // Start / Re-start the agent
-        this.isRunning = true;
-        this.taskOutput = [];
-        if(this.startEpochMs == 0) this.setStartTime();
-            
-        // Main Loop
-        while(this.isRunning == true){
-
-            switch (this.TaskState.currentFlowState) {
-                // [][] -- LOADING ACTIONS -- [][]
-                case TaskFlow.Loading.main:
-                    await loadingMain(this);
-                break;
+        try {
+             console.log("Starting Task Agent Job")
+            // Start / Re-start the agent
+            this.isRunning = true;
+            this.taskOutput = [];
+            if(this.startEpochMs == 0) this.setStartTime();
                 
-                // [][] -- PLANNING ACTIONS -- [][]
-                case TaskFlow.Plan.createPlan:
-                case TaskFlow.Plan.rePlan:
-                    await createPlan(this);
-                break;
-
-                // [][] -- AGENT ACTIONS -- [][]
-                case TaskFlow.Action.callTool:
-                    await performNextAction(this)
-                break;
-
-                // [][] -- REVIEW ACTIONS -- [][]
-                case TaskFlow.Review.newMessage:
-                    await reviewUserMessage(this);
-                break;
-                case TaskFlow.Review.toolOutput:
-                case TaskFlow.Review.processContext:
-                    await reviewToolOutput(this);
-                break;  
-                
-                case TaskFlow.Action.messageUser:
-                    await messageUser(this);
-                break;          
-
-                // [][] -- STOPPED STATES -- [][]
-                case TaskFlow.Stopped.Failed:
-                    this.isRunning = false;
-                    this.emitFailed();
-                break;
-                case TaskFlow.Stopped.AwaitUser:
-                case TaskFlow.Stopped.Stopped:
-                    this.isRunning = false;
-                    return;
-                case TaskFlow.Stopped.FinalOutput:
-                    this.emitUpdateStatus('TaskAgent is stopped.');
-                    await processFinalOutput(this);
+            // Main Loop
+            while(this.isRunning == true){
+                switch (this.TaskState.currentFlowState) {
+                    // [][] -- LOADING ACTIONS -- [][]
+                    case TaskFlow.Loading.main:
+                        await loadingMain(this);
                     break;
-                case TaskFlow.Stopped.Complete:
-                    this.isRunning = false;
-                    this.emitFinalResult();
-                    return; 
-                
-                // [][] -- HEALING / FIXES -- [][]
-                case TaskFlow.Healing.main:
-                    await healing(this);
-                break;
-            }// end switch
+                    
+                    // [][] -- PLANNING ACTIONS -- [][]
+                    case TaskFlow.Plan.createPlan:
+                    case TaskFlow.Plan.rePlan:
+                        await createPlan(this);
+                    break;
 
-            // catch max loops
-            if(this.stats.loopNumber >= this.maxLoops){
-                this.isRunning = false;
-                let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
-                this.errors.push(e);
-                console.log(e);
-                this.status.setMaxLoopsHit()
-                this.emitFailed();
-                return;
-            }
-            this.addLoopCount(1);
-        }// end loop
+                    // [][] -- AGENT ACTIONS -- [][]
+                    case TaskFlow.Action.callTool:
+                        await performNextAction(this)
+                    break;
+
+                    // [][] -- REVIEW ACTIONS -- [][]
+                    case TaskFlow.Review.newMessage:
+                        await reviewUserMessage(this);
+                    break;
+                    case TaskFlow.Review.toolOutput:
+                    case TaskFlow.Review.processContext:
+                        await reviewToolOutput(this);
+                    break;  
+                    
+                    case TaskFlow.Action.messageUser:
+                        await messageUser(this);
+                    break;          
+
+                    // [][] -- STOPPED STATES -- [][]
+                    case TaskFlow.Stopped.Failed:
+                        this.isRunning = false;
+                        this.emitFailed();
+                    break;
+                    case TaskFlow.Stopped.AwaitUser:
+                    case TaskFlow.Stopped.Stopped:
+                        this.isRunning = false;
+                        return Services.v2Core.Helpers.Ok("Task Agent Has Stopped");;
+                    case TaskFlow.Stopped.FinalOutput:
+                        this.emitUpdateStatus('Creating Final Output...');
+                        await processFinalOutput(this);
+                        break;
+                    case TaskFlow.Stopped.Complete:
+                        this.isRunning = false;
+                        this.emitFinalResult();
+                        return Services.v2Core.Helpers.Ok("Task Agent Run Complete");; 
+                    
+                    // [][] -- HEALING / FIXES -- [][]
+                    case TaskFlow.Healing.main:
+                        await healing(this);
+                    break;
+
+                    case undefined :
+                        console.log("DANG.. it's gone and broken!") 
+                        return;
+                }// end switch
+
+                // catch max loops
+                if(this.stats.loopNumber >= this.maxLoops){
+                    this.isRunning = false;
+                    let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
+                    this.emitUpdateStatus("Failed : Max Loops Hit! ➿")
+                    this.errors.push(e);
+                    console.log(e);
+                    this.status.setMaxLoopsHit()
+                    this.emitFailed();
+                    return Services.v2Core.Helpers.Err(`Error (Task Agent) : ${e}`);
+                }
+                this.addLoopCount(1);
+            }// end loop
+        } catch (error) {
+            console.log("MAJOR ERROR :: ", error);
+        }
+       
 
     this.setEndTime();
     this.debugParams = [];

@@ -6,13 +6,6 @@ Function flow for AiCall
 AiCall Method -> EstimateTokens -> dispatch -> resolveModel -> ProviderFunctions -> AI PROVIDER
 */
 export class AiCall {
-  #models = [];
-  #AiQuality = {};
-  #AiProviders = {};
-  #ModelTypes = {};
-  #ProviderFunctions = {};
-  #defaultProvider = '';
-
   constructor({
     models = [],
     quality = 2,
@@ -21,12 +14,12 @@ export class AiCall {
     functions = {},
     defaultProvider = '',
   } = {}) {
-    this.#models = models;
-    this.#AiQuality = quality;
-    this.#AiProviders = providers; 
-    this.#ModelTypes = capabilities;
-    this.#ProviderFunctions = functions;
-    this.#defaultProvider = defaultProvider;
+    this.models = models;
+    this.AiQuality = quality;
+    this.AiProviders = providers; 
+    this.ModelTypes = capabilities;
+    this.ProviderFunctions = functions;
+    this.defaultProvider = defaultProvider;
   }
 
   /** Generate Text (model only - no tools)
@@ -180,7 +173,7 @@ export class AiCall {
     } = options;
     // Build the full capability requirements for this call
     const requiredCaps = new Set([requiredCapability]);
-    if (structuredOutput) requiredCaps.add(this.#ModelTypes.structuredOutputs);
+    if (structuredOutput) requiredCaps.add(this.ModelTypes.structuredOutputs);
 
     // Helper function - quality-proximity sorter: closest to target wins; ties go to the higher quality model
     const requestQuality = quality ?? 2;
@@ -193,7 +186,7 @@ export class AiCall {
 
     // Path 1: Caller named an exact model
     if (model !== null && typeof model == 'string') {
-      const entry = this.#models.find((m) => m.model === model);
+      const entry = this.models.find((m) => m.model === model);
       if (!entry) {
         return Services.v2Core.Helpers.Err(
           `Error ( resolveModel ) : Unknown Model : ${model}`
@@ -211,7 +204,7 @@ export class AiCall {
     }
 
     // Filter models for other paths (filter capabilities & context size)
-    const capableCandidates = this.#models.filter((m) =>
+    const capableCandidates = this.models.filter((m) =>
       [...requiredCaps].every((cap) => m.capabilities.includes(cap))
     );
     // catch no models available for task
@@ -239,7 +232,7 @@ export class AiCall {
     }
 
     // Path 3: Go with default provider (unless user specifies one) and closest model to quality
-    const resolvedProvider = provider ?? this.#defaultProvider;
+    const resolvedProvider = provider ?? this.ProviderFunctions;
     const providerCandidates = capableCandidates.filter(
       (m) => m.provider === resolvedProvider
     );
@@ -303,7 +296,7 @@ export class AiCall {
     if (entry.isErr()) {
       return Services.v2Core.Helpers.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
     }
-    const callFn = this.#ProviderFunctions[entry.value.provider];
+    const callFn = this.ProviderFunctions[entry.value.provider];
     if (!callFn) {
       return Services.v2Core.Helpers.Err(
         `Error : ( #dispatch ) No dispatch function registered for provider. ${entry.value.provider}`

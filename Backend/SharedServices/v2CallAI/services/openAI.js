@@ -194,7 +194,7 @@ export async function generateText(
         type: 'json_schema',
         json_schema: {
           name: 'structured_response',
-          strict: true,
+          strict: false,
           schema: strictSchema,
         },
       };

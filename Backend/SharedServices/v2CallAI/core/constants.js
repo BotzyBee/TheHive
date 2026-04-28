@@ -66,7 +66,7 @@ export const MODEL_REGISTRY = [
     id:"no-db-id"
   },
   {
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.1-flash-lite-preview',
     provider: AiProviders.gemini,
     capabilities: [
       ModelTypes.text,
@@ -151,7 +151,7 @@ export const MODEL_REGISTRY = [
     id:"no-db-id"
   },
   {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     provider: AiProviders.gemini,
     capabilities: [
       ModelTypes.text,

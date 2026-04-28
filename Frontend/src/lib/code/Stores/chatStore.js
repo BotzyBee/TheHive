@@ -16,7 +16,10 @@ function createChatStore() {
         latestJobRef: null,
         lastStatus: ['Processing...'],
         aiSettings: {
-            agent: "Task_Agent"
+            agent: "Task_Agent",
+            provider:"Gemini",
+            quality:2,
+            randomModel:false
         },
         config: {},
         webGrounding: false
@@ -134,7 +137,6 @@ function createChatStore() {
         socket.on('job_error', (data) => {
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return;
-
             update(s => ({
                 ...s,
                 isLoading: false,
@@ -218,7 +220,10 @@ function createChatStore() {
         set({
             ...state, // Reset to initial blank state defined at top
             aiSettings: {
-                agent: currentState.aiSettings.agent || "Task_Agent"
+                agent: currentState.aiSettings.agent || "Task_Agent",
+                provider: currentState.aiSettings.provider || "Gemini",
+                quality: currentState.aiSettings.quality || 2,
+                randomModel: currentState.aiSettings.randomModel || false
             }
         });
     }
