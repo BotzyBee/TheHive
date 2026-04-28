@@ -2,7 +2,9 @@ import { FrontendMessageFormat, TextMessage, Status } from "../core/classes.js";
 import { JOBS } from "./jobManager.js";
 import { Roles } from "../core/constants.js";
 import { processApiMessagesToClasses } from "../services/processMessages.js";
-import { TaskAgent, TaskPhases } from "../services/TaskAgent/index.js";
+import { TaskAgent } from "../services/TaskAgent_v3/index.js";
+import { TaskFlow } from "../services/TaskAgent_v3/constantsAndClasses.js";
+//import { TaskAgent, TaskPhases } from "../services/TaskAgent/index.js";
 import { Services } from "../../index.js";
 
 /**
@@ -109,11 +111,12 @@ export async function handleTAMessage(frontendMessage, socketId = null){
             msg => job.value.messageHistory.addMessage(msg)
         );
         // Setup to review new messages
-        job.value.status.setNewInfoAdded();
-        job.value.nextPhase = TaskPhases.Review;
+        //job.value.status.setNewInfoAdded();
+        //job.value.nextPhase = TaskPhases.Review;
+        job.value.setFlowState(TaskFlow.Review.newMessage);
         // Clear output to stop polling from picking up old output.
         job.value.taskOutput = [];
-        job.value.toolOutputData = [];
+        //job.value.toolOutputData = [];
         job.value.stats.loopNumber = 0; // reset loop number to allow for new loop of agent actions.
         // Add to un-allocated
         JOBS.NON_ALLOCATED.push(job.value.id);

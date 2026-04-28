@@ -362,20 +362,25 @@ You can only quote the text DO NOT add string functions like .split() etc. You c
     }
     },
     healError: {
-        sys: `Your task is to review a provided error and decide how best to 'heal' it. 
-The error you will be given has come from a 'tool calling' action performed as part of an AI agent loop.
+        sys: `Your task is to review a provided error and decide how best to 'heal' it. You will be given a 'handover' message and any available error message to help you. 
+    In general your first approch should be to try the same action again - unless the error suggest that this wouldn't sove the issue, for example if the wrong tool has been used. 
 
 You have several options open to you:
-- Retry the tool an updated prompt ("retry_tool"): This should be used when the tool has suffered a potentially intermittent fault (network connection etc) or an issue crafting input parameters (nunjacks).
-- Go back to the tool selection stage with an updated prompt ("re_plan") : This should be used when the tool selected is potentially the wrong one.
-- Return to user ("return_to_user"): This should be used when 'hard' errors (eg undeclared variable, code issues) happen. This will error and return to the user. 
-Parameter "additionalPrompt" will be added to the prompt during the next run of the agent. You should add clear instructions which will help the agent avoid this error or correct their mistake. If using "return_to_user" then additionalPrompt can be 'N/A'.
+"Loading::main" - Go back to the loading stage. This is the first stage of the agent loop. 
+"Plan::createPlan" and "Plan::rePlanning" - Go back to the planning stage. This is great for fixing issues with wrong tool choice or when the current action plan doesn't make sense.
+"Action::callAgentTool" - Go back to the tool calling stage. This is great for re-trying a failed tool, either for a one off error or when the parameters were wrong. 
+"Action::messageUser" - This will trigger a message to the user. This is great to alert them to something or ask them for further details. 
+"Review::newMessageFromUser" - This will re-run the processing of a user message. 
+"Review::toolOutput" and "Review::contextProcessing" - These will re-run the processing of the output from a tool call. This is great when the tool has sucessfully completed but the processing has failed. 
+"Stopped::draftingFinalOutput" - This will move the agent to drafting a final output based on all sucessfully completed actions so far. 
+"Stopped::failed" - This should be used when the agent has hit a 'hard' error that cannot be recovered from. 
+
+Parameter "additionalPrompt" will be added to the prompt during the next run of the agent. You should add clear instructions which will help the agent avoid this error or correct their mistake.
 `,
     
-    usr: (error, toolObject, plan, task) => {
+    usr: (error, plan, task) => {
         return `
 Here is the error text <error> ${error} </error>
-Here is tool object which details the tool capabilities and schema <toolObject> ${toolObject} </toolObject>
 Here is the current plan <plan> ${plan} </plan>
 Here is the overall task the agent is trying to complete <task> ${task} </task>`;
     },
@@ -385,7 +390,18 @@ Here is the overall task the agent is trying to complete <task> ${task} </task>`
         "properties": {
             "action": {
             "type": "string",
-            "enum": ["retry_tool", "re_plan", "return_to_user"]
+            "enum": [
+                "Loading::main", 
+                "Plan::createPlan", 
+                "Plan::rePlanning", 
+                "Action::callAgentTool", 
+                "Action::messageUser", 
+                "Review::newMessageFromUser", 
+                "Review::toolOutput", 
+                "Review::contextProcessing", 
+                "Stopped::draftingFinalOutput", 
+                "Stopped::failed"
+            ]
             },
             "additionalPrompt": {
             "type": "string"
@@ -394,4 +410,17 @@ Here is the overall task the agent is trying to complete <task> ${task} </task>`
         "required": ["action", "additionalPrompt"]
         }
     },
+}
+
+export const TaskFlow = {
+    Stopped: {
+        Failed: "Stopped::failed",
+        AwaitUser: "Stopped::awaitingUser",
+        Stopped: "Stopped:stoppedByUser",
+        FinalOutput: "Stopped::draftingFinalOutput",
+        Complete: "Stopped::complete"
+    },
+    Healing: {
+        main: "Healing::main" // using main as default is a reserved word.
+    }
 }

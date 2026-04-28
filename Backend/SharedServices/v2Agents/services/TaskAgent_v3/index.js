@@ -2,6 +2,16 @@ import path from 'path';
 import { Services } from '../../../index.js';
 import { AiJob } from '../../core/classes.js';
 import { TaskFlow } from './constantsAndClasses.js';
+import { 
+    loadingMain, 
+    createPlan, 
+    performNextAction, 
+    messageUser, 
+    reviewUserMessage, 
+    reviewToolOutput,
+    processFinalOutput,
+    healing
+} from './functions.js';
 
 export class TaskAgent extends AiJob {
     constructor({ 
@@ -37,6 +47,7 @@ export class TaskAgent extends AiJob {
         this.summaryDataSizeThreshold = summaryDataSizeThreshold; // How many characters before context summarisation
         this.debugParams = []; // used to store params crafted for tools for debugging and improvement purposes.
         this.skipReviewTools = skipReviewTools || ['createCodeTool', 'deepResearchTool', 'superWriterTool', 'rePlanTool', 'returnToUser']; // Outputs from these tools aren't critiqued (they have their own QA process!)
+        this.healPrompt = "";
     }
 
     // [][] -- HELPER FUNCTIONS -- [][]
@@ -220,77 +231,75 @@ export class TaskAgent extends AiJob {
             switch (this.TaskState.currentFlowState) {
                 // [][] -- LOADING ACTIONS -- [][]
                 case TaskFlow.Loading.main:
-                // function(this)
+                    await loadingMain(this);
                 break;
                 
                 // [][] -- PLANNING ACTIONS -- [][]
                 case TaskFlow.Plan.createPlan:
                 case TaskFlow.Plan.rePlan:
-                // function(this)
+                    await createPlan(this);
                 break;
 
                 // [][] -- AGENT ACTIONS -- [][]
                 case TaskFlow.Action.callTool:
-                // function(this)
+                    await performNextAction(this)
                 break;
 
                 // [][] -- REVIEW ACTIONS -- [][]
                 case TaskFlow.Review.newMessage:
-                // function(this)
+                    await reviewUserMessage(this);
                 break;
                 case TaskFlow.Review.toolOutput:
-                // function(this)
-                break;  
                 case TaskFlow.Review.processContext:
-                // function(this)
+                    await reviewToolOutput(this);
+                break;  
+                
+                case TaskFlow.Action.messageUser:
+                    await messageUser(this);
                 break;          
 
                 // [][] -- STOPPED STATES -- [][]
                 case TaskFlow.Stopped.Failed:
-                // function(this)
+                    this.isRunning = false;
+                    this.emitFailed();
                 break;
                 case TaskFlow.Stopped.AwaitUser:
-                // function(this)
-                break;
                 case TaskFlow.Stopped.Stopped:
                     this.isRunning = false;
                     return;
                 case TaskFlow.Stopped.FinalOutput:
-                    // create final message..
-                    this.TaskState.currentFlowState = TaskFlow.Stopped.Complete;
+                    this.emitUpdateStatus('TaskAgent is stopped.');
+                    await processFinalOutput(this);
                     break;
                 case TaskFlow.Stopped.Complete:
                     this.isRunning = false;
                     this.emitFinalResult();
                     return; 
                 
-
                 // [][] -- HEALING / FIXES -- [][]
                 case TaskFlow.Healing.main:
-                // function(this)
+                    await healing(this);
                 break;
             }// end switch
 
             // catch max loops
             if(this.stats.loopNumber >= this.maxLoops){
-                // let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
-                // this.errors.push(e);
-                // console.log(e);
-                // this.status.setMaxLoopsHit()
-                // this.emitFailed();
-                // this.nextPhase = TaskPhases.Review;
+                this.isRunning = false;
+                let e = `Error: Maximum loop count of ${this.maxLoops} exceeded.`;
+                this.errors.push(e);
+                console.log(e);
+                this.status.setMaxLoopsHit()
+                this.emitFailed();
+                return;
             }
             this.addLoopCount(1);
         }// end loop
 
-    // this.setEndTime();
-    // this.debugParams = [];
-    // const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
-    // await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
-    
-    this.emitFinalResult();
+    this.setEndTime();
+    this.debugParams = [];
+    const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
+    await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
     return Services.v2Core.Helpers.Ok("Task Agent Run Complete");
-                    
     }// end run
 }// end Task Agent
 

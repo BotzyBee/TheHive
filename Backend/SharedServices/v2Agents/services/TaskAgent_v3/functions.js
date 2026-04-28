@@ -7,8 +7,10 @@ let thisT = new TaskAgent(); // for intelisense help
 
 // [][] -- LOADING FUNCTIONS -- [][]
 export function loadingMain(agentObject){
+    
     // Flow directly to Planning Stage
     agentObject.setFlowState(TaskFlow.Plan.createPlan);
+    agentObject.healPrompt = "";
     return;
 }
 
@@ -48,7 +50,7 @@ export async function createPlan(agentObject){
         ? PromptsAndSchemas.planUpdate.usr(
             agentObject.task, 
             completedActions, 
-            agentObject.TaskState.handoverMessage, 
+            `${agentObject.TaskState.handoverMessage} \n \n Additional info (if any) : ${agentObject.healPrompt}`, 
             agentObject.contextData.getFullContextString(), 
             guideText)
         : PromptsAndSchemas.planning.usr(
@@ -133,7 +135,7 @@ export async function createPlan(agentObject){
     agentObject.emitUpdateStatus("Matching actions to tools...");
     const toolsOverview = tools.value;
     const toolUserPrompt = PromptsAndSchemas.planningTools.usr(
-        agentObject.task, 
+        `${agentObject.task} \n \n Additional info (if any) : ${agentObject.healPrompt}`, 
         JSON.stringify(actionResponse.plan), 
         JSON.stringify(toolsOverview),
         isReplan ? JSON.stringify(oldPlan.filter(p => p.complete)) : "",
@@ -144,7 +146,15 @@ export async function createPlan(agentObject){
         toolUserPrompt,
         { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.planningTools.schema }
     ) 
-    if (toolStep.isErr()) return toolStep;
+    if (toolStep.isErr()) {
+        // Flow to healing
+        agentObject.setFlowState(TaskFlow.Healing.main);
+        agentObject.TaskState.handoverMessage = "Planning Step 2 - has thrown an error. Consider re-trying planning phase";
+        agentObject.TaskState.handoverData = [toolStep.value];
+        agentObject.errors.push(tools.value);
+        return;
+    }
+        
     // Finalize and Merge Plan
     const newActions = toolStep.value.plan.map(p => new TaskAction(p.action, p.tool));
     // If updating, keep completed actions and append/replace the rest
@@ -154,13 +164,15 @@ export async function createPlan(agentObject){
     // [][]  --------------------------------- [][]
     // [][]  -- Set Control Flow Properties -- [][]
     // [][]  --------------------------------- [][]
+    agentObject.healPrompt = "";
+
     // Check for flags (!!Flag)
     agentObject.plansNeedApproved = agentObject.task.toLowerCase().includes("!!plans-need-approved");
     if (agentObject.plansNeedApproved) {
         // Flow to Message User
         agentObject.setFlowState(TaskFlow.Action.messageUser);
         agentObject.TaskState.handoverMessage = "The user needs to approve the plan before we continue.";
-        agentObject.TaskState.handoverData = agentObject.plan;
+        agentObject.TaskState.handoverData = agentObject.plan; // already is an array.
     } else {
         // Flow to Craft Params / Tool Calling
         agentObject.setFlowState(TaskFlow.Action.craftParams);
@@ -170,7 +182,6 @@ export async function createPlan(agentObject){
     agentObject.maxLoops = agentObject.maxLoopBuffer + agentObject.plan.length;
     return;
 }
-
 
 async function performNextAction(agentObject){ 
     if (!agentObject.isRunning) {
@@ -183,9 +194,10 @@ async function performNextAction(agentObject){
     let nextAction = agentObject.getNextAction(); // {id: string, action: string, complete: bool, attempt: num, tool: string } 
     // catch null output
     if(nextAction == null){
-        // Flow to Craft Params / Tool Calling
+        // Flow to Finalise Output
         agentObject.setFlowState(TaskFlow.Stopped.FinalOutput);
         agentObject.TaskState.handoverMessage = "No actions needing complete - process final output.";
+        agentObject.TaskState.handoverData = [];
         return;
     }
 
@@ -202,6 +214,7 @@ async function performNextAction(agentObject){
             { role: Services.aiAgents.Constants.Roles.Tool, textData: "Re-planning tool has been called...", 
                 toolName: "rePlanTool", instructions: agentObject.phaseMessage, metadata: {actionID: nextAction.id }});
         agentObject.messageHistory.addMessage(msg);
+        return;
     }
 
     if(nextAction.tool == 'returnToUser'){ 
@@ -244,7 +257,7 @@ async function performNextAction(agentObject){
     // [][]  -- Craft Params -- [][]
     // [][]  ------------------ [][]
     let craftedParams = await agentObject.generateText(
-        Services.aiAgents.InputParse.parserPrompts.craftParams.sys,
+        `${Services.aiAgents.InputParse.parserPrompts.craftParams.sys} \n \n Additional Info (if any) : ${agentObject.healPrompt}`,
         Services.aiAgents.InputParse.parserPrompts.craftParams.usr(
             nextAction.action, 
             agentObject.getAllContextSummaryString(), 
@@ -282,6 +295,7 @@ async function performNextAction(agentObject){
         agentObject.setFlowState(TaskFlow.Stopped.Stopped);
         return;
     } 
+    agentObject.healPrompt = "";
     agentObject.emitUpdateStatus(`Using Tool: ${toolObj.value.details.toolName}`);
     console.log(`Calling tool ${toolObj.value.details.toolName}`);
     let toolCall = await Services.aiAgents.AgentHelpers.callAgentTool(
@@ -305,11 +319,10 @@ async function performNextAction(agentObject){
     // Flow to Tool Output Review
     agentObject.setFlowState(TaskFlow.Review.toolOutput);
     agentObject.TaskState.handoverMessage = `Tool ${toolObj.value.details.toolName} has completed and it's output is ready for review.`;
-    agentObject.TaskState.handoverData = [...toolCall.value];
+    agentObject.TaskState.handoverData = toolCall.value;
     agentObject.addToolCount(1);
     return;
 }
-
 
 async function messageUser(agentObject){
     // Send Messaage to user
@@ -317,7 +330,7 @@ async function messageUser(agentObject){
     let returnMessage = await agentObject.generateText(
         PromptsAndSchemas.returnMessage.sys,
             PromptsAndSchemas.returnMessage.usr(
-                hvrMsg,
+                `${hvrMsg} \n \n Additional Info (if any) : ${agentObject.healPrompt}`,
                 agentObject.messageHistory.getSimpleUserAgentComms(),
                 agentObject.getAllContextSummaryString,
                 JSON.stringify(agentObject.plan)
@@ -336,6 +349,7 @@ async function messageUser(agentObject){
     agentObject.messageHistory.addMessage(msg);
     agentObject.taskOutput.push(msg);
     // Flow to Complete - triggers emit final (task output)
+    agentObject.healPrompt = "";
     agentObject.setFlowState(TaskFlow.Stopped.Complete);
     agentObject.TaskState.handoverMessage = "";
     agentObject.TaskState.handoverData = [];
@@ -343,15 +357,16 @@ async function messageUser(agentObject){
 }
 
 async function reviewUserMessage(agentObject){
-
+    
     agentObject.emitUpdateStatus("Got your message..."); 
     // user message will have been added to message history by jobManager
     let convoHistory = agentObject.messageHistory.getSimpleUserAgentComms();
     let processUserMessage = await agentObject.generateText(
-            PromptsAndSchemas.reviewUserMsg.sys,
+            `${PromptsAndSchemas.reviewUserMsg.sys} \n \n Additional Info (if any) : ${agentObject.healPrompt}`,
             PromptsAndSchemas.reviewUserMsg.usr( convoHistory, JSON.stringify(agentObject.plan)),
             { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.reviewUserMsg.schema } 
     );
+    agentObject.healPrompt = "";
     if(processUserMessage.isErr()){
         // Flow to healing
         agentObject.setFlowState(TaskFlow.Healing.main);
@@ -440,7 +455,7 @@ async function reviewUserMessage(agentObject){
 }
 
 async function reviewToolOutput(agentObject){
-    
+    agentObject.healPrompt = "";
     if (!agentObject.isRunning) {
         agentObject.setFlowState(TaskFlow.Stopped.Stopped);
         return;
@@ -454,6 +469,14 @@ async function reviewToolOutput(agentObject){
         return;
     }
     let toolActionID = toolOutput[0]?.metadata?.actionID || null ;
+    if(toolActionID == null){
+        // Flow to healing
+        agentObject.setFlowState(TaskFlow.Healing.main);
+        agentObject.TaskState.handoverMessage = "Error : Review tool output. No ActionID found. Consider re-running action phase or route to final output.";
+        agentObject.TaskState.handoverData = [];
+        agentObject.errors.push("Error : Review tool output. No ActionID found. Consider re-running action phase");
+        return;  
+    }
 
     // Catch rePlan tool (skip review and go back to planning).. should never get here in normal circs. 
     if(toolOutput[0]?.toolName == 'rePlanTool' || toolOutput == []){
@@ -476,14 +499,6 @@ async function reviewToolOutput(agentObject){
     agentObject.emitUpdateStatus("Reviewing Tool Output... 🕵️🐝");
     // custom status & inProgress status handled here
     
-    if(toolActionID == null || toolActionID == undefined){
-        // Flow to healing
-        agentObject.setFlowState(TaskFlow.Healing.main);
-        agentObject.TaskState.handoverMessage = "Error : Review tool output. No ActionID found. Consider re-running action phase";
-        agentObject.TaskState.handoverData = [];
-        agentObject.errors.push("Error : Review tool output. No ActionID found. Consider re-running action phase");
-        return;  
-    }
     // get action & tool output needing reviewed 
     let actionObj = agentObject.fetchAction(toolActionID); // get the action from the plan
     if(actionObj == null ){
@@ -503,6 +518,7 @@ async function reviewToolOutput(agentObject){
         agentObject.setFlowState(TaskFlow.Action.callTool);
         agentObject.TaskState.handoverMessage = "";
         agentObject.TaskState.handoverData = [];
+        return;
     }
 
     let processedToolMessages = Services.aiAgents.AgentSharedServices.stripOutAudioAndImageData(toolOutput);
@@ -581,21 +597,12 @@ async function reviewToolOutput(agentObject){
         agentObject.TaskState.handoverData = [];
         return;
     }
-    // Action is complete 
+    // Action is complete - PROCESS TO CONTEXT 
     if(completeCheck.value.status == "COMPLETE"){   
-        // Flow to Tool OP Processing
-        agentObject.setFlowState(TaskFlow.Review.processContext);
-        agentObject.TaskState.handoverMessage = completeCheck.value; // { status: COMPLETE || INCOMPLETE, replan: true | false, feedback: string (optional) }
-        agentObject.TaskState.handoverData = toolOutput;
-        return;
-    }
-}
-
-async function processToolOutputToContext(agentObject){
-       // Process the tool output(s)
+        // Process the tool output(s)
         agentObject.emitUpdateStatus("Adding tool output to context...");
-        const reviewData = agentObject.TaskState.handoverData; //  { status: COMPLETE || INCOMPLETE, replan: true | false, feedback: string (optional) }
-        let processedToolOp = await agentObject.processToolOutput(agentObject.TaskState.handoverData); 
+        const reviewData = completeCheck.value; //  { status: COMPLETE || INCOMPLETE, replan: true | false, feedback: string (optional) }
+        let processedToolOp = await agentObject.processToolOutput(toolOutput); 
         if(processedToolOp.isErr()){ 
             // Flow to healing
             agentObject.setFlowState(TaskFlow.Healing.main);
@@ -636,20 +643,110 @@ async function processToolOutputToContext(agentObject){
         agentObject.setFlowState(TaskFlow.Action.callTool);
         agentObject.TaskState.handoverMessage = "";
         agentObject.TaskState.handoverData = [];
-        return;       
+        return;   
+    }
 }
 
+async function processFinalOutput(agentObject){
+    agentObject.healPrompt = "";
+    let saveFolder = agentObject.contextData.globalData.isProject 
+        ? agentObject.contextData.globalData.projectIndexUrl
+        : agentObject.contextData.globalData.workingDirectory;
+    let output =  await Services.aiAgents.AgentSharedServices.finialiseOutput(agentObject, saveFolder); // Finalises from context 
+    if(output.isErr()){ 
+        // Flow to healing
+        agentObject.setFlowState(TaskFlow.Healing.main);
+        agentObject.TaskState.handoverMessage = "Process Final Output has thrown an error. Consider re-running final output processing.";
+        agentObject.TaskState.handoverData = [];
+        agentObject.errors.push(`Error (processFinalOutput -> finialiseOutput ) : ${output.value}`);
+        return;          
+    }
+    agentObject.taskOutput = output.value;
+}
 
-// async function processFinalOutput(agentObject, actionReviewID){
+async function healing(agentObject){
+    agentObject.emitUpdateStatus("Entering healing phase... 🩹🐝");
+    let history = agentObject.TaskState.stateHistory;
+    let multiFail = hasFailedMultipleTimes(history);
+    if(multiFail){
+        // Flow to failed. 
+        agentObject.emitUpdateStatus("Healing has failed ☹️")
+        agentObject.setFlowState(TaskFlow.Stopped.Failed);
+        agentObject.TaskState.handoverMessage = "Healing process has failed.";
+        agentObject.TaskState.handoverData = [];
+        return;
+    }
 
-//             agentObject.isRunning = false;
-//         agentObject.phaseMessage = "";
-//         agentObject.setEndTime();
-//         let output =  await Services.aiAgents.AgentSharedServices.finialiseOutput(agentObject, saveFolder); // takes context to 
-//         if(output.isErr()){ 
-//             agentObject.errors.push(`Error: reviewAndReturn -> finaliseOutput 2 : ${output.value}`);
-//             return Services.v2Core.Helpers.Err(`Error: reviewAndReturn -> finaliseOutput 2 : ${output.value}`);
-//         }
-//         agentObject.taskOutput = output.value;
-//         agentObject.#setActionComplete(agentObject.actionReviewID);
-// }
+    // Consider the best option for healing the error 
+    const nextStep = await agentObject.generateText(
+        PromptsAndSchemas.healError.sys,
+        PromptsAndSchemas.healError.usr(
+            `Error details: ${agentObject.TaskState.handoverMessage} . Futher Data (if any): ${JSON.stringify(agentObject.TaskState.handoverData)}`,
+            JSON.stringify(agentObject.plan),
+            agentObject.task
+        ),
+        { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.planning.schema, quality: 3 } 
+    ) // { action: string, additionalPrompt: string}
+
+    // Set Flow Control 
+    agentObject.TaskState.handoverData = [];
+    agentObject.TaskState.handoverMessage = "";
+    this.healPrompt = nextStep.value.additionalPrompt;
+
+    switch (nextStep.value.action) {
+        case "Loading::main" :
+            agentObject.setFlowState(TaskFlow.Loading.main);
+            return;
+        case "Plan::createPlan" :
+            agentObject.setFlowState(TaskFlow.Plan.createPlan);
+            return;
+        case "Plan::rePlanning" :
+            agentObject.setFlowState(TaskFlow.Plan.rePlan);
+            return;
+        case "Action::callAgentTool" :
+            agentObject.setFlowState(TaskFlow.Action.callTool);
+            return; 
+        case "Action::messageUser" :
+            agentObject.setFlowState(TaskFlow.Action.messageUser);
+            return;
+        case "Review::newMessageFromUser" :
+            agentObject.setFlowState(TaskFlow.Review.newMessage);
+            return;
+        case "Review::toolOutput" :
+            agentObject.setFlowState(TaskFlow.Review.toolOutput);
+            return;
+        case "Review::contextProcessing" :
+            agentObject.setFlowState(TaskFlow.Review.processContext);
+            return;
+        case "Stopped::draftingFinalOutput" :
+            agentObject.setFlowState(TaskFlow.Stopped.FinalOutput);
+            return;
+        case "Stopped::failed" :
+            agentObject.setFlowState(TaskFlow.Stopped.Failed);
+            return;
+        default:
+            agentObject.setFlowState(TaskFlow.Stopped.Failed);
+            return;            
+    }
+}
+
+/**
+ * Checks if the last 6 elements of an array contain exactly 
+ * two unique strings, one of which must be 'Healing::main'.
+ * * @param {string[]} arr - The array of strings to check.
+ * @returns {boolean}
+ */
+function hasFailedMultipleTimes(arr) {
+  // Check if there are at least 6 entries
+  if (arr.length < 6) {
+    return false;
+  }
+  // Get the last 6 entries
+  const lastSix = arr.slice(-6);
+  // Determine unique strings using a Set
+  const uniqueStrings = new Set(lastSix);
+  // Validate requirements:
+  // - Must have exactly 2 unique strings
+  // - One of them must be 'Healing::main'
+  return uniqueStrings.size === 2 && uniqueStrings.has('Healing::main');
+}

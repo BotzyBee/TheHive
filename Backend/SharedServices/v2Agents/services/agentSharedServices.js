@@ -170,13 +170,10 @@ export async function finialiseOutput(agentObject, saveFolder){
       ),
       { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.outputOverview.schema } 
     ); // { outputPlan: [ {type: Enum, instructions: string, contextKey}... ] }
+    agentObject.addAiCount(1);
     if(outputOverview.isErr()){
-      agentObject.setFailed();
-      agentObject.isRunning = false;
       return Services.v2Core.Helpers.Err(`Error (finialiseOutput -> outputOverview ) : ${outputOverview.value}`)    
     } 
-
-    agentObject.addAiCount(1);
     let outputPlan = outputOverview.value.outputPlan || [];
     if(outputPlan.length == 0){
       return Services.v2Core.Helpers.Err(`Error (finialiseOutput -> outputOverview ) : Returned empty output plan!`); 
