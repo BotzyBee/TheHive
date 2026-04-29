@@ -676,6 +676,8 @@ export async function healing(agentObject){
         return;
     }
 
+    console.log(`Error details: ${agentObject.TaskState.handoverMessage} . Futher Data (if any): ${JSON.stringify(agentObject.TaskState.handoverData)}`)
+
     // Consider the best option for healing the error 
     const nextStep = await agentObject.generateText(
         PromptsAndSchemas.healError.sys,
@@ -686,7 +688,12 @@ export async function healing(agentObject){
         ),
         { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.planning.schema, quality: 3 } 
     ) // { action: string, additionalPrompt: string}
-
+    if(nextStep.isErr()){
+        console.log("Heal call failed to return any data");
+        agentObject.setFlowState(TaskFlow.Stopped.Failed);
+        return;
+    }
+    console.log("Healing output:: ", nextStep.value);
     // Set Flow Control 
     agentObject.TaskState.handoverData = [];
     agentObject.TaskState.handoverMessage = "";

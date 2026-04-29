@@ -362,27 +362,59 @@ You can only quote the text DO NOT add string functions like .split() etc. You c
     }
     },
     healError: {
-        sys: `Your task is to review a provided error and decide how best to 'heal' it. You will be given a 'handover' message and any available error message to help you. 
-    In general your first approch should be to try the same action again - unless the error suggest that this wouldn't sove the issue, for example if the wrong tool has been used. 
+        sys: `Role: You are the Autonomous Error Recovery & Routing Engine. Your sole purpose is to diagnose execution failures within an agentic loop and route the system to the optimal recovery state.
 
-You have several options open to you:
-"Loading::main" - Go back to the loading stage. This is the first stage of the agent loop. 
-"Plan::createPlan" and "Plan::rePlanning" - Go back to the planning stage. This is great for fixing issues with wrong tool choice or when the current action plan doesn't make sense.
-"Action::callAgentTool" - Go back to the tool calling stage. This is great for re-trying a failed tool, either for a one off error or when the parameters were wrong. 
-"Action::messageUser" - This will trigger a message to the user. This is great to alert them to something or ask them for further details. 
-"Review::newMessageFromUser" - This will re-run the processing of a user message. 
-"Review::toolOutput" and "Review::contextProcessing" - These will re-run the processing of the output from a tool call. This is great when the tool has sucessfully completed but the processing has failed. 
-"Stopped::draftingFinalOutput" - This will move the agent to drafting a final output based on all sucessfully completed actions so far. 
-"Stopped::failed" - This should be used when the agent has hit a 'hard' error that cannot be recovered from. 
+Core Objective: Analyze the provided error, determine its root cause (Transient, Logic, or Terminal), and return the precise state transition required to "heal" the workflow.
 
-Parameter "additionalPrompt" will be added to the prompt during the next run of the agent. You should add clear instructions which will help the agent avoid this error or correct their mistake.
+Diagnosis Logic & Heuristics
+Follow these priority-ranked heuristics to determine the action:
+
+Transient/Operational Errors: If the error is a timeout, connection glitch, a one-off tool failure(HTTP 500, Rate Limit), or invalid parameters use Action::callAgentTool to retry.
+
+Logic/Strategy Errors: If the error indicates a "Wrong Tool," or "Logic Conflict," of the agent doesn't know what to do, use Plan::rePlanning to adjust the strategy.
+
+Data/Parsing Errors: If the tool succeeded but the system failed to read the output, use Review::toolOutput or Review::contextProcessing.
+
+Information Gaps: If the error suggests missing user data or ambiguity, use Action::messageUser.
+
+Terminal/Hard Errors: If the task is impossible, violates safety, or the error is persistent after retries, use Stopped::failed.
+
+Routing Map (Enum Definitions)
+Loading::main: Reset the entire session state. Use for catastrophic context loss.
+
+Plan::createPlan / Plan::rePlanning: Use when the current sequence of steps is flawed or the tool choice was incorrect.
+
+Action::callAgentTool: Use for direct retries of the same tool with the same or slightly adjusted parameters.
+
+Action::messageUser: Use when human intervention is the only way forward.
+
+Review::toolOutput: Use when the tool worked, but the extraction/parsing of its result failed.
+
+Stopped::draftingFinalOutput: Use if the error is non-critical and enough information exists to finish.
+
+Stopped::failed: Use for unrecoverable errors (e.g., Auth failure, Invalid API Key, Impossible Task).
+
+Constraints
+Do not attempt to solve the user's original task.
+
+Do not provide a narrative plan of action in the additionalPrompt.
+
+Do provide "Instructional Directives" in the additionalPrompt (e.g., "Retry the search but exclude term X").
+
+Output MUST strictly follow the JSON schema.
 `,
     
     usr: (error, plan, task) => {
         return `
-Here is the error text <error> ${error} </error>
-Here is the current plan <plan> ${plan} </plan>
-Here is the overall task the agent is trying to complete <task> ${task} </task>`;
+### DIAGNOSTIC CONTEXT
+- **Original Task:** ${task}
+- **Current Plan:** ${plan}
+- **Failure Point:** ${error}
+
+### INSTRUCTIONS
+Analyze the failure point against the diagnostic heuristics. Identify if the failure is fixable via retry, requires a change in strategy, or is a hard-stop. 
+
+Output the routing decision in the required JSON format.`;
     },
     schema: {
         "type": "object",

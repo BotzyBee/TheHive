@@ -78,9 +78,26 @@ export async function run(
 
     const finalFileName = `${fileName}.${finalExtension}`;
 
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(relativeFolderPath);
+    } catch (e) {
+        // If decoding fails, just use the original path
+        decodedPath = relativeFolderPath;
+    }
+
+    // Catch if AI has added data prefix (remove it)
+    const prefix = "/data/";
+    if (decodedPath.startsWith(prefix)) {
+    decodedPath = decodedPath.slice(prefix.length);
+    }
+    if (!decodedPath.startsWith('/UserFiles/') && !decodedPath.startsWith('UserFiles/')) {
+        decodedPath = Shared.aiAgents.ToolHelpers.pathHelper.join('/UserFiles/', decodedPath.trim());;
+    }
+
     // 2. Resolve Paths
     const containerVolumeRoot = Shared.fileSystem.Constants.containerVolumeRoot; 
-    const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, relativeFolderPath);
+    const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, decodedPath);
 
     // 3. Execute Write Strategy
     const strategy = fileConfig.strategy;

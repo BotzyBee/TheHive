@@ -13,35 +13,38 @@ export const details = {
     +"Important: Only use this tool when the user explicitly requests in-depth research. For general questions, use the standard web search tool or other lighter tools.",
     guide: "Provide as much detail as possible in the 'topic' input. The tool will handle the rest, but clearer input can lead to better results. The JobID can be found in global context data.",
     inputSchema: {
-    "type": "object",
-    "properties": {
-        "topic": {
-        "type": "string",
-        "description": "The main topic or question to research."
+        "type": "object",
+        "properties": {
+            "questions": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                },
+                "description": "The main topics or questions to research."
+            },
+            "breadth": {
+                "type": "number",
+                "description": "Number of top questions to consider for research. Defaults to 1.",
+                "minimum": 1,
+                "default": 1
+            },
+            "savePath": {
+                "type": "string",
+                "description": "Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/'"
+            },
+            "scopeSources": {
+                "type": "boolean",
+                "default": true,
+                "description": "If true, the tool will perform additional searches to locate the best sources."
+            }
         },
-        "breadth": {
-        "type": "number",
-        "description": "Number of top questions to consider for research. Defaults to 1.",
-        "minimum": 1,
-        "default": 1
-        },
-        "savePath": {
-        "type": "string",
-        "description": "Relative path to save the final report. Defaults to 'UserFiles/CompletedResearch/' ",
-        },
-        "scopeSources": {
-        "type": "boolean",
-        "default": true,
-        "description": "If true, the tool will perform additional searches to locate the best sources."
-        }
-    },
-    "required": [
-        "topic",
-        "breadth",
-        "savePath",
-        "scopeSources"
-    ],
-    "additionalProperties": false
+        "required": [
+            "questions",
+            "breadth",
+            "savePath",
+            "scopeSources"
+        ],
+        "additionalProperties": false
     }
 };
 
@@ -254,7 +257,7 @@ let RESEARCH_CHUNKS = []; // Global array to hold all research chunks for the en
  */
 export async function run(Shared, params = {}, agent = {}) {
     stats.aiCount = 0; // Reset AI call count at the start of each run.
-    const { topic, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID, scopeSources = true } = params;
+    const { questions, breadth = 1, savePath = "UserFiles/CompletedResearch/", jobID, scopeSources = true } = params;
     const { aiSettings = {} } = agent || {};
     
     // Set minimum quality level for this tool. 
@@ -262,26 +265,26 @@ export async function run(Shared, params = {}, agent = {}) {
         if(aiSettings.quality < 2) aiSettings.quality = 2;
     }
     
-    if (!topic || typeof topic !== 'string') {
-        return Shared.v2Core.Helpers.Err("Error (deepResearchTool) requires a valid 'topic' string.");
-    }
+    // if (!topic || typeof topic !== 'string') {
+    //     return Shared.v2Core.Helpers.Err("Error (deepResearchTool) requires a valid 'topic' string.");
+    // }
 
     // [][] ----- RESEARCH PHASE ------ [][]
     // Scope the topic, find best questions and sources to research.
-    safeEmit(agent, `Scoping research task and gathering sources - 🤖🐝`);
-    let scoping = await scopeTopic(Shared, topic, breadth, aiSettings, scopeSources); 
-    if (scoping.isErr()){ return Shared.v2Core.Helpers.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
-    let firstChunk = new ResearchChunk();
-    firstChunk.output = scoping.value.terms;
-    RESEARCH_CHUNKS.push(firstChunk); // Store scoped terms as the first research chunk.
+    // safeEmit(agent, `Scoping research task and gathering sources - 🤖🐝`);
+    // let scoping = await scopeTopic(Shared, topic, breadth, aiSettings, scopeSources); 
+    // if (scoping.isErr()){ return Shared.v2Core.Helpers.Err(`Error (deepResearchTool) in run -> scopeTopic : ${scoping.value}`)}
+    // let firstChunk = new ResearchChunk();
+    // firstChunk.output = scoping.value.terms;
+    // RESEARCH_CHUNKS.push(firstChunk); // Store scoped terms as the first research chunk.
 
     //Loop through the top questions and conduct research, iteratively building context and learnings.
-    let questionLength = scoping.value.questions.length ?? 0;
+    let questionLength = questions.length ?? 0;
     for (let i = 0; i < questionLength; i++) {
-        let question = scoping.value.questions[i];
+        let question = questions[i];
         let chunk = new ResearchChunk({ Shared: Shared, question: question, aiSettings });
         safeEmit(agent, `Conducting research for question ${i + 1}/${questionLength} - 🤖🐝`);
-        await chunk.getInitialResearch(scoping.value.sources);
+        await chunk.getInitialResearch();
         safeEmit(agent, `Doing a little fact checking 🕵️`);
         await chunk.factCheckClaims();
         safeEmit(agent, `Finalising research chunk ⚙️`);
@@ -303,103 +306,122 @@ export async function run(Shared, params = {}, agent = {}) {
         console.log(`Completed research for question ${i + 1}/${questionLength}`);
     }
 
-    // [][] ----- WRITING PHASE - CREATE REPORT PLAN ------ [][]
-    // Create a final report plan (layout, sections, structure) based on the research chunks and user task.
-    let callAI = await Shared.callAI.aiFactory();
-    let chunkLength = RESEARCH_CHUNKS.length ?? 0;
-    // reverse order as first chunk is just definitions and terms.
-    let latestPlan = ""; 
-    safeEmit(agent, `Starting writing phase - creating report plan 🤖🐝`);
-    let chunk = 1;
-    for (let i = chunkLength - 1; i >= 0; i--){
-        safeEmit(agent, `Generating report plan based on research chunk ${chunk}/${chunkLength}`);
-        let planCall = await callAI.generateText(
-            PromptsAndSchemas.reportPlan.sys,
-            PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
-            {...aiSettings}
-        );
-        if (planCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> reportPlan : ${planCall.value}`)}
-        stats.aiCount += 1;
-        latestPlan = planCall.value; // Update the latest plan with the current plan call result
-        chunk++;
-    }
-    // turn plan into array of actions
-    let planArray = [];
-    let planArrayCall = await callAI.generateText(
-        PromptsAndSchemas.planArray.sys,
-        PromptsAndSchemas.planArray.usr(latestPlan),
-        { ...aiSettings, structuredOutput: PromptsAndSchemas.planArray.schema }
-    );
-    if (planArrayCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> planArray : ${planArrayCall.value}`)}
-    planArray = planArrayCall.value.sections;
+    // // [][] ----- WRITING PHASE - CREATE REPORT PLAN ------ [][]
+    // // Create a final report plan (layout, sections, structure) based on the research chunks and user task.
+    // let callAI = await Shared.callAI.aiFactory();
+    // let chunkLength = RESEARCH_CHUNKS.length ?? 0;
+    // // reverse order as first chunk is just definitions and terms.
+    // let latestPlan = ""; 
+    // safeEmit(agent, `Starting writing phase - creating report plan 🤖🐝`);
+    // let chunk = 1;
+    // for (let i = chunkLength - 1; i >= 0; i--){
+    //     safeEmit(agent, `Generating report plan based on research chunk ${chunk}/${chunkLength}`);
+    //     let planCall;
+    //     // Retry on fail..
+    //     for(let k = 0; k<2; k++){
+    //         planCall = await callAI.generateText(
+    //             PromptsAndSchemas.reportPlan.sys,
+    //             PromptsAndSchemas.reportPlan.usr(topic, RESEARCH_CHUNKS[i].output, latestPlan),
+    //             {...aiSettings}
+    //         );
+    //         if(planCall.isOk()) break;
+    //         stats.aiCount += 1;
+    //     }
+    //     if (planCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> reportPlan : ${planCall.value}`)}
+    //     latestPlan = planCall.value; // Update the latest plan with the current plan call result
+    //     chunk++;
+    // }
+    // // turn plan into array of actions
+    // let planArray = [];
+    // let planArrayCall = await callAI.generateText(
+    //     PromptsAndSchemas.planArray.sys,
+    //     PromptsAndSchemas.planArray.usr(latestPlan),
+    //     { ...aiSettings, structuredOutput: PromptsAndSchemas.planArray.schema }
+    // );
+    // if (planArrayCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> planArray : ${planArrayCall.value}`)}
+    // planArray = planArrayCall.value.sections;
      
-    // [][] ----- WRITING PHASE - CREATE EACH SECTION ------ [][]
+    // // [][] ----- WRITING PHASE - CREATE EACH SECTION ------ [][]
 
-    let latestReport = ""; // Start with the title/ head.
-    let planLen = planArray.length ?? 0;
-    // combine research chunks
-    let combinedResearch = RESEARCH_CHUNKS.map(c => c.output).join(`\n \n`);
-    for(let i=0; i<planLen; i++){
-         safeEmit(agent, `Writing report section for section ${i + 1}/${planLen} ⌨️🐝`);
-        let sectionCall = await callAI.generateText(
-            PromptsAndSchemas.writeSection.sys,
-            PromptsAndSchemas.writeSection.usr(planArray[i], combinedResearch, latestReport),
-            {...aiSettings}
-        ); // Returns the text for this section of the report.
-        if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> writeSection : ${sectionCall.value}`)}
-        stats.aiCount += 1;
-        latestReport += `\n \n ${sectionCall.value}`; // Append each section to build the full report.
-    }
+    // let latestReport = ""; // Start with the title/ head.
+    // let planLen = planArray.length ?? 0;
+    // // combine research chunks
+    // let combinedResearch = RESEARCH_CHUNKS.map(c => c.output).join(`\n \n`);
+    // for(let i=0; i<planLen; i++){
+    //      safeEmit(agent, `Writing report section for section ${i + 1}/${planLen} ⌨️🐝`);
+    //     let sectionCall;
+    //     // retry on fail.
+    //     for(let k = 0; k<2; k++){
+    //         sectionCall = await callAI.generateText(
+    //             PromptsAndSchemas.writeSection.sys,
+    //             PromptsAndSchemas.writeSection.usr(planArray[i], combinedResearch, latestReport),
+    //             {...aiSettings}
+    //         ); // Returns the text for this section of the report.
+    //         stats.aiCount += 1;
+    //         if(sectionCall.isOk()) break;
+    //     }
+    //     if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> writeSection : ${sectionCall.value}`)}
+    //     latestReport += `\n \n ${sectionCall.value}`; // Append each section to build the full report.
+    // }
     
-    // Final Review and Polishing (1)
-    for(let i=0; i<3; i++){ // Run 3 loops of review and polish to ensure quality and coherence.
-        console.log(`Final review loop ${i + 1}/3`);
-        safeEmit(agent, `Final review and polish of the report - loop ${i + 1}/3 🛠️🐝`);
-        let sectionCall = await callAI.generateText(
-            PromptsAndSchemas.finalCheck.sys,
-            PromptsAndSchemas.finalCheck.usr(latestReport),
-            { ...aiSettings, structuredOutput: PromptsAndSchemas.finalCheck.schema }
-        ); // Returns a prompt for final edits and polishing.
-        if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> finalCheck : ${sectionCall.value}`)}
-        stats.aiCount += 1;
-        let editLen = sectionCall.value.edits.length ?? 0;
-        if (editLen === 0) break;
-        console.log(`Performing final edit and polish of the report.`);
+    // // Final Review and Polishing (1)
+    // for(let i=0; i<3; i++){ // Run 3 loops of review and polish to ensure quality and coherence.
+    //     console.log(`Final review loop ${i + 1}/3`);
+    //     safeEmit(agent, `Final review and polish of the report - loop ${i + 1}/3 🛠️🐝`);
+    //     // retry on fail
+    //     let sectionCall
+    //     for(let k = 0; k<2; k++){
+    //         sectionCall = await callAI.generateText(
+    //             PromptsAndSchemas.finalCheck.sys,
+    //             PromptsAndSchemas.finalCheck.usr(latestReport),
+    //             { ...aiSettings, structuredOutput: PromptsAndSchemas.finalCheck.schema }
+    //         ); // Returns a prompt for final edits and polishing.
+    //         stats.aiCount += 1;
+    //         if(sectionCall.isOk()) break;
+    //     }
+    //     if (sectionCall.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> finalCheck : ${sectionCall.value}`)}
+    //     let editLen = sectionCall.value.edits.length ?? 0;
+    //     if (editLen === 0) break;
+    //     console.log(`Performing final edit and polish of the report.`);
 
-        // Conduct Edits (2)
-        for(let j=0; j<editLen; j++){
-            let polishPrompt = sectionCall.value.edits[j];    
-            let editAgent = await Shared.aiAgents.AgentTools.superEditor.run(
-                Shared,
-                { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" },
-                agent
-            ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
-            if (editAgent.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> superEditor : ${editAgent.value}`)}
-            latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
-            stats.aiCount += 1; // add ai calls from edit agent.
-        }// j
-    }// i 
+    //     // Conduct Edits (2)
+    //     for(let j=0; j<editLen; j++){
+    //         let polishPrompt = sectionCall.value.edits[j]; 
+    //         let editAgent;
+    //         for(let k = 0; k<2; k++){
+    //             editAgent = await Shared.aiAgents.AgentTools.superEditor.run(
+    //                 Shared,
+    //                 { prompt: PromptsAndSchemas.editAgentPrompt.prompt(polishPrompt), document: latestReport, context: "" },
+    //                 agent
+    //             ); // Returns DataMessage with data : { success, editedDocument , textualDiff , chunksProcessed , timestamp }
+    //             stats.aiCount += 1;
+    //             if(editAgent.isOk()) break;
+    //         }//k 
+    //         if (editAgent.isErr()){ return Shared.v2Core.Helpers.Err(`Error in run -> superEditor : ${editAgent.value}`)}
+    //         latestReport = editAgent.value[0].data.editedDocument; // Update the latest report with the edited document from the superEditor tool.
+    //     }// j
+    // }// i 
     
-    // [][] ----- WRITING PHASE - MANAGE REFERENCES ------ [][]
+    // // [][] ----- WRITING PHASE - MANAGE REFERENCES ------ [][]
     
-    // Merge all references
-    safeEmit(agent, `Adding references.. almost done! 🏁🐝`);
-    let allRefChunks = [];
-    for(let chunk of RESEARCH_CHUNKS){
-        allRefChunks.push(chunk.mergeAllReferences());
-    }
-    let processedReferences = processReferences(latestReport, allRefChunks ); // returns { updatedText, referenceList }
-    let finalReport = finalFormatting(
-        planArrayCall.value.reportTitle, 
-        processedReferences.updatedText, 
-        processedReferences.referenceList
-    );
+    // // Merge all references
+    // safeEmit(agent, `Adding references.. almost done! 🏁🐝`);
+    // let allRefChunks = [];
+    // for(let chunk of RESEARCH_CHUNKS){
+    //     allRefChunks.push(chunk.mergeAllReferences());
+    // }
+    // let processedReferences = processReferences(latestReport, allRefChunks ); // returns { updatedText, referenceList }
+    // let finalReport = finalFormatting(
+    //     planArrayCall.value.reportTitle, 
+    //     processedReferences.updatedText, 
+    //     processedReferences.referenceList
+    // );
 
-    const containerVolumeRoot = Shared.fileSystem.Constants.containerVolumeRoot; 
-    //Construct the full path and save the content
+    // const containerVolumeRoot = Shared.fileSystem.Constants.containerVolumeRoot; 
+    // //Construct the full path and save the content
 
-    const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, savePath);
-    await Shared.fileSystem.CRUD.saveFile(targetDirectoryInContainer, finalReport, `Final_Report_${jobID || Date.now()}.txt`);
+    // const targetDirectoryInContainer = Shared.aiAgents.ToolHelpers.pathHelper.join(containerVolumeRoot, savePath);
+    // await Shared.fileSystem.CRUD.saveFile(targetDirectoryInContainer, finalReport, `Final_Report_${jobID || Date.now()}.txt`);
 
     if (agent && typeof agent.addAiCount === 'function') {
        agent.addAiCount(stats.aiCount);
@@ -409,9 +431,9 @@ export async function run(Shared, params = {}, agent = {}) {
         role: Shared.aiAgents.Constants.Roles.Tool, 
         mimeType: "text/markdown",
         ext: "md", 
-        textData: finalReport,
+        textData: `The Deep Research Tool has completed - files have been saved to: UserFiles/deepResearchTool/${agent.id} `,//finalReport,
         toolName: "deepResearchTool",
-        instructions: `Deep research has completed on the topic: "${topic}". The final report has been saved to ${savePath} with the filename "Final_Report_${jobID || Date.now()}.txt". The report includes detailed research findings, structured sections, and a reference list.`
+        instructions: `Conduct research on the user's questions.`
     });
     return Shared.v2Core.Helpers.Ok([message]);
 }

@@ -54,6 +54,9 @@ export async function run(
     if (decodedPath.startsWith(prefix)) {
     decodedPath = decodedPath.slice(prefix.length);
     }
+    if (!decodedPath.startsWith('/UserFiles/') && !decodedPath.startsWith('UserFiles/')) {
+        decodedPath = Shared.aiAgents.ToolHelpers.pathHelper.join('/UserFiles/', decodedPath.trim());;
+    }
 
     const root = Shared.fileSystem.Constants.containerVolumeRoot 
     const targetURL = Shared.aiAgents.ToolHelpers.pathHelper.join(root, decodedPath.trim());

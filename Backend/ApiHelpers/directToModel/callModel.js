@@ -32,7 +32,7 @@ export async function directToModel(userQuery, aiSettings, webGrounding, socketI
         }
         return 
     } catch (error) {
-        emitToSocket(socketID, "direct_to_model_response", { outcome: "Error", value: error});
+        emitToSocket({sockedId: socketID, event: "direct_to_model_response",  data: { outcome: "Error", value: error}});
         return
     }
 }
