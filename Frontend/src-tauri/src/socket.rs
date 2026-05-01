@@ -205,7 +205,7 @@ pub fn start_socket() {
                         // Store the connected client using async lock
                         let mut lock = socket_state_clone.lock().await;
                         *lock = Some(socket);
-                        println!("Socket.io connected successfully.");
+                        //println!("Socket.io connected successfully.");
                     }
                     Err(e) => {
                         eprintln!("Socket.io connection failed: {}", e);

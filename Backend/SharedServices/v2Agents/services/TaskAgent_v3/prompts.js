@@ -380,28 +380,28 @@ Information Gaps: If the error suggests missing user data or ambiguity, use Acti
 Terminal/Hard Errors: If the task is impossible, violates safety, or the error is persistent after retries, use Stopped::failed.
 
 Routing Map (Enum Definitions)
-Loading::main: Reset the entire session state. Use for catastrophic context loss.
+Loading_main: Reset the entire session state. Use for catastrophic context loss.
 
-Plan::createPlan / Plan::rePlanning: Use when the current sequence of steps is flawed or the tool choice was incorrect.
+Plan_createPlan / Plan::rePlanning: Use when the current sequence of steps is flawed or the tool choice was incorrect.
 
-Action::callAgentTool: Use for direct retries of the same tool with the same or slightly adjusted parameters.
+Action_callAgentTool: Use for direct retries of the same tool with the same or slightly adjusted parameters.
 
-Action::messageUser: Use when human intervention is the only way forward.
+Action_messageUser: Use when human intervention is the only way forward.
 
-Review::toolOutput: Use when the tool worked, but the extraction/parsing of its result failed.
+Review_toolOutput: Use when the tool worked, but the extraction/parsing of its result failed.
 
-Stopped::draftingFinalOutput: Use if the error is non-critical and enough information exists to finish.
+Stopped_draftingFinalOutput: Use if the error is non-critical and enough information exists to finish.
 
-Stopped::failed: Use for unrecoverable errors (e.g., Auth failure, Invalid API Key, Impossible Task).
+Stopped_failed: Use for unrecoverable errors (e.g., Auth failure, Invalid API Key, Impossible Task).
 
 Constraints
 Do not attempt to solve the user's original task.
 
-Do not provide a narrative plan of action in the additionalPrompt.
-
 Do provide "Instructional Directives" in the additionalPrompt (e.g., "Retry the search but exclude term X").
 
-Output MUST strictly follow the JSON schema.
+Output MUST strictly follow the JSON schema. 
+
+# THIS IS VERY IMPORTANT - The output for the 'nextPhase' field should only be one of the provided JSON enums. For example 'Loading_main' . DO NOT output anything other than the enums here!!
 `,
     
     usr: (error, plan, task) => {
@@ -414,45 +414,32 @@ Output MUST strictly follow the JSON schema.
 ### INSTRUCTIONS
 Analyze the failure point against the diagnostic heuristics. Identify if the failure is fixable via retry, requires a change in strategy, or is a hard-stop. 
 
-Output the routing decision in the required JSON format.`;
+# THIS IS VERY IMPORTANT - The output for the 'nextPhase' field should only be one of the provided JSON enums. For example 'Loading_main' . DO NOT output anything other than the enums here!!`;
     },
     schema: {
         "type": "object",
-        "description": "An object for returning the next action to take and suitable prompt",
+        "description": "An object for selecting the next phase to run.",
         "properties": {
-            "action": {
+            "nextPhase": {
             "type": "string",
             "enum": [
-                "Loading::main", 
-                "Plan::createPlan", 
-                "Plan::rePlanning", 
-                "Action::callAgentTool", 
-                "Action::messageUser", 
-                "Review::newMessageFromUser", 
-                "Review::toolOutput", 
-                "Review::contextProcessing", 
-                "Stopped::draftingFinalOutput", 
-                "Stopped::failed"
+                "Loading_main", 
+                "Plan_createPlan", 
+                "Plan_rePlanning", 
+                "Action_callAgentTool", 
+                "Action_messageUser", 
+                "Review_newMessageFromUser", 
+                "Review_toolOutput", 
+                "Review_contextProcessing", 
+                "Stopped_draftingFinalOutput", 
+                "Stopped_failed"
             ]
             },
             "additionalPrompt": {
             "type": "string"
             }
         },
-        "required": ["action", "additionalPrompt"]
+        "required": ["nextPhase", "additionalPrompt"]
         }
     },
-}
-
-export const TaskFlow = {
-    Stopped: {
-        Failed: "Stopped::failed",
-        AwaitUser: "Stopped::awaitingUser",
-        Stopped: "Stopped:stoppedByUser",
-        FinalOutput: "Stopped::draftingFinalOutput",
-        Complete: "Stopped::complete"
-    },
-    Healing: {
-        main: "Healing::main" // using main as default is a reserved word.
-    }
 }

@@ -60,6 +60,7 @@
     function refreshData() {
         modelsPromise = getModels().then(data => {
             groupedModels = data;
+            console.log(groupedModels);
             return groupedModels;
         });
     }
@@ -236,7 +237,7 @@
                                                     <div class="flex flex-wrap gap-1.5">
                                                         {#each model.capabilities as cap}
                                                             <span class="text-[11px] px-2.5 py-1 capabilities-list rounded-md border border-blue-100 font-medium">
-                                                                {getCapabilityLabel(cap)}
+                                                                {cap}
                                                             </span>
                                                         {/each}
                                                     </div>
@@ -314,7 +315,7 @@
                                 <label class="flex items-center p-3 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:bg-blue-50 has-[:checked]:border-blue-200">
                                     <input 
                                         type="checkbox" 
-                                        value={cap.id} 
+                                        value={cap.label} 
                                         bind:group={formData.capabilities} 
                                         class="w-4 h-4 text-[#0098ac] border-slate-300 rounded focus:ring-[#0098ac]"
                                     >

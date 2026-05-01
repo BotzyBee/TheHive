@@ -219,7 +219,7 @@ export class QuickAskAgent extends AiJob {
 
       // Finalise output
       this.emitUpdateStatus('Task Completed - Finalising Output...');
-      let formattedOP = await Services.aiAgents.AgentSharedServices.finialiseOutput(this, 'UserFiles/QuickAskOutputs');
+      let formattedOP = await Services.aiAgents.AgentSharedServices.finialiseOutput(this, 'UserFiles/BotzysFiles/QuickAskOutputs');
       if( formattedOP.isErr()){
         this.setFailed();
         this.isRunning = false;
@@ -236,7 +236,7 @@ export class QuickAskAgent extends AiJob {
       // Write output for debugging.
       this.debugParams = []; // reset debug params
       this.stats.loopNumber += 1;
-      const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
+      const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/BotzysFiles/TestJobs/');
       await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
       
       // Emit final message with output and stats

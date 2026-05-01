@@ -9,7 +9,7 @@
         if (browser) {
             // Setup / Connect all socket routes.
             for(let i=0; i<socketRoutes.length ?? 0; i++){
-                console.log("Setting Up : ", socketRoutes[i])
+                //console.log("Setting Up : ", socketRoutes[i])
                 const chatSocket = sockets[socketRoutes[i]];
                 chatSocket.connect();
             }

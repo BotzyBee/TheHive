@@ -15,9 +15,9 @@ export const AiQuality = Object.freeze({
   Pro: 3,
 });
 export const ModelTypes = Object.freeze({
-  text: 'text',
-  image: 'image',
-  code: 'code',
+  text: 'Text',
+  image: 'Image',
+  code: 'Code',
   textToSpeech: 'Text to Speech',
   speechToText: 'Speech to Text',
   local: 'Runs Locally',
@@ -217,7 +217,6 @@ export const MODEL_REGISTRY = [
     provider: AiProviders.deepseek,
     capabilities: [
       ModelTypes.text,
-      ModelTypes.structuredOutputs,
       ModelTypes.code
     ],
     maxContext: 1000000,

@@ -686,8 +686,8 @@ export async function healing(agentObject){
             JSON.stringify(agentObject.plan),
             agentObject.task
         ),
-        { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.planning.schema, quality: 3 } 
-    ) // { action: string, additionalPrompt: string}
+        { ...agentObject.aiSettings, structuredOutput: PromptsAndSchemas.healError.schema, quality: 3 } 
+    ) // { nextPhase: string, additionalPrompt: string}
     if(nextStep.isErr()){
         console.log("Heal call failed to return any data");
         agentObject.setFlowState(TaskFlow.Stopped.Failed);
@@ -699,35 +699,35 @@ export async function healing(agentObject){
     agentObject.TaskState.handoverMessage = "";
     agentObject.healPrompt = nextStep.value.additionalPrompt;
 
-    switch (nextStep.value.action) {
-        case "Loading::main" :
+    switch (nextStep.value.nextPhase) {
+        case "Loading_main" :
             agentObject.setFlowState(TaskFlow.Loading.main);
             return;
-        case "Plan::createPlan" :
+        case "Plan_createPlan" :
             agentObject.setFlowState(TaskFlow.Plan.createPlan);
             return;
-        case "Plan::rePlanning" :
+        case "Plan_rePlanning" :
             agentObject.setFlowState(TaskFlow.Plan.rePlan);
             return;
-        case "Action::callAgentTool" :
+        case "Action_callAgentTool" :
             agentObject.setFlowState(TaskFlow.Action.callTool);
             return; 
-        case "Action::messageUser" :
+        case "Action_messageUser" :
             agentObject.setFlowState(TaskFlow.Action.messageUser);
             return;
-        case "Review::newMessageFromUser" :
+        case "Review_newMessageFromUser" :
             agentObject.setFlowState(TaskFlow.Review.newMessage);
             return;
-        case "Review::toolOutput" :
+        case "Review_toolOutput" :
             agentObject.setFlowState(TaskFlow.Review.toolOutput);
             return;
-        case "Review::contextProcessing" :
+        case "Review_contextProcessing" :
             agentObject.setFlowState(TaskFlow.Review.processContext);
             return;
-        case "Stopped::draftingFinalOutput" :
+        case "Stopped_draftingFinalOutput" :
             agentObject.setFlowState(TaskFlow.Stopped.FinalOutput);
             return;
-        case "Stopped::failed" :
+        case "Stopped_failed" :
             agentObject.setFlowState(TaskFlow.Stopped.Failed);
             return;
         default:

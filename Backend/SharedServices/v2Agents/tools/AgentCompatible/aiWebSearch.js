@@ -117,15 +117,17 @@ export async function run(
  * @param {string[]} linksArray - Array of URL strings.
  * @returns {object} { text: string, references: object[] }
  */
-function transformReferences(Shared, inputText, linksArray) {
+function transformReferences(Shared, inputText, linksArray = []) {
   // Map the original URLs to their new unique reference IDs
   // We do this first so we have a lookup table for the text replacement
-  const updatedReferences = linksArray.map((url) => {
-    return {
-      ref: Shared.v2Core.Utils.generateSimpleRef(4),
-      url: url
-    };
-  });
+  if(linksArray.length != 0){
+      const updatedReferences = linksArray.map((url) => {
+        return {
+        ref: Shared.v2Core.Utils.generateSimpleRef(4),
+        url: url
+        };
+    });
+ 
 
   // Use regex to find all [number] patterns in the text
   // \d+ matches one or more digits inside literal square brackets
@@ -142,8 +144,15 @@ function transformReferences(Shared, inputText, linksArray) {
     return match;
   });
 
-  return {
-    text: updatedText,
-    references: updatedReferences
-  };
+    return {
+        text: updatedText,
+        references: updatedReferences
+    };
+
+    } else {
+        return {
+        text: inputText,
+        references: []
+        };
+    }
 }

@@ -18,7 +18,7 @@ export class TaskAgent extends AiJob {
             task = "", 
             aiSettings = {}, 
             toolRetryCount = 1,
-            maxLoopBuffer = 5,
+            maxLoopBuffer = 20,
             summaryDataSizeThreshold = 500,
             socketId = null,
             emitFunction = null,
@@ -263,11 +263,14 @@ export class TaskAgent extends AiJob {
                     // [][] -- STOPPED STATES -- [][]
                     case TaskFlow.Stopped.Failed:
                         this.isRunning = false;
+                        const targetDirectoryInContainer1 = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/BotzysFiles/FailedJobs/');
+                        await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer1, JSON.stringify(this, null, 2), `${this.id}_Failed.txt`);
                         this.emitFailed();
                     break;
                     case TaskFlow.Stopped.AwaitUser:
                     case TaskFlow.Stopped.Stopped:
                         this.isRunning = false;
+                        await endActions(this);
                         return Services.v2Core.Helpers.Ok("Task Agent Has Stopped");;
                     case TaskFlow.Stopped.FinalOutput:
                         this.emitUpdateStatus('Creating Final Output...');
@@ -276,6 +279,7 @@ export class TaskAgent extends AiJob {
                     case TaskFlow.Stopped.Complete:
                         this.isRunning = false;
                         this.emitFinalResult();
+                        await endActions(this);
                         return Services.v2Core.Helpers.Ok("Task Agent Run Complete");; 
                     
                     // [][] -- HEALING / FIXES -- [][]
@@ -284,7 +288,9 @@ export class TaskAgent extends AiJob {
                     break;
 
                     case undefined :
-                        console.log("DANG.. it's gone and broken!") 
+                        console.log("DANG.. it's gone and broken!")
+                        const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/BotzysFiles/FailedJobs/');
+                        await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}_Failed.txt`);
                         return;
                 }// end switch
 
@@ -297,6 +303,7 @@ export class TaskAgent extends AiJob {
                     console.log(e);
                     this.status.setMaxLoopsHit()
                     this.emitFailed();
+                    await endActions(this);
                     return Services.v2Core.Helpers.Err(`Error (Task Agent) : ${e}`);
                 }
                 this.addLoopCount(1);
@@ -305,12 +312,13 @@ export class TaskAgent extends AiJob {
             console.log("MAJOR ERROR :: ", error);
         }
        
-
-    this.setEndTime();
-    this.debugParams = [];
-    const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/TestJobs/');
-    await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(this, null, 2), `${this.id}.txt`);
     return Services.v2Core.Helpers.Ok("Task Agent Run Complete");
     }// end run
 }// end Task Agent
 
+async function endActions(agentObject){
+    agentObject.setEndTime();
+    agentObject.debugParams = [];
+    const targetDirectoryInContainer = path.join(Services.fileSystem.Constants.containerVolumeRoot, 'UserFiles/BotzysFiles/TestJobs/');
+    await Services.fileSystem.CRUD.saveFile(targetDirectoryInContainer, JSON.stringify(agentObject, null, 2), `${agentObject.id}.txt`);
+}

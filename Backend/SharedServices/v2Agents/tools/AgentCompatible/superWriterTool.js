@@ -91,7 +91,7 @@ export async function run(Shared, params = {}, agent = {}) {
                 }
                 
                 workingDocument = draftCall.value;
-                aiCount++;
+                aiCount += 1;
             }
 
             // Structuring the edit plan ensures the LLM tackles revisions sequentially and logically, 
@@ -131,7 +131,7 @@ export async function run(Shared, params = {}, agent = {}) {
             if (editPlanCall.isErr()) {
                 return Shared.v2Core.Helpers.Err(`Error (superWriterTool -> Edit Plan) : ${editPlanCall.value}`);
             }
-            aiCount++;
+            aiCount +=1;
 
             const edits = editPlanCall.value.edits || [];
 

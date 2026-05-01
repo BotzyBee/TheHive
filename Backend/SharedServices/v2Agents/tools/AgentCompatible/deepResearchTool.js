@@ -299,7 +299,7 @@ export async function run(Shared, params = {}, agent = {}) {
             {
                 relativeFolderPath: `UserFiles/deepResearchTool/${agent.id}`,
                 fileContent: saveContent,
-                fileName: `Research_Chunk_${i+1}`,
+                fileName: `Chunk_${i+1}_${Date.now()}`,
                 ext: 'txt'
             }
         );
@@ -427,15 +427,20 @@ export async function run(Shared, params = {}, agent = {}) {
        agent.addAiCount(stats.aiCount);
     }
 
-    let message = new Shared.aiAgents.Classes.TextMessage({
-        role: Shared.aiAgents.Constants.Roles.Tool, 
-        mimeType: "text/markdown",
-        ext: "md", 
-        textData: `The Deep Research Tool has completed - files have been saved to: UserFiles/deepResearchTool/${agent.id} `,//finalReport,
-        toolName: "deepResearchTool",
-        instructions: `Conduct research on the user's questions.`
-    });
-    return Shared.v2Core.Helpers.Ok([message]);
+    let retMessages = [];
+    for (let i=0; i<RESEARCH_CHUNKS.length || 0; i++){
+        let message = new Shared.aiAgents.Classes.TextMessage({
+            role: Shared.aiAgents.Constants.Roles.Tool, 
+            mimeType: "text/markdown",
+            ext: "md", 
+            textData: RESEARCH_CHUNKS[i].output,
+            toolName: "deepResearchTool",
+            instructions: `Research Output for Question: ${questions[i]}`
+        });
+        retMessages.push(message);
+    }
+
+    return Shared.v2Core.Helpers.Ok(retMessages);
 }
 
 function processReferences(text, referencesArray) {
