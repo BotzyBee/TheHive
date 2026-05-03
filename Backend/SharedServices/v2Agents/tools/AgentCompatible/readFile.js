@@ -73,7 +73,7 @@ export async function run(
     // lookup correct read tool
     let strategyToUse = Shared.fileSystem.IO.fileRegistry.getByExt(fileInfo.value.extension).strategy;
     if(strategyToUse.read == null){
-        Shared.v2Core.Helpers.Err(`Error (readFile) : No strategy to read ${fileInfo.value.extension} files.`)
+        return Shared.v2Core.Helpers.Err(`Error (readFile) : No strategy to read ${fileInfo.value.extension} files.`)
     }
 
     // Use the supplied read function;

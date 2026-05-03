@@ -78,15 +78,15 @@
         if (lastWord.startsWith("/")) {
         const query = lastWord.slice(1).toLowerCase();
         
-        // 1. Initial Categories
+        // Initial Categories
         let options = [
             { label: 'folder', icon: '📁', type: 'cmd' },
             { label: 'file', icon: '📄', type: 'cmd' },
-            { label: 'Plan Needs Approved', icon: '👌', type: 'flag', flagText: '!!plans-need-approved' }
+            { label: 'Plan Needs Approved', icon: '👌', type: 'flag', flagText: '!!plans-need-approved' },
+            { label: 'Pre Load Files', icon: '🗄️', type: 'flag', flagText: '!!pre-load-files' }
         ];
 
-        // 2. If user typed "/folder " or similar, we could trigger Rust here
-        // For this example, we filter the initial command list
+        // filter the initial command list
         filteredOptions = options.filter(opt => 
             opt.label.toLowerCase().includes(query)
         );
@@ -128,25 +128,40 @@
         const baseText = textBeforeCursor.slice(0, lastSlashIndex);
         let replacement = "";
 
-        if (option.label === 'folder' || option.label === 'file') {
+        if (option.label === 'folder' || option.label === 'file' || option.label === 'Pre Load Files') {
             try {
-                const selected = await open({
+                let selected = await open({
                     directory: option.label === 'folder',
-                    multiple: false,
+                    multiple: option.label === 'Pre Load Files' ? true : false,
                     defaultPath: import.meta.env.VITE_KNOWLEDGEBASE_PATH
                 });
 
                 if (selected) {
-                    let selectedPath = selected.replace(/\\/g, '/');
-                    const basePath = import.meta.env.VITE_KNOWLEDGEBASE_PATH.replace(/\\/g, '/');
-                    const base = new URL(`file:///${basePath}/`);
-                    const target = new URL(`file:///${selectedPath}`);
-                    let relative = target.pathname.replace(base.pathname, '');
-                    
-                    if (!relative.startsWith('/')) {
-                        relative = '/' + relative;
+                    // multiple select
+                    let allPaths = '';
+                    if(!Array.isArray(selected)){
+                        selected = [selected];
                     }
-                    replacement = relative;
+                    for(let i=0; i<selected.length ?? 0; i++){
+                        let selectedPath = selected[i].replace(/\\/g, '/');
+                        const basePath = import.meta.env.VITE_KNOWLEDGEBASE_PATH.replace(/\\/g, '/');
+                        const base = new URL(`file:///${basePath}/`);
+                        const target = new URL(`file:///${selectedPath}`);
+                        let relative = target.pathname.replace(base.pathname, '');
+                        if (!relative.startsWith('/')) {
+                            relative = '/' + relative;
+                        }
+                        if(option.label === 'Pre Load Files'){
+                            allPaths += ` target:${relative} `;
+                        } else {
+                            allPaths += `${relative}`
+                        }
+                    }
+                    if(option.label === 'Pre Load Files'){
+                        replacement = `[ ${option.flagText} ${allPaths} ]`;
+                    } else {
+                        replacement = allPaths;
+                    }
                 } else {
                     // If user cancels, we might want to put the slash back or leave it
                     replacement = "/"; 

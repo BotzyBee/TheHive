@@ -205,7 +205,7 @@ export class TaskAgent extends AiJob {
         for(let i=0; i<newMessageLen; i++){
             // Shorten & add to context
             if(toolOutputArray[i].role === Services.aiAgents.Constants.Roles.Tool){
-                console.log("Processing Tool Message... ");
+                this.emitUpdateStatus(`Processing Tool Message: ${i+1} of ${newMessageLen}`);
                 let processed = await Services.aiAgents.AgentSharedServices.processMessageForContext(toolOutputArray[i], this.summaryDataSizeThreshold, this.aiSettings, this );
                 if(processed.isErr()){
                     return Services.v2Core.Helpers.Err(`Error : ( processToolOutput ) : ${processed.value}`);   

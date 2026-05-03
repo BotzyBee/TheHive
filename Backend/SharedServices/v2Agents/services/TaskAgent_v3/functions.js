@@ -3,11 +3,79 @@ import { TaskFlow, TaskAction } from "./constantsAndClasses.js";
 import { TA_PromptsAndSchemas as PromptsAndSchemas } from './prompts.js';
 
 // [][] -- LOADING FUNCTIONS -- [][]
-export function loadingMain(agentObject){
+export async function loadingMain(agentObject){
+    let preLoad = agentObject.task.toLowerCase().includes("!!pre-load-files");
+    if (preLoad) {
+        agentObject.emitUpdateStatus(`Loading Files into Context...`);
+        // Extract the required file URLS
+        const regex = /target:([^\s]+)/g;
+        const urls = [];
+        let match;
+        while ((match = regex.exec(agentObject.task)) !== null) {
+            urls.push(match[1]);
+        }
+        // Load the URLS 
+        let loadedContent = [];
+        for(let i=0; i<urls.length ?? 0; i++){
+            // Get File data
+            const root = Services.fileSystem.Constants.containerVolumeRoot 
+            const targetURL = Services.aiAgents.ToolHelpers.pathHelper.join(root, urls[i].trim());
+            let fileInfo = Services.fileSystem.CRUD.getFileExtensionAndSize(targetURL); // returns : {"extension":"xlsx","sizeBytes":8665,"sizeFormatted":"8.46 KB"}}
+            if(fileInfo.isErr()){
+                // Flow to healing
+                agentObject.setFlowState(TaskFlow.Healing.main);
+                agentObject.TaskState.handoverMessage = `The pre-load stage has thown an error. Could not get file extensions : ERROR - ${fileInfo.value}`;
+                agentObject.TaskState.handoverData = [];
+                agentObject.errors.push(`Error (loadingMain -> getFileExtensionAndSize ) : ${fileInfo.value}`);
+                return;  
+            }
+            // lookup correct read tool
+            let strategyToUse = Services.fileSystem.IO.fileRegistry.getByExt(fileInfo.value.extension).strategy;
+            if(strategyToUse.read == null){
+                // Flow to healing
+                agentObject.setFlowState(TaskFlow.Healing.main);
+                agentObject.TaskState.handoverMessage = `The pre-load stage has thown an error : No strategy to read ${fileInfo.value.extension} files.`;
+                agentObject.TaskState.handoverData = [];
+                agentObject.errors.push(`Error (loadingMain -> getByExt ) : No strategy to read ${fileInfo.value.extension} files.`);
+                return;  
+            }
+
+            // Use the supplied read function;
+            let toolCall = await strategyToUse.read(targetURL);
+            if(toolCall.isErr()){
+                // Flow to healing
+                agentObject.setFlowState(TaskFlow.Healing.main);
+                agentObject.TaskState.handoverMessage = `The pre-load stage has thown an error : ${toolCall.value})`;
+                agentObject.TaskState.handoverData = [];
+                agentObject.errors.push(`Error (loadingMain -> strategyToUse.readFN() : ${toolCall.value})`);
+                return;  
+            }
+
+            let message = new Services.aiAgents.Classes.DataMessage({
+                role: Services.aiAgents.Constants.Roles.Tool, 
+                ext: fileInfo.value.extension,
+                data: toolCall.value,
+                toolName: "preLoadTool",
+                instructions: `Read the file: ${targetURL}`
+            });
+            loadedContent.push(message);
+        }
+        // Push to context
+        let processedToolOp = await agentObject.processToolOutput(loadedContent); 
+        if(processedToolOp.isErr()){ 
+            // Flow to healing
+            agentObject.setFlowState(TaskFlow.Healing.main);
+            agentObject.TaskState.handoverMessage = "Process Tool Output has thrown an error - consider re-running process tool output action.";
+            agentObject.TaskState.handoverData = [];
+            agentObject.errors.push(`Error (processToolOutputToContext -> processToolOutput ) : ${processedToolOp.value}`);
+            return;  
+        }; // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
+    }
     
     // Flow directly to Planning Stage
     agentObject.setFlowState(TaskFlow.Plan.createPlan);
     agentObject.healPrompt = "";
+    agentObject.TaskState.handoverData = [];
     return;
 }
 
