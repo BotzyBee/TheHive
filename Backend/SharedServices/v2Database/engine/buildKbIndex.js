@@ -1,9 +1,13 @@
-import { indexJob } from "../services/fileIndexing.js";
-import { dirTableName } from "../core/constants.js";
+import { indexJob } from '../services/fileIndexing.js';
+import { dirTableName } from '../core/constants.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
-import { Services } from "../../index.js";
-import { updateMgmtData, getRecords, getDirsAndFilesFromUrl } from "../services/CRUD.js";
+import { Services } from '../../index.js';
+import {
+  updateMgmtData,
+  getRecords,
+  getDirsAndFilesFromUrl,
+} from '../services/CRUD.js';
 
 let indexingActive = false;
 let furtherChecks = []; // array of sub-directory Urls needing indexed
@@ -16,7 +20,6 @@ let dbTotal = 0; // database checks
 let totalJobCount = 0; // total number of jobs completed
 
 export async function indexKnowledgebase(dbAgent) {
-
   // reset Index Stats
   kbTotal = 0;
   dbTotal = 0;
@@ -29,7 +32,7 @@ export async function indexKnowledgebase(dbAgent) {
   // Check update millis
   let MsNow = new Date().getTime(); // for updating mgmt record when done. \
   // Begin index from root
-  
+
   const kbURL = process.env.knowledgebaseURL;
   let rootUpdates = await checkAndUpdateDirAndFiles(dbAgent, kbURL);
   if (rootUpdates.isErr()) {
@@ -123,7 +126,8 @@ async function checkAndUpdateDirAndFiles(dbAgent, Url) {
   dbFiles = subDirsFiles.value.fileList;
 
   // Get data from knowledgebase
-  let kbFilDir = await Services.fileSystem.CRUD.getFilesAndDirectoriesFromDir(Url);
+  let kbFilDir =
+    await Services.fileSystem.CRUD.getFilesAndDirectoriesFromDir(Url);
   // catch error
   if (kbFilDir.isErr()) {
     return Services.v2Core.Helpers.Err(

@@ -1,7 +1,12 @@
-
-import { Services } from "../../index.js";
-import { fileTableName, dirTableName } from "../core/constants.js";
-import { addFileToDB, addDirectoryToDB, updateRecords, deleteRecordsByField, getDirsAndFilesRecursive } from "./CRUD.js";
+import { Services } from '../../index.js';
+import { fileTableName, dirTableName } from '../core/constants.js';
+import {
+  addFileToDB,
+  addDirectoryToDB,
+  updateRecords,
+  deleteRecordsByField,
+  getDirsAndFilesRecursive,
+} from './CRUD.js';
 
 // [][] -- Change Job - Used to update DB with file/ Dir changes -- [][]
 export class indexJob {
@@ -66,7 +71,8 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      Services.v2Core.Helpers.log(`Error indexJob (updateDbFile -> updateRecords) : 
+      Services.v2Core.Helpers
+        .log(`Error indexJob (updateDbFile -> updateRecords) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -88,7 +94,8 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      Services.v2Core.Helpers.log(`Error indexJob (updateDbDir -> updateRecords) : 
+      Services.v2Core.Helpers
+        .log(`Error indexJob (updateDbDir -> updateRecords) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -107,7 +114,8 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      Services.v2Core.Helpers.log(`Error indexJob (removeFileFromDB -> deleteRecordsByField) : 
+      Services.v2Core.Helpers
+        .log(`Error indexJob (removeFileFromDB -> deleteRecordsByField) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -122,7 +130,8 @@ export class indexJob {
     let allSubs = await getDirsAndFilesRecursive(dbAgent, this.url);
     if (allSubs.isErr()) {
       this.attemptNumber += 1;
-      Services.v2Core.Helpers.log(`Error indexJob (removeDirFromDB -> getDirsAndFilesRecursive) : 
+      Services.v2Core.Helpers
+        .log(`Error indexJob (removeDirFromDB -> getDirsAndFilesRecursive) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${allSubs.value}`);
@@ -142,7 +151,8 @@ export class indexJob {
       );
       if (allDirRes.isErr()) {
         this.attemptNumber += 1;
-        Services.v2Core.Helpers.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField ${i}) : 
+        Services.v2Core.Helpers
+          .log(`Error indexJob (removeDirFromDB -> deleteRecordsByField ${i}) : 
                     attempt: ${this.attemptNumber}
                     url: ${this.url} 
                     error text : ${allDirRes.value}`);
@@ -161,7 +171,8 @@ export class indexJob {
       );
       if (allFileRes.isErr()) {
         this.attemptNumber += 1;
-        Services.v2Core.Helpers.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField(2) ${i}) : 
+        Services.v2Core.Helpers
+          .log(`Error indexJob (removeDirFromDB -> deleteRecordsByField(2) ${i}) : 
                     attempt: ${this.attemptNumber}
                     url: ${this.url} 
                     error text : ${allFileRes.value}`);
@@ -179,7 +190,8 @@ export class indexJob {
     );
     if (res.isErr()) {
       this.attemptNumber += 1;
-      Services.v2Core.Helpers.log(`Error indexJob (removeDirFromDB -> deleteRecordsByField) : 
+      Services.v2Core.Helpers
+        .log(`Error indexJob (removeDirFromDB -> deleteRecordsByField) : 
                 attempt: ${this.attemptNumber}
                 url: ${this.url} 
                 error text : ${res.value}`);
@@ -189,6 +201,3 @@ export class indexJob {
     return this; // return this for chaining calls.
   }
 }
-
-
-

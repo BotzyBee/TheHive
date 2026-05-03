@@ -20,7 +20,9 @@ export async function callOllama(
   const { capability } = options;
 
   if (!capability) {
-    return Services.v2Core.Helpers.Err('Error (callOllama) : Capability param is missing or null. Ensure options.capability has valid ModelTypes');
+    return Services.v2Core.Helpers.Err(
+      'Error (callOllama) : Capability param is missing or null. Ensure options.capability has valid ModelTypes'
+    );
   }
 
   // Match Capabilities
@@ -32,34 +34,50 @@ export async function callOllama(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.image:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have image capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have image capability.'
+      );
 
     case ModelTypes.reasoning:
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.deepResearch:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have deep research capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have deep research capability.'
+      );
 
     case ModelTypes.websearch:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have websearch capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have websearch capability.'
+      );
 
     case ModelTypes.embedding:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have embedding capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have embedding capability.'
+      );
 
     case ModelTypes.textToSpeech:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have text to speech capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have text to speech capability.'
+      );
 
     case ModelTypes.speechToText:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have speech to text capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have speech to text capability.'
+      );
 
     case ModelTypes.maps:
-      return Services.v2Core.Helpers.Err('Error (callOllama) : Ollama does not have maps capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOllama) : Ollama does not have maps capability.'
+      );
 
     case ModelTypes.local:
       return await generateText(systemMessage, contentMessage, model, options);
 
     default:
-      return Services.v2Core.Helpers.Err(`Error (callOllama) "${capability}" not specifically handled.`);
+      return Services.v2Core.Helpers.Err(
+        `Error (callOllama) "${capability}" not specifically handled.`
+      );
   }
 }
 
@@ -79,17 +97,21 @@ async function generateText(
   options = {}
 ) {
   if (!model || typeof model !== 'string') {
-    return Services.v2Core.Helpers.Err('Error (generateText): A valid model string is required.');
+    return Services.v2Core.Helpers.Err(
+      'Error (generateText): A valid model string is required.'
+    );
   }
 
   if (!contentMessage || typeof contentMessage !== 'string') {
-    return Services.v2Core.Helpers.Err('Error (generateText): A valid contentMessage string is required.');
+    return Services.v2Core.Helpers.Err(
+      'Error (generateText): A valid contentMessage string is required.'
+    );
   }
 
   const payload = {
     model: model.trim(),
     prompt: contentMessage.trim(),
-    stream: false
+    stream: false,
   };
 
   let systemPrompt = systemMessage ? systemMessage.trim() : '';
@@ -107,31 +129,45 @@ async function generateText(
   }
 
   try {
-    const response = await axios.post('http://ollama:11434/api/generate', payload, {
-      headers: {
-        'Content-Type': 'application/json'
+    const response = await axios.post(
+      'http://ollama:11434/api/generate',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
 
     const data = response.data;
     const content = data.response;
 
     if (options.structuredOutput) {
       try {
-        return Services.v2Core.Helpers.Ok(typeof content === 'string' ? JSON.parse(content) : content);
+        return Services.v2Core.Helpers.Ok(
+          typeof content === 'string' ? JSON.parse(content) : content
+        );
       } catch (parseError) {
-        return Services.v2Core.Helpers.Err(`Error (generateText): Failed to parse structured output: ${parseError.message}`);
+        return Services.v2Core.Helpers.Err(
+          `Error (generateText): Failed to parse structured output: ${parseError.message}`
+        );
       }
     }
 
     return Services.v2Core.Helpers.Ok(content || '');
   } catch (error) {
     if (error.response) {
-      return Services.v2Core.Helpers.Err(`Error (generateText): Ollama API responded with status ${error.response.status}. Details: ${JSON.stringify(error.response.data)}`);
+      return Services.v2Core.Helpers.Err(
+        `Error (generateText): Ollama API responded with status ${error.response.status}. Details: ${JSON.stringify(error.response.data)}`
+      );
     } else if (error.request) {
-      return Services.v2Core.Helpers.Err('Error (generateText): No response received from local Ollama API. Ensure Ollama is running on localhost:11434.');
+      return Services.v2Core.Helpers.Err(
+        'Error (generateText): No response received from local Ollama API. Ensure Ollama is running on localhost:11434.'
+      );
     } else {
-      return Services.v2Core.Helpers.Err(`Error (generateText): Request setup failed. Details: ${error.message}`);
+      return Services.v2Core.Helpers.Err(
+        `Error (generateText): Request setup failed. Details: ${error.message}`
+      );
     }
   }
 }

@@ -16,8 +16,8 @@ export function parseDirtyJson(input) {
   if (input == null) {
     return {
       ok: false,
-      error: new Error("Input is null or undefined"),
-      steps
+      error: new Error('Input is null or undefined'),
+      steps,
     };
   }
 
@@ -35,7 +35,7 @@ export function parseDirtyJson(input) {
   };
 
   // 1. First try raw parse
-  let result = attemptParse(text, "Parsed without cleaning");
+  let result = attemptParse(text, 'Parsed without cleaning');
   if (result) return result;
 
   // 2. Basic normalisation
@@ -78,29 +78,29 @@ export function parseDirtyJson(input) {
   // Final failure
   return {
     ok: false,
-    error: new Error("Failed to parse JSON after applying all cleaning steps."),
+    error: new Error('Failed to parse JSON after applying all cleaning steps.'),
     cleaned: text,
-    steps
+    steps,
   };
 }
 
 /* ---------------- Helpers ---------------- */
 
 function stripBom(text, steps) {
-  const next = text.replace(/^\uFEFF/, "");
-  if (next !== text) steps.push("Removed BOM");
+  const next = text.replace(/^\uFEFF/, '');
+  if (next !== text) steps.push('Removed BOM');
   return next;
 }
 
 function normaliseNewlines(text, steps) {
-  const next = text.replace(/\r\n?/g, "\n");
-  if (next !== text) steps.push("Normalised newlines");
+  const next = text.replace(/\r\n?/g, '\n');
+  if (next !== text) steps.push('Normalised newlines');
   return next;
 }
 
 function removeZeroWidthChars(text, steps) {
-  const next = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
-  if (next !== text) steps.push("Removed zero-width characters");
+  const next = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  if (next !== text) steps.push('Removed zero-width characters');
   return next;
 }
 
@@ -108,13 +108,13 @@ function replaceSmartQuotes(text, steps) {
   const next = text
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/[\u2018\u2019]/g, "'");
-  if (next !== text) steps.push("Replaced smart quotes");
+  if (next !== text) steps.push('Replaced smart quotes');
   return next;
 }
 
 function trim(text, steps) {
   const next = text.trim();
-  if (next !== text) steps.push("Trimmed whitespace");
+  if (next !== text) steps.push('Trimmed whitespace');
   return next;
 }
 
@@ -122,14 +122,16 @@ function trim(text, steps) {
  * Extract content from markdown code fences.
  */
 function extractFromMarkdownCodeBlock(text, steps) {
-  const codeBlockMatch = text.match(/```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/i);
+  const codeBlockMatch = text.match(
+    /```(?:json|javascript|js)?\s*([\s\S]*?)\s*```/i
+  );
   if (codeBlockMatch) {
-    steps.push("Extracted content from markdown code fence");
+    steps.push('Extracted content from markdown code fence');
     return codeBlockMatch[1].trim();
   }
 
-  const next = text.replace(/^`+|`+$/g, "").trim();
-  if (next !== text) steps.push("Removed wrapping backticks");
+  const next = text.replace(/^`+|`+$/g, '').trim();
+  if (next !== text) steps.push('Removed wrapping backticks');
   return next;
 }
 
@@ -139,10 +141,10 @@ function extractFromMarkdownCodeBlock(text, steps) {
 function extractLikelyJson(text, steps) {
   const candidates = [];
 
-  const obj = extractBalanced(text, "{", "}");
+  const obj = extractBalanced(text, '{', '}');
   if (obj) candidates.push(obj);
 
-  const arr = extractBalanced(text, "[", "]");
+  const arr = extractBalanced(text, '[', ']');
   if (arr) candidates.push(arr);
 
   if (candidates.length === 0) return text;
@@ -151,7 +153,7 @@ function extractLikelyJson(text, steps) {
   const chosen = candidates[0].value.trim();
 
   if (chosen && chosen !== text) {
-    steps.push("Extracted likely JSON substring");
+    steps.push('Extracted likely JSON substring');
     return chosen;
   }
 
@@ -171,7 +173,7 @@ function extractBalanced(text, openChar, closeChar) {
     if (inString) {
       if (escaped) {
         escaped = false;
-      } else if (ch === "\\") {
+      } else if (ch === '\\') {
         escaped = true;
       } else if (ch === quote) {
         inString = false;
@@ -210,12 +212,12 @@ function removeTrailingCommas(text, steps) {
     /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(,\s*[\]}])/g,
     (match, badCommaGroup) => {
       if (badCommaGroup) {
-        return match.replace(/,\s*/, ""); // Remove the comma, keep the bracket/brace
+        return match.replace(/,\s*/, ''); // Remove the comma, keep the bracket/brace
       }
       return match; // It was a string, return unchanged
     }
   );
-  if (next !== text) steps.push("Removed trailing commas");
+  if (next !== text) steps.push('Removed trailing commas');
   return next;
 }
 
@@ -227,14 +229,14 @@ function fixPythonLiterals(text, steps) {
   const next = text.replace(
     /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b(None|True|False)\b/g,
     (match, pythonLiteral) => {
-      if (pythonLiteral === "None") return "null";
-      if (pythonLiteral === "True") return "true";
-      if (pythonLiteral === "False") return "false";
+      if (pythonLiteral === 'None') return 'null';
+      if (pythonLiteral === 'True') return 'true';
+      if (pythonLiteral === 'False') return 'false';
       return match; // It was a string, return unchanged
     }
   );
 
-  if (next !== text) steps.push("Converted Python-style literals");
+  if (next !== text) steps.push('Converted Python-style literals');
   return next;
 }
 
@@ -252,7 +254,7 @@ function quoteUnquotedKeys(text, steps) {
       return match; // It was a string, return unchanged
     }
   );
-  if (next !== text) steps.push("Quoted unquoted object keys");
+  if (next !== text) steps.push('Quoted unquoted object keys');
   return next;
 }
 
@@ -261,7 +263,7 @@ function quoteUnquotedKeys(text, steps) {
  * Safely handles escapes and nested quotes.
  */
 function convertSingleQuotedStrings(text, steps) {
-  let next = "";
+  let next = '';
   let inDouble = false;
   let inSingle = false;
   let escaped = false;
@@ -271,7 +273,7 @@ function convertSingleQuotedStrings(text, steps) {
 
     if (escaped) {
       if (inSingle && ch === "'") {
-        // Unescape single quotes inside single-quoted strings 
+        // Unescape single quotes inside single-quoted strings
         // as they will now be valid inside double quotes.
         next = next.slice(0, -1);
         next += "'";
@@ -282,7 +284,7 @@ function convertSingleQuotedStrings(text, steps) {
       continue;
     }
 
-    if (ch === "\\") {
+    if (ch === '\\') {
       next += ch;
       escaped = true;
       continue;
@@ -308,7 +310,8 @@ function convertSingleQuotedStrings(text, steps) {
     next += ch;
   }
 
-  if (next !== text) steps.push("Converted single-quoted strings to double quotes");
+  if (next !== text)
+    steps.push('Converted single-quoted strings to double quotes');
   return next;
 }
 
@@ -316,7 +319,7 @@ function convertSingleQuotedStrings(text, steps) {
  * Remove JS-style comments while respecting strings.
  */
 function removeComments(text, steps) {
-  let result = "";
+  let result = '';
   let inString = false;
   let quote = null;
   let escaped = false;
@@ -328,7 +331,7 @@ function removeComments(text, steps) {
     const nextChar = text[i + 1];
 
     if (inLineComment) {
-      if (ch === "\n") {
+      if (ch === '\n') {
         inLineComment = false;
         result += ch;
       }
@@ -336,7 +339,7 @@ function removeComments(text, steps) {
     }
 
     if (inBlockComment) {
-      if (ch === "*" && nextChar === "/") {
+      if (ch === '*' && nextChar === '/') {
         inBlockComment = false;
         i++;
       }
@@ -347,7 +350,7 @@ function removeComments(text, steps) {
       result += ch;
       if (escaped) {
         escaped = false;
-      } else if (ch === "\\") {
+      } else if (ch === '\\') {
         escaped = true;
       } else if (ch === quote) {
         inString = false;
@@ -356,20 +359,20 @@ function removeComments(text, steps) {
       continue;
     }
 
-    if ((ch === '"' || ch === "'")) {
+    if (ch === '"' || ch === "'") {
       inString = true;
       quote = ch;
       result += ch;
       continue;
     }
 
-    if (ch === "/" && nextChar === "/") {
+    if (ch === '/' && nextChar === '/') {
       inLineComment = true;
       i++;
       continue;
     }
 
-    if (ch === "/" && nextChar === "*") {
+    if (ch === '/' && nextChar === '*') {
       inBlockComment = true;
       i++;
       continue;
@@ -378,6 +381,6 @@ function removeComments(text, steps) {
     result += ch;
   }
 
-  if (result !== text) steps.push("Removed comments");
+  if (result !== text) steps.push('Removed comments');
   return result;
 }

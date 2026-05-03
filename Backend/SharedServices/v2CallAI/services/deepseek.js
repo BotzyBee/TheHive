@@ -27,7 +27,9 @@ export async function callDeepseek(
 
   const { capability } = options;
   if (!capability) {
-    return Services.v2Core.Helpers.Err('Error (callDeepseek) : Capability param is missing or null. Ensure options.capability has valid ModelTypes');
+    return Services.v2Core.Helpers.Err(
+      'Error (callDeepseek) : Capability param is missing or null. Ensure options.capability has valid ModelTypes'
+    );
   }
 
   switch (capability) {
@@ -40,28 +42,44 @@ export async function callDeepseek(
       return await generateEmbeddings(model, options);
 
     case ModelTypes.image:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek image generation not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek image generation not implemented yet.'
+      );
 
     case ModelTypes.websearch:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek websearch not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek websearch not implemented yet.'
+      );
 
     case ModelTypes.textToSpeech:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek text to speech not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek text to speech not implemented yet.'
+      );
 
     case ModelTypes.speechToText:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek speech to text not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek speech to text not implemented yet.'
+      );
 
     case ModelTypes.deepResearch:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek deep research not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek deep research not implemented yet.'
+      );
 
     case ModelTypes.maps:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek maps capability not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek maps capability not implemented yet.'
+      );
 
     case ModelTypes.local:
-      return Services.v2Core.Helpers.Err('Error (callDeepseek) : Deepseek local capability not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callDeepseek) : Deepseek local capability not implemented yet.'
+      );
 
     default:
-      return Services.v2Core.Helpers.Err(`Error (callDeepseek) : Capability "${capability}" not specifically handled for Deepseek.`);
+      return Services.v2Core.Helpers.Err(
+        `Error (callDeepseek) : Capability "${capability}" not specifically handled for Deepseek.`
+      );
   }
 }
 
@@ -77,18 +95,20 @@ export async function generateEmbeddings(model, options = {}) {
   const { inputDataVec, dimensionSize } = options;
 
   if (!Array.isArray(inputDataVec)) {
-    return Services.v2Core.Helpers.Err('Error: inputDataVec must be an array of strings.');
+    return Services.v2Core.Helpers.Err(
+      'Error: inputDataVec must be an array of strings.'
+    );
   }
 
   try {
     const client = new OpenAI({
       apiKey: apiKey,
-      baseURL: 'https://api.deepseek.com'
+      baseURL: 'https://api.deepseek.com',
     });
 
     const payload = {
       model: model,
-      input: inputDataVec
+      input: inputDataVec,
     };
 
     if (dimensionSize) {
@@ -96,12 +116,14 @@ export async function generateEmbeddings(model, options = {}) {
     }
 
     const response = await client.embeddings.create(payload);
-    
+
     // Extract the vector arrays from the response data
     const vectors = response.data.map((item) => item.embedding);
     return Services.v2Core.Helpers.Ok(vectors);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateEmbeddings): ${error.message || error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callDeepseek -> generateEmbeddings): ${error.message || error}`
+    );
   }
 }
 
@@ -121,7 +143,9 @@ export async function generateText(
   options = {}
 ) {
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callDeepseek -> generateText): No model provided.');
+    return Services.v2Core.Helpers.Err(
+      'Error (callDeepseek -> generateText): No model provided.'
+    );
   }
 
   const apiKey = process.env.DPSK_KEY;
@@ -129,7 +153,7 @@ export async function generateText(
 
   const client = new OpenAI({
     apiKey: apiKey,
-    baseURL: 'https://api.deepseek.com'
+    baseURL: 'https://api.deepseek.com',
   });
 
   const hasImage = contentMessage?.imageUrl != null;
@@ -142,7 +166,7 @@ export async function generateText(
     }
     humanContent.push({
       type: 'image_url',
-      image_url: { url: contentMessage.imageUrl }
+      image_url: { url: contentMessage.imageUrl },
     });
   } else {
     humanContent = contentMessage;
@@ -150,7 +174,7 @@ export async function generateText(
 
   const messages = [
     { role: 'system', content: systemMessage },
-    { role: 'user', content: humanContent }
+    { role: 'user', content: humanContent },
   ];
 
   const requestPayload = {
@@ -161,16 +185,16 @@ export async function generateText(
   // Configure structured outputs using the json_object approach
   if (structuredOutput) {
     const schemaWithStrictness = makeSchemaStrict(structuredOutput);
-    
+
     // Deepseek requires explicit instructions in the prompt to output JSON
     const jsonInstructions = `\n\nYou must output your response in JSON format. Please ensure your response adheres to the following JSON schema:\n${JSON.stringify(schemaWithStrictness)}`;
-    
+
     // Append instructions and schema to the system message
     messages[0].content += jsonInstructions;
 
     // Use the json_object response format
     requestPayload.response_format = {
-      type: 'json_object'
+      type: 'json_object',
     };
   }
 
@@ -178,7 +202,7 @@ export async function generateText(
     if (options.stream === true) {
       requestPayload.stream = true;
       const stream = await client.chat.completions.create(requestPayload);
-      
+
       let fullContent = '';
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content;
@@ -194,7 +218,6 @@ export async function generateText(
         return Services.v2Core.Helpers.Ok(JSON.parse(fullContent));
       }
       return Services.v2Core.Helpers.Ok(fullContent);
-
     } else {
       const response = await client.chat.completions.create(requestPayload);
       const responseContent = response.choices[0]?.message?.content || '';
@@ -205,6 +228,8 @@ export async function generateText(
       return Services.v2Core.Helpers.Ok(responseContent);
     }
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callDeepseek -> generateText): ${error.message || error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callDeepseek -> generateText): ${error.message || error}`
+    );
   }
 }

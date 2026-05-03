@@ -1,5 +1,5 @@
-import { AiQuality, MODEL_REGISTRY } from "./constants.js";
-import { Services } from "../../index.js";
+import { AiQuality, MODEL_REGISTRY } from './constants.js';
+import { Services } from '../../index.js';
 
 /**
  * Recursively adds additionalProperties: false to all object nodes in a JSON schema,
@@ -10,7 +10,10 @@ export function makeSchemaStrict(schema) {
   if (typeof schema !== 'object' || schema === null) return schema;
   const newSchema = Array.isArray(schema) ? [...schema] : { ...schema };
   // Only set to false if the property is currently undefined
-  if (newSchema.type === 'object' && newSchema.additionalProperties === undefined) {
+  if (
+    newSchema.type === 'object' &&
+    newSchema.additionalProperties === undefined
+  ) {
     newSchema.additionalProperties = false;
   }
   // Recursively check properties
@@ -24,15 +27,13 @@ export function makeSchemaStrict(schema) {
     newSchema.items = makeSchemaStrict(newSchema.items);
   }
   // Handle other keywords that might contain schemas, like anyOf, allOf, or oneOf
-  ['anyOf', 'allOf', 'oneOf'].forEach(keyword => {
+  ['anyOf', 'allOf', 'oneOf'].forEach((keyword) => {
     if (Array.isArray(newSchema[keyword])) {
       newSchema[keyword] = newSchema[keyword].map(makeSchemaStrict);
     }
   });
   return newSchema;
 }
-
-
 
 /**
  * Groups models by provider, sorts them by quality, 
@@ -58,45 +59,45 @@ export function makeSchemaStrict(schema) {
     }
  */
 export async function getFormattedModelRegistry() {
-    let models = MODEL_REGISTRY;
-    let getDBModels = await Services.database.ModelRegistry.getAllModels();
-    if(getDBModels.isOk()) models = getDBModels.value;
-    // 1. Map for internal sorting logic
-    const QUALITY_WEIGHTS = {
-        [AiQuality.Pro]: 3,
-        [AiQuality.Advanced]: 2,
-        [AiQuality.Base]: 1,
-    };
+  let models = MODEL_REGISTRY;
+  let getDBModels = await Services.database.ModelRegistry.getAllModels();
+  if (getDBModels.isOk()) models = getDBModels.value;
+  // 1. Map for internal sorting logic
+  const QUALITY_WEIGHTS = {
+    [AiQuality.Pro]: 3,
+    [AiQuality.Advanced]: 2,
+    [AiQuality.Base]: 1,
+  };
 
-    // 2. Map for final string output
-    const QUALITY_LABELS = {
-        [AiQuality.Pro]: 'Pro',
-        [AiQuality.Advanced]: 'Advanced',
-        [AiQuality.Base]: 'Base',
-    };
+  // 2. Map for final string output
+  const QUALITY_LABELS = {
+    [AiQuality.Pro]: 'Pro',
+    [AiQuality.Advanced]: 'Advanced',
+    [AiQuality.Base]: 'Base',
+  };
 
-    // 3. Group the models by provider
-    const grouped = models.reduce((acc, model) => {
-        const providerKey = model.provider;
-        if (!acc[providerKey]) {
-        acc[providerKey] = [];
-        }
-        acc[providerKey].push({ ...model }); // Use a copy to avoid mutating the original registry
-        return acc;
-    }, {});
-
-    // 4. Sort and transform the quality property
-    for (const provider in grouped) {
-        grouped[provider] = grouped[provider]
-        .sort((a, b) => {
-            const weightA = QUALITY_WEIGHTS[a.quality] || 0;
-            const weightB = QUALITY_WEIGHTS[b.quality] || 0;
-            return weightB - weightA; // Sort descending
-        })
-        .map((model) => ({
-            ...model,
-            quality: QUALITY_LABELS[model.quality] || 'Unknown', // Swap the value for the string
-        }));
+  // 3. Group the models by provider
+  const grouped = models.reduce((acc, model) => {
+    const providerKey = model.provider;
+    if (!acc[providerKey]) {
+      acc[providerKey] = [];
     }
-    return grouped;
-};
+    acc[providerKey].push({ ...model }); // Use a copy to avoid mutating the original registry
+    return acc;
+  }, {});
+
+  // 4. Sort and transform the quality property
+  for (const provider in grouped) {
+    grouped[provider] = grouped[provider]
+      .sort((a, b) => {
+        const weightA = QUALITY_WEIGHTS[a.quality] || 0;
+        const weightB = QUALITY_WEIGHTS[b.quality] || 0;
+        return weightB - weightA; // Sort descending
+      })
+      .map((model) => ({
+        ...model,
+        quality: QUALITY_LABELS[model.quality] || 'Unknown', // Swap the value for the string
+      }));
+  }
+  return grouped;
+}

@@ -16,7 +16,7 @@ export class AiCall {
   } = {}) {
     this.models = models;
     this.AiQuality = quality;
-    this.AiProviders = providers; 
+    this.AiProviders = providers;
     this.ModelTypes = capabilities;
     this.ProviderFunctions = functions;
     this.defaultProvider = defaultProvider;
@@ -79,12 +79,17 @@ export class AiCall {
   async generateEmbeddings(options = {}) {
     options.contextSize = 0;
     options.embeddingsMode = true;
-    return this.#dispatch(Services.callAI.Constants.ModelTypes.embedding, '', '', options);
+    return this.#dispatch(
+      Services.callAI.Constants.ModelTypes.embedding,
+      '',
+      '',
+      options
+    );
   }
 
   /**
-   * Generates an Image using AI 
-   * @param {string} contentMessage - Input prompt for the AI to follow 
+   * Generates an Image using AI
+   * @param {string} contentMessage - Input prompt for the AI to follow
    * @param {object} options
    * @param {string} [options.model] - Exact model string (optional)
    * @param {string} [options.provider] - AiProviders value (optional)
@@ -96,26 +101,36 @@ export class AiCall {
    * @returns {Result<[ImageMessage] | String>} - Result< [ ImageMessage ] | String >
    */
   async generateImage(contentMessage, options = {}) {
-      const sys = "N/A";
-      const tkns = this.#estimateTokens(contentMessage);
-      options.contextSize = tkns;
-      return this.#dispatch(Services.callAI.Constants.ModelTypes.image, sys, contentMessage, options);
+    const sys = 'N/A';
+    const tkns = this.#estimateTokens(contentMessage);
+    options.contextSize = tkns;
+    return this.#dispatch(
+      Services.callAI.Constants.ModelTypes.image,
+      sys,
+      contentMessage,
+      options
+    );
   }
 
-    /** Generate Text (model only - no tools)
+  /** Generate Text (model only - no tools)
    * @param {string} systemMessage
    * @param {string} contentMessage
    * @param {object} [options]
-   * @param {string} [options.context] - Optional. For passing any context or reference text along with the task. 
+   * @param {string} [options.context] - Optional. For passing any context or reference text along with the task.
    * @param {string} [options.model]           - Exact model string (optional)
    * @param {string} [options.provider]        - AiProviders value (optional)
    * @param {number} [options.quality]         - AiQuality value (optional)
    * @param {bool}   [options.randomModel]       - If true a random model fitting the requirements will be chosen.
    */
   async generateCode(systemMessage, contentMessage, options = {}) {
-      const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
-      options.contextSize = tkns;
-      return this.#dispatch(Services.callAI.Constants.ModelTypes.code, systemMessage, contentMessage, options);
+    const tkns = this.#estimateTokens(`${systemMessage} ${contentMessage}`);
+    options.contextSize = tkns;
+    return this.#dispatch(
+      Services.callAI.Constants.ModelTypes.code,
+      systemMessage,
+      contentMessage,
+      options
+    );
   }
 
   // async mapSearch(systemMessage, contentMessage, options = {}) {
@@ -125,22 +140,27 @@ export class AiCall {
   // }
 
   /**
- * Generates an audio (speech) from input text. 
- * @param {string} contentMessage - The text to be converted to speech
- * @param {object} options - further options
- * @param {string} [options.model] - Exact model string (optional)
- * @param {string} [options.provider] - AiProviders value (optional)
- * @param {number} [options.quality] - AiQuality value (optional)
- * @param {boolean} [options.useWeb] - If true, AI uses web grounding (Optional)
- * @param {object}  [options.ttsOptions] - Object for voice configurations (Optional)
- * @param {string}  [options.ttsOptions.gender ] - Optional, [ "Male" | "Female" ] specify if male or female voice should be used.
- * @returns {Result< [AudioMessage] | string > } - Result< [ AudioMessage, ...] | string >
- */
+   * Generates an audio (speech) from input text.
+   * @param {string} contentMessage - The text to be converted to speech
+   * @param {object} options - further options
+   * @param {string} [options.model] - Exact model string (optional)
+   * @param {string} [options.provider] - AiProviders value (optional)
+   * @param {number} [options.quality] - AiQuality value (optional)
+   * @param {boolean} [options.useWeb] - If true, AI uses web grounding (Optional)
+   * @param {object}  [options.ttsOptions] - Object for voice configurations (Optional)
+   * @param {string}  [options.ttsOptions.gender ] - Optional, [ "Male" | "Female" ] specify if male or female voice should be used.
+   * @returns {Result< [AudioMessage] | string > } - Result< [ AudioMessage, ...] | string >
+   */
   async textToSpeech(contentMessage, options = {}) {
-      const tkns = this.#estimateTokens(contentMessage);
-      const sys = "N/A";
-      options.contextSize = tkns;
-      return this.#dispatch(Services.callAI.Constants.ModelTypes.textToSpeech, sys, contentMessage, options);
+    const tkns = this.#estimateTokens(contentMessage);
+    const sys = 'N/A';
+    options.contextSize = tkns;
+    return this.#dispatch(
+      Services.callAI.Constants.ModelTypes.textToSpeech,
+      sys,
+      contentMessage,
+      options
+    );
   }
 
   // async speechToText(systemMessage, contentMessage, options = {}) {
@@ -199,7 +219,7 @@ export class AiCall {
         return Services.v2Core.Helpers.Err(
           `Error ( resolveModel ) : ${model} does not support ${missing.join(', ')}`
         );
-      } 
+      }
       return Services.v2Core.Helpers.Ok(entry);
     }
 
@@ -219,7 +239,8 @@ export class AiCall {
       (m) => m.maxContext >= ctxRequired && m.quality == requestQuality
     );
     if (contextSizeAndQualityApproved.length === 0) {
-      return Services.v2Core.Helpers.Err(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
+      return Services.v2Core.Helpers
+        .Err(`Error ( resolveModel ) : No model found supporting capabilities, Context Size and Quality. 
             Capabilities : [${[...requiredCaps].join(', ')}]. Context Size: ${ctxRequired}. Quality ${requestQuality}`);
     }
 
@@ -228,7 +249,9 @@ export class AiCall {
       let randomNum = Math.floor(
         Math.random() * contextSizeAndQualityApproved.length
       );
-      return Services.v2Core.Helpers.Ok(contextSizeAndQualityApproved[randomNum]);
+      return Services.v2Core.Helpers.Ok(
+        contextSizeAndQualityApproved[randomNum]
+      );
     }
 
     // Path 3: Go with default provider (unless user specifies one) and closest model to quality
@@ -243,7 +266,9 @@ export class AiCall {
           (m) => m.maxContext >= contextSize
         );
         if (contextFit.length > 0) {
-          return Services.v2Core.Helpers.Ok(contextFit.sort(byQualityProximity)[0]); // nearest to quality requested.
+          return Services.v2Core.Helpers.Ok(
+            contextFit.sort(byQualityProximity)[0]
+          ); // nearest to quality requested.
         }
         // No model from this provider fits the context — warn and fall through
         Services.v2Core.Helpers.log(
@@ -252,7 +277,9 @@ export class AiCall {
         );
       } else {
         // No context constraint — just pick by quality proximity within provider
-        return Services.v2Core.Helpers.Ok(providerCandidates.sort(byQualityProximity)[0]);
+        return Services.v2Core.Helpers.Ok(
+          providerCandidates.sort(byQualityProximity)[0]
+        );
       }
     } else if (provider) {
       // Caller explicitly named a provider that has no capable models — hard fail
@@ -280,21 +307,25 @@ export class AiCall {
         );
       }
     }
-    return Services.v2Core.Helpers.Ok(fallbackCandidates.sort(byQualityProximity)[0]);
+    return Services.v2Core.Helpers.Ok(
+      fallbackCandidates.sort(byQualityProximity)[0]
+    );
   }
 
   /**
    * Dispatch function routes to the required AI provider
-   * @param {ModelTypes} capability 
-   * @param {string} systemMessage 
-   * @param {string} contentMessage 
-   * @param {object} options 
+   * @param {ModelTypes} capability
+   * @param {string} systemMessage
+   * @param {string} contentMessage
+   * @param {object} options
    * @returns {Result( any | string )} - Result{ outcome: 'Ok' | 'Error', value: any | string }
    */
   async #dispatch(capability, systemMessage, contentMessage, options) {
     const entry = this.#resolveModel(capability, options);
     if (entry.isErr()) {
-      return Services.v2Core.Helpers.Err(`Error (#dispatch -> resolveModel) ${entry.value}`);
+      return Services.v2Core.Helpers.Err(
+        `Error (#dispatch -> resolveModel) ${entry.value}`
+      );
     }
     const callFn = this.ProviderFunctions[entry.value.provider];
     if (!callFn) {

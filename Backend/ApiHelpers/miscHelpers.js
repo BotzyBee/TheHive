@@ -1,32 +1,34 @@
-import { Services } from "../SharedServices/index.js";
-import { JOBS } from "../SharedServices/v2Agents/engine/jobManager.js";
+import { Services } from '../SharedServices/index.js';
+import { JOBS } from '../SharedServices/v2Agents/engine/jobManager.js';
 
-export function getConfigForFrontend(){
+export function getConfigForFrontend() {
   let rtnObject = {
     AiProviders: Services.callAI.Constants.AiProviders,
     AiModels: Services.callAI.Constants.MODEL_REGISTRY,
     ModelTypes: Services.callAI.Constants.ModelTypes,
     AiQuality: Services.callAI.Constants.AiQuality,
     Agents: {
-      taskAgent: "Task_Agent",
-      quickAsk: "Quick_Ask_Agent"
-    }
-  }
+      taskAgent: 'Task_Agent',
+      quickAsk: 'Quick_Ask_Agent',
+    },
+  };
   return rtnObject;
 }
 
-export function stopJob(jobID){
+export function stopJob(jobID) {
   let msg = JOBS.jobListManager({ stopJob: jobID });
   if (msg.isErr()) return { error: msg.value };
 
   const rtnMsg = new Services.aiAgents.Classes.FrontendMessageFormat({
-      aiJobId: jobID,
-      status: Services.aiAgents.Classes.Status.Stopped,
-      isRunning: false,
-      messages: [new Services.aiAgents.Classes.TextMessage({ 
-          role: Services.aiAgents.Constants.Roles.Agent, 
-          textData: `Job ${jobID} has been stopped.` 
-      })]
+    aiJobId: jobID,
+    status: Services.aiAgents.Classes.Status.Stopped,
+    isRunning: false,
+    messages: [
+      new Services.aiAgents.Classes.TextMessage({
+        role: Services.aiAgents.Constants.Roles.Agent,
+        textData: `Job ${jobID} has been stopped.`,
+      }),
+    ],
   });
   return rtnMsg;
 }
@@ -46,7 +48,10 @@ export async function handleModelUpdates(actionObject) {
 
     // Replace this with however you obtain your db agent
     const dbAgentCall = await Services.database.ManageDb.getDbAgent();
-    if(dbAgentCall.isErr()) throw new Error(`Error (handleModelUpdates -> getDbAgent) : ${dbAgentCall.value}`);
+    if (dbAgentCall.isErr())
+      throw new Error(
+        `Error (handleModelUpdates -> getDbAgent) : ${dbAgentCall.value}`
+      );
     const dbAgent = dbAgentCall.value;
     const modelTableName = Services.database.Constants.modelTableName;
 
@@ -59,15 +64,8 @@ export async function handleModelUpdates(actionObject) {
       throw new Error(`Invalid quality value: ${quality}`);
     };
 
-    const {
-      id,
-      active,
-      model,
-      provider,
-      capabilities,
-      maxContext,
-      quality,
-    } = data;
+    const { id, active, model, provider, capabilities, maxContext, quality } =
+      data;
 
     const mappedQuality = mapQualityToNumber(quality);
 
@@ -116,7 +114,11 @@ export async function handleModelUpdates(actionObject) {
         // Full id looks like: "ModelRegistry:0aci1w6hba7cjd9ndgds"
         const idRef = id.includes(':') ? id.split(':')[1] : id;
 
-        return await Services.database.CRUD.deleteRecordsById(dbAgent, modelTableName, idRef);
+        return await Services.database.CRUD.deleteRecordsById(
+          dbAgent,
+          modelTableName,
+          idRef
+        );
       }
 
       default:
@@ -124,6 +126,6 @@ export async function handleModelUpdates(actionObject) {
     }
     return Services.v2Core.Helpers.Ok(null);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (handleModelUpdates) : ${error}`)
+    return Services.v2Core.Helpers.Err(`Error (handleModelUpdates) : ${error}`);
   }
 }

@@ -1,6 +1,6 @@
 import { initRegistry } from './ApiHelpers/buildRegistry.js';
 
-console.log("BOOTSTRAPPING THE HIVE BACKEND...");
+console.log('BOOTSTRAPPING THE HIVE BACKEND...');
 // Build the registry completely
 initRegistry();
 

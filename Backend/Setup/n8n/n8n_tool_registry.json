@@ -9,10 +9,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        -352,
-        -48
-      ],
+      "position": [-352, -48],
       "id": "ad694c66-849c-42af-bbb0-d5df671363f9",
       "name": "Webhook",
       "webhookId": "9a96bbe0-6e9c-4db8-87b5-65c53358530b"
@@ -23,10 +20,7 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -144,
-        -48
-      ],
+      "position": [-144, -48],
       "id": "1f12fe71-8756-4ac6-aa36-b9f2eb3e0318",
       "name": "Code in JavaScript"
     },
@@ -37,10 +31,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [
-        64,
-        -48
-      ],
+      "position": [64, -48],
       "id": "ad0a481d-6455-4af0-bcf2-4e26db40f069",
       "name": "Respond to Webhook"
     }

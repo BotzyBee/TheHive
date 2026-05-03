@@ -2,7 +2,6 @@
  * 🐝 TheHive Plugin Tool Standard - Mermaid Diagram Generator
  */
 
-
 const MERMAID_GUIDE = `
 Use Quoted Labels for All Nodes
 Wrap node contents in double quotes to avoid issues with special characters or line breaks. Example: A["Initialize process"]. Quoted strings safely contain spaces, symbols, and line breaks (\n), preventing parse errors.
@@ -70,110 +69,129 @@ Fix them silently. Return ONLY the fully corrected, raw Mermaid code wrapped in 
 `.trim();
 
 export const details = {
-    toolName: "createMermaidDiagram",
-    version: "1.0.0",
-    creator: "TheHive",
-    overview: "Generates high-quality, parser-compatible Mermaid flowchart code based on user instructions. It automatically reviews and corrects its own syntax to ensure it adheres to strict limitations (e.g., no HTML, strict quote usage). Limitations: Only supports basic flowcharts (TD/LR); does not support Gantt, sequence, or advanced styling.",
-    guide: "Pass the descriptive instructions for the diagram in the 'prompt' parameter. The resulting code can be directly rendered or imported into tools like Excalidraw.",
-    inputSchema: JSON.stringify({
-        "type": "object",
-        "properties": {
-            "prompt": {
-                "type": "string",
-                "description": "The specific instructions or description of the diagram to be generated."
-            }
-        },
-        "required": ["prompt"],
-        "additionalProperties": false
-    })
+  toolName: 'createMermaidDiagram',
+  version: '1.0.0',
+  creator: 'TheHive',
+  overview:
+    'Generates high-quality, parser-compatible Mermaid flowchart code based on user instructions. It automatically reviews and corrects its own syntax to ensure it adheres to strict limitations (e.g., no HTML, strict quote usage). Limitations: Only supports basic flowcharts (TD/LR); does not support Gantt, sequence, or advanced styling.',
+  guide:
+    "Pass the descriptive instructions for the diagram in the 'prompt' parameter. The resulting code can be directly rendered or imported into tools like Excalidraw.",
+  inputSchema: JSON.stringify({
+    type: 'object',
+    properties: {
+      prompt: {
+        type: 'string',
+        description:
+          'The specific instructions or description of the diagram to be generated.',
+      },
+    },
+    required: ['prompt'],
+    additionalProperties: false,
+  }),
 };
 
-function safeEmit(agent, message){
-    if(agent && typeof agent.emitUpdateStatus === "function"){
-        agent.emitUpdateStatus(message);
-    }
+function safeEmit(agent, message) {
+  if (agent && typeof agent.emitUpdateStatus === 'function') {
+    agent.emitUpdateStatus(message);
+  }
 }
 
 /**
  * Executes the Mermaid Code Generator logic.
- * 
+ *
  * @param {object} Shared - Core Hive services injected by the system
  * @param {object} params - Inputs defined in inputSchema
  * @returns {Promise<object>} - A Shared.Utils.Ok or Shared.Utils.Err Result
  */
 export async function run(Shared, params = {}, agent = {}) {
-    const { prompt } = params;
-    const { aiSettings = {} } = agent || {};
+  const { prompt } = params;
+  const { aiSettings = {} } = agent || {};
 
-    if (!prompt || typeof prompt !== 'string') {
-        return Shared.v2Core.Helpers.Err("Error (createMermaidDiagram): 'prompt' parameter is strictly required and must be a string.");
+  if (!prompt || typeof prompt !== 'string') {
+    return Shared.v2Core.Helpers.Err(
+      "Error (createMermaidDiagram): 'prompt' parameter is strictly required and must be a string."
+    );
+  }
+
+  try {
+    safeEmit(agent, `Charting and drawing...`);
+    // Instantiate the standard AI Caller service
+    const aiCall = await Shared.callAI.aiFactory();
+
+    // Step 1: Generate initial diagram
+    const userPrompt = `Here are your instructions: <prompt>${prompt}</prompt>\nReturn only the Mermaid code.`;
+
+    const generationResponse = await aiCall.generateText(
+      userPrompt,
+      GENERATION_SYSTEM_PROMPT,
+      { ...aiSettings, quality: 3 }
+    );
+    if (generationResponse.isErr()) {
+      return Shared.v2Core.Helpers.Err(
+        `AI Call failed during Mermaid generation step: ${generationResponse.value}`
+      );
+    }
+    safeEmit(agent, `Sharpening pencil.. `);
+    const rawGeneratedCode = extractCodeBlock(generationResponse.value);
+
+    // Step 2: Critic / Review Phase
+    const reviewPrompt = `Review this mermaid code for errors and fix any that you find:\n\n\n${rawGeneratedCode}`;
+
+    safeEmit(agent, `Checking my work...`);
+    const reviewResponse = await aiCall.generateText(
+      reviewPrompt,
+      REVIEW_SYSTEM_PROMPT,
+      { ...aiSettings, quality: 3 }
+    );
+    if (reviewResponse.isErr()) {
+      return Shared.v2Core.Helpers.Err(
+        `AI Call failed during Mermaid review step: ${reviewResponse.value}`
+      );
     }
 
-    try {
-        safeEmit(agent, `Charting and drawing...`);
-        // Instantiate the standard AI Caller service
-        const aiCall = await Shared.callAI.aiFactory();
+    const finalMermaidCode = extractCodeBlock(reviewResponse.value);
 
-        // Step 1: Generate initial diagram
-        const userPrompt = `Here are your instructions: <prompt>${prompt}</prompt>\nReturn only the Mermaid code.`;
-        
-        const generationResponse = await aiCall.generateText(userPrompt, GENERATION_SYSTEM_PROMPT, { ...aiSettings, quality: 3 });
-        if (generationResponse.isErr()) {
-            return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid generation step: ${generationResponse.value}`);
-        }
-        safeEmit(agent, `Sharpening pencil.. `);
-        const rawGeneratedCode = extractCodeBlock(generationResponse.value);
-
-        // Step 2: Critic / Review Phase
-        const reviewPrompt = `Review this mermaid code for errors and fix any that you find:\n\n\n${rawGeneratedCode}`;
-        
-        safeEmit(agent, `Checking my work...`);
-        const reviewResponse = await aiCall.generateText(reviewPrompt, REVIEW_SYSTEM_PROMPT, { ...aiSettings, quality: 3 });
-        if (reviewResponse.isErr()) {
-            return Shared.v2Core.Helpers.Err(`AI Call failed during Mermaid review step: ${reviewResponse.value}`);
-        }
-
-        const finalMermaidCode = extractCodeBlock(reviewResponse.value);
-
-        // Step 3: Prepare standardized Tool output
-        const resultData = {
-            success: true,
-            mermaidCode: finalMermaidCode,
-            timestamp: new Date().toISOString()
-        };
-        const message = new Shared.aiAgents.Classes.DataMessage({
-            role: Shared.aiAgents.Constants.Roles.Tool,
-            data: resultData,
-            ext: "json",
-            toolName: details.toolName,
-            instructions: "Present the generated Mermaid code to the user or process it for rendering."
-        });
-        if (agent && typeof agent.addAiCount === 'function') {
-            agent.addAiCount(2);
-        }
-        return Shared.v2Core.Helpers.Ok([message]);
-
-    } catch (error) {
-        return Shared.v2Core.Helpers.Err(`Critical execution error in ${details.toolName}: ${error.message}`);
+    // Step 3: Prepare standardized Tool output
+    const resultData = {
+      success: true,
+      mermaidCode: finalMermaidCode,
+      timestamp: new Date().toISOString(),
+    };
+    const message = new Shared.aiAgents.Classes.DataMessage({
+      role: Shared.aiAgents.Constants.Roles.Tool,
+      data: resultData,
+      ext: 'json',
+      toolName: details.toolName,
+      instructions:
+        'Present the generated Mermaid code to the user or process it for rendering.',
+    });
+    if (agent && typeof agent.addAiCount === 'function') {
+      agent.addAiCount(2);
     }
+    return Shared.v2Core.Helpers.Ok([message]);
+  } catch (error) {
+    return Shared.v2Core.Helpers.Err(
+      `Critical execution error in ${details.toolName}: ${error.message}`
+    );
+  }
 }
 
 /**
  * Pure function to extract Mermaid code from markdown formatting.
- * 
+ *
  * @param {string} text - The raw AI output
  * @returns {string} - The clean extracted code
  */
 function extractCodeBlock(text) {
-    if (!text) return "";
-    
-    const blockRegex = /```(?:mermaid)?\n([\s\S]*?)```/;
-    const match = text.match(blockRegex);
-    
-    if (match && match[1]) {
-        return match[1].trim();
-    }
-    
-    // Fallback if AI forgot to wrap in a markdown block
-    return text.trim();
+  if (!text) return '';
+
+  const blockRegex = /```(?:mermaid)?\n([\s\S]*?)```/;
+  const match = text.match(blockRegex);
+
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+
+  // Fallback if AI forgot to wrap in a markdown block
+  return text.trim();
 }

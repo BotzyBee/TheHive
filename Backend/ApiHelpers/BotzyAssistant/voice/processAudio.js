@@ -11,31 +11,30 @@ import { PassThrough, Readable } from 'stream';
  * @returns {Promise<Buffer>}    - MP3-encoded audio
  */
 export const convertToMp3Buffer = (inputBuffer, inputFormat = 'webm') => {
-    return new Promise((resolve, reject) => {
-        // Wrap the buffer in a readable stream so fluent-ffmpeg can consume it
-        const inputStream  = Readable.from(inputBuffer);
-        const outputStream = new PassThrough();
+  return new Promise((resolve, reject) => {
+    // Wrap the buffer in a readable stream so fluent-ffmpeg can consume it
+    const inputStream = Readable.from(inputBuffer);
+    const outputStream = new PassThrough();
 
-        const chunks = [];
-        outputStream.on('data',  (chunk) => chunks.push(chunk));
-        outputStream.on('end',   ()      => resolve(Buffer.concat(chunks)));
-        outputStream.on('error', reject);
+    const chunks = [];
+    outputStream.on('data', (chunk) => chunks.push(chunk));
+    outputStream.on('end', () => resolve(Buffer.concat(chunks)));
+    outputStream.on('error', reject);
 
-        ffmpeg(inputStream)
-            .inputFormat(inputFormat)
-            .audioCodec('libmp3lame')
-            .audioBitrate('128k')
-            .audioChannels(1)
-            .audioFrequency(16000)
-            .format('mp3')
-            .on('error', (err) => {
-                console.error('[FFmpeg] Conversion error:', err.message);
-                reject(err);
-            })
-            .pipe(outputStream);
-    });
+    ffmpeg(inputStream)
+      .inputFormat(inputFormat)
+      .audioCodec('libmp3lame')
+      .audioBitrate('128k')
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .format('mp3')
+      .on('error', (err) => {
+        console.error('[FFmpeg] Conversion error:', err.message);
+        reject(err);
+      })
+      .pipe(outputStream);
+  });
 };
-
 
 /**
  * SOURCE: Frontend WebSockets (WebM) — kept for reference / future use
@@ -43,19 +42,19 @@ export const convertToMp3Buffer = (inputBuffer, inputFormat = 'webm') => {
  * DESTINATION: Streaming STT (not currently used)
  */
 export const normalizeToPCMStream = (inputStream, inputFormat = 'webm') => {
-    const outputStream = new PassThrough();
+  const outputStream = new PassThrough();
 
-    ffmpeg(inputStream)
-        .inputFormat(inputFormat)
-        .audioCodec('pcm_s16le')
-        .format('s16le')
-        .audioChannels(1)
-        .audioFrequency(16000)
-        .on('error', (err) => {
-            console.error('[FFmpeg] PCM stream error:', err.message);
-            outputStream.end();
-        })
-        .pipe(outputStream);
+  ffmpeg(inputStream)
+    .inputFormat(inputFormat)
+    .audioCodec('pcm_s16le')
+    .format('s16le')
+    .audioChannels(1)
+    .audioFrequency(16000)
+    .on('error', (err) => {
+      console.error('[FFmpeg] PCM stream error:', err.message);
+      outputStream.end();
+    })
+    .pipe(outputStream);
 
-    return outputStream;
+  return outputStream;
 };

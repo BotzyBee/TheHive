@@ -25,19 +25,25 @@ export function Err(value) {
  * @param {any} value - accepts any type of data
  * @returns {Result} { outcome: 'Error', value: the data passed as input }
  */
-export function logAndErr(value){
-    log(value);
-    return new Result(false, value);
-};
+export function logAndErr(value) {
+  log(value);
+  return new Result(false, value);
+}
 
 // [][] -- Log Helper Fn -- [][]
 const MAX_LOGS = 500;
 export function log(...input) {
   console.log(...input);
-  allLogs.push(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    message: input,
-  }, null, 2));
+  allLogs.push(
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        message: input,
+      },
+      null,
+      2
+    )
+  );
   if (allLogs.length > MAX_LOGS) {
     allLogs.shift();
   }

@@ -1,6 +1,6 @@
 export const TA_PromptsAndSchemas = {
-    planning: {
-        sys: `Role: You are a Logic Decomposition Specialist. Your goal is to transform vague user tasks into a sequence of atomic, "zero-assumption" action points for an autonomous AI agent.
+  planning: {
+    sys: `Role: You are a Logic Decomposition Specialist. Your goal is to transform vague user tasks into a sequence of atomic, "zero-assumption" action points for an autonomous AI agent.
 Core Philosophy: You must take nothing for granted. 
 
 If a task contains a relative term (e.g., "yesterday," "last week," "the budget"), you must try and resolve these. Note some details may be found in globalData or toolData.  
@@ -27,44 +27,46 @@ Example Transformation: Task: "Email the summary of yesterday's meeting to Sarah
 IMPORTANT! - You MUST review the tool data in the context to check if an action has already been completed. Any completed tool actions are added to the context object.
 You must not repeat actions when the data is already available in the context object. 
 `,
-        usr: (task, globalContext, guideText) => {
-            return `Here is your task from the user <userTask> ${task} </userTask>
+    usr: (task, globalContext, guideText) => {
+      return `Here is your task from the user <userTask> ${task} </userTask>
             Here is some context which may help (may be blank) <context> ${globalContext} </context>
-            Here is some guide text which may help (may be blank) <guide> ${guideText} </guide>`
-        },
-        schema: {
-            "type": "object",
-            "description": "Status of the current task, including the execution plan and any failure details.",
-            "properties": {
-            "status": {
-                "type": "string",
-                "enum": ["ok", "need info", "cant plan"],
-                "description": "The current state of the task request."
-            },
-            "plan": {
-                "type": "array",
-                "description": "A list of steps required to complete the task.",
-                "items": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                    "type": "string",
-                    "description": "Description of the step to be taken."
-                    }
-                },
-                "required": ["action"]
-                }
-            },
-            "failText": {
-                "type": "string",
-                "description": "Explanation of why the plan failed or cannot be completed."
-            }
-            },
-            "required": ["status"]
-        }
+            Here is some guide text which may help (may be blank) <guide> ${guideText} </guide>`;
     },
-    planningTools: {
-        sys: `Role: You are a Systems Integration Architect. Your task is to take a raw list of atomic actions and map them to a functional execution plan using a specific set of available tools.
+    schema: {
+      type: 'object',
+      description:
+        'Status of the current task, including the execution plan and any failure details.',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['ok', 'need info', 'cant plan'],
+          description: 'The current state of the task request.',
+        },
+        plan: {
+          type: 'array',
+          description: 'A list of steps required to complete the task.',
+          items: {
+            type: 'object',
+            properties: {
+              action: {
+                type: 'string',
+                description: 'Description of the step to be taken.',
+              },
+            },
+            required: ['action'],
+          },
+        },
+        failText: {
+          type: 'string',
+          description:
+            'Explanation of why the plan failed or cannot be completed.',
+        },
+      },
+      required: ['status'],
+    },
+  },
+  planningTools: {
+    sys: `Role: You are a Systems Integration Architect. Your task is to take a raw list of atomic actions and map them to a functional execution plan using a specific set of available tools.
 Objectives:
 1.	Tool Matching: For every action provided, identify the most appropriate tool from the provided Tool Documentation.
 2.	Strategic Synthesis: You are permitted to merge actions if a single tool call handles multiple steps (e.g., a "Search and Read" tool) or add "Verification" actions if a tool's output is required to proceed safely.
@@ -79,60 +81,64 @@ Guidelines for Selection:
 CRITICAL: Use a 'rePlanTool' immediately after any tool call that identifies a list of objects (files, data points, etc.). Our plans are static and cannot loop or scale automatically; replanning is necessary to handle the specific number of entities discovered at runtime.
 Do not repeat any actions that are in the context. It is important not to duplicate work unless a change of plan necessitates it. 
 `,
-        usr: (task, actions, tools, priorActions, contextData) => {
-            return `Here is your task from the user <userTask> ${task} </userTask>
+    usr: (task, actions, tools, priorActions, contextData) => {
+      return `Here is your task from the user <userTask> ${task} </userTask>
             Here is a list of suggested atomic actions <actions> ${actions} </actions>
             Here is a list of previously completed action which must not be duplicated (may be empty) <completed> ${priorActions} </completed>
             Here is any context from prior tool use <context> ${contextData} </context>
-            Here is a list of available tools <tools> ${tools} </tools>`
-        },
-        schema: {
-            "type": "object",
-            "description": "Status of the current task, including the execution plan and any failure details.",
-            "properties": {
-            "status": {
-                "type": "string",
-                "enum": ["ok", "need info", "cant plan"],
-                "description": "The current state of the task request."
-            },
-            "plan": {
-                "type": "array",
-                "description": "A list of steps required to complete the task.",
-                "items": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                    "type": "string",
-                    "description": "Description of the step to be taken."
-                    },
-                    "tool": {
-                    "type": "string",
-                    "description": "The name of the tool to be used to complete the action"
-                    }
-                },
-                "required": ["action", "tool"]
-                }
-            },
-            "failText": {
-                "type": "string",
-                "description": "Explanation of why the plan failed or cannot be completed."
-            }
-            },
-            "required": ["status", "plan"]
-        }
+            Here is a list of available tools <tools> ${tools} </tools>`;
     },
-    planUpdate: { // note - plan update uses the sys and schema from planning!
-        usr: (task, completedActions, reviewFeedback, globalContext, guideText) => {
-            return `Here is your task from the user <userTask> ${task} </userTask>
+    schema: {
+      type: 'object',
+      description:
+        'Status of the current task, including the execution plan and any failure details.',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['ok', 'need info', 'cant plan'],
+          description: 'The current state of the task request.',
+        },
+        plan: {
+          type: 'array',
+          description: 'A list of steps required to complete the task.',
+          items: {
+            type: 'object',
+            properties: {
+              action: {
+                type: 'string',
+                description: 'Description of the step to be taken.',
+              },
+              tool: {
+                type: 'string',
+                description:
+                  'The name of the tool to be used to complete the action',
+              },
+            },
+            required: ['action', 'tool'],
+          },
+        },
+        failText: {
+          type: 'string',
+          description:
+            'Explanation of why the plan failed or cannot be completed.',
+        },
+      },
+      required: ['status', 'plan'],
+    },
+  },
+  planUpdate: {
+    // note - plan update uses the sys and schema from planning!
+    usr: (task, completedActions, reviewFeedback, globalContext, guideText) => {
+      return `Here is your task from the user <userTask> ${task} </userTask>
             The following actions have already been completed <completed> ${completedActions} </completed>
             Here are any issues that need to be resolved <issues> ${reviewFeedback} </issues>
             Here is some context which may help (may be blank) <context> ${globalContext} </context>
             Here is some guide text which may help (may be blank) <guide> ${guideText} </guide>
-            IMPORTANT: Only include the new actions needing to be done in your output. Do not include actions which have already been completed in your plan.`
-        },
+            IMPORTANT: Only include the new actions needing to be done in your output. Do not include actions which have already been completed in your plan.`;
     },
-    craftParams: {
-        sys: `
+  },
+  craftParams: {
+    sys: `
         You are an AI agent tasked with building input parameter objects.
         The final output should always be an array of objects where each object has this shape: { key: string, type: string, value: any }.
         Use the input schema to decide what keys and values you need to add to the array.
@@ -149,54 +155,54 @@ Do not repeat any actions that are in the context. It is important not to duplic
             { key : 'key_from_schema' , type: 'ref', value: '<< contextData.ACT_XXXX.data.b >>' },
             { key : 'key_from_schema2' , type: 'ref', value: '<< contextData.ACT_XXXX.data.a >> can be combined in the output.' }
         ]`,
-        usr: (task, contextData, toolSchema) => {
-            return `<task> ${task} </task>
+    usr: (task, contextData, toolSchema) => {
+      return `<task> ${task} </task>
             Here is the context data (may be empty) <contextData>${contextData}</contextData>
             Here is the tool input parameters schema <tool>${toolSchema}</tool>
             Remember you can use property access paths or direct responses when crafting the input params.
             Check you are providing params for all inputs specified in the schema - do not miss any that are required.
             Your output must be an array of { key: string, type: string, value: any } objects`;
-        },
-        schema: {
-        "type": "object",
-        "properties": {
-            "params": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                "key": { "type": "string" },
-                "type": { "type": "string" },
-                "value": {
-                    "description": "The value associated with the key.",
-                    "anyOf": [
-                    { "type": "string" },
-                    { "type": "number" },
-                    { "type": "boolean" },
-                    { "type": "null" },
-                    { 
-                        "type": "object", 
-                        "properties": {}, 
-                        "additionalProperties": false 
-                    },
-                    { 
-                        "type": "array", 
-                        "items": { "type": "string" } 
-                    }
-                    ]
-                }
-                },
-                "required": ["key", "type", "value"],
-                "additionalProperties": false
-            }
-            }
-        },
-        "required": ["params"],
-        "additionalProperties": false
-        },
     },
-    reviewUserMsg: {
-        sys: `Role and Purpose: You are the Strategic Decision Engine. Your sole purpose is to analyse the dialogue between a User and an AI Agent to determine the optimal next step in their workflow. You act as a precise gatekeeper for the Agent’s task management and planning by reviewing the entire conversation history to understand the trajectory of the project. 
+    schema: {
+      type: 'object',
+      properties: {
+        params: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              key: { type: 'string' },
+              type: { type: 'string' },
+              value: {
+                description: 'The value associated with the key.',
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'number' },
+                  { type: 'boolean' },
+                  { type: 'null' },
+                  {
+                    type: 'object',
+                    properties: {},
+                    additionalProperties: false,
+                  },
+                  {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                ],
+              },
+            },
+            required: ['key', 'type', 'value'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['params'],
+      additionalProperties: false,
+    },
+  },
+  reviewUserMsg: {
+    sys: `Role and Purpose: You are the Strategic Decision Engine. Your sole purpose is to analyse the dialogue between a User and an AI Agent to determine the optimal next step in their workflow. You act as a precise gatekeeper for the Agent’s task management and planning by reviewing the entire conversation history to understand the trajectory of the project. 
 
 Analysis Protocol 
 Intent Inference: Analyse the last User message with high sensitivity. Determine if the user is providing new data, pivoting the core goal, affirming the current path, or expressing confusion. 
@@ -214,53 +220,57 @@ Instruction Field Requirements When crafting the text for the ‘instruction’ 
 Quote the User: Use direct quotes from the user to anchor your reasoning and ensure accuracy. 
 Focus on Delta: Specifically highlight only the changes that are needed rather than restating unchanged parts of the plan. 
 Maintain Scope: Ensure the instruction is a direct reflection of the user's intent without adding unauthorized tool suggestions or external assumptions.`,
-        usr: (convoHistory, planData) => {
-            return `Here is the conversation history between user and AI agent <history> ${convoHistory} </history>
+    usr: (convoHistory, planData) => {
+      return `Here is the conversation history between user and AI agent <history> ${convoHistory} </history>
             Here is the current plan (including any completed actions) <plan> ${planData} </plan>`;
-        },
-        schema: {
-        "type": "object",
-        "description": "An object used to manage task workflow and updates based on user feedback.",
-        "properties": {
-            "action": {
-            "type": "string",
-            "description": "The specific operation to perform.",
-            "enum": [
-                "stop",
-                "update_task_plan",
-                "update_task_only",
-                "approve_existing_plan",
-                "clarify_user_message"
-            ]
-            },
-            "instruction": {
-            "type": "string",
-            "description": "Detailed guidance on what needs to happen or change based on user feedback. This is only needed if updating the task or plan."
-            }
-        },
-        "required": [
-            "action"
-        ],
-        "additionalProperties": false
-        }
     },
-    newTaskWording: {
-        sys: `Your task is to reword the current task using feedback as a guide. You should keep the task as detailed and clear as possible. Use UK English.`,
-        usr: (task, feedback) => { return `Here is the curent task wording <task> ${task} </task>.
-        Here is feedback on what needs to change in the task <feedback> ${feedback} </feedback>` },
+    schema: {
+      type: 'object',
+      description:
+        'An object used to manage task workflow and updates based on user feedback.',
+      properties: {
+        action: {
+          type: 'string',
+          description: 'The specific operation to perform.',
+          enum: [
+            'stop',
+            'update_task_plan',
+            'update_task_only',
+            'approve_existing_plan',
+            'clarify_user_message',
+          ],
+        },
+        instruction: {
+          type: 'string',
+          description:
+            'Detailed guidance on what needs to happen or change based on user feedback. This is only needed if updating the task or plan.',
+        },
+      },
+      required: ['action'],
+      additionalProperties: false,
     },
-    returnMessage: {
-        sys: `You are a helpful AI Agent. Your task is to draft a comprehensive response to a user based on the context provided. Your goal is to move the project forward without requiring unnecessary back-and-forth. 
+  },
+  newTaskWording: {
+    sys: `Your task is to reword the current task using feedback as a guide. You should keep the task as detailed and clear as possible. Use UK English.`,
+    usr: (task, feedback) => {
+      return `Here is the curent task wording <task> ${task} </task>.
+        Here is feedback on what needs to change in the task <feedback> ${feedback} </feedback>`;
+    },
+  },
+  returnMessage: {
+    sys: `You are a helpful AI Agent. Your task is to draft a comprehensive response to a user based on the context provided. Your goal is to move the project forward without requiring unnecessary back-and-forth. 
         Your communication style is professional, proactive, and polished - the message format is a 'standard text message'. Don't output the message in an email or letter format. 
         The topic or reason you are messaging the user will be detailed in <phaseMessage>. You will be given other context to help you craft a response message.
         Focus on clarity. If sending the action plan for approval - ensure to include the full plan including details of tools and exact action text. Use UK English. Format and structure your messages for readability.`,
-        usr: (phaseMessage, convoHistory, worldContext, plan) => { return `Here is the phaseMessage which details the reason for messaging the user <phaseMessage> ${phaseMessage} </phaseMessage>.
+    usr: (phaseMessage, convoHistory, worldContext, plan) => {
+      return `Here is the phaseMessage which details the reason for messaging the user <phaseMessage> ${phaseMessage} </phaseMessage>.
         Here is the conversation history with the user <history> ${convoHistory} </history>
         Here is some context data (may be empty) <context> ${worldContext} </context>
-        Here is the task plan. Remember to include this in full if you want the user to review it. <plan> ${plan} </plan>` },
+        Here is the task plan. Remember to include this in full if you want the user to review it. <plan> ${plan} </plan>`;
     },
-    completeCheck: {
-        sys: `Role: You are a pragmatic Quality Assurance (QA) Critic Agent. Your purpose is to verify that the tool output effectively addresses the user's core intent and if the plan still make sense. 
+  },
+  completeCheck: {
+    sys: `Role: You are a pragmatic Quality Assurance (QA) Critic Agent. Your purpose is to verify that the tool output effectively addresses the user's core intent and if the plan still make sense. 
 Goal: Do not nitpick. Your objective is to ensure the output is useful and accurate, not necessarily perfect. 
 
 Evaluation Framework:
@@ -279,9 +289,9 @@ Re-planning could be needed for a number of reasons, for example the wrong tool 
 It could be that the tool has completed however the plan needs to be updated to account for the returned data. 
 Any tool used will be marked complete / not complete at a later stage. Do not trigger a replan to update this field.
 Only set replan to true when it's clear the current plan will not work.`,
-        
-        // Alternative system message (for tools that skip content review) 
-        sysAlt: `Role: Your task is to review the progress of the task and consider if the plan needs updating as a result of the tool output.
+
+    // Alternative system message (for tools that skip content review)
+    sysAlt: `Role: Your task is to review the progress of the task and consider if the plan needs updating as a result of the tool output.
 You are NOT tasked with quality checking or commenting on the quality, accuracy or content of the tool output - simply if the plan needs an update.
 
 Evaluation Framework:
@@ -292,40 +302,39 @@ Re-planning could be needed for a number of reasons, for example the wrong tool 
 It could be that the tool has completed however the plan needs to be updated to account for the returned data. 
 Any tool used will be marked complete / not complete at a later stage. Do not trigger a replan to update this field.
 Only set replan to true when it's clear the current plan will not work.`,
-        usr: (actionText, toolOutputData, globalContext, plan) => { return `Here is the user task which the tool should complete <task> ${actionText} </task>
+    usr: (actionText, toolOutputData, globalContext, plan) => {
+      return `Here is the user task which the tool should complete <task> ${actionText} </task>
         Here is the output from the tool call <toolData> ${toolOutputData} </toolData>
         Here is some global context which might help (may be empty) <globalContext> ${globalContext} </globalContext>
-        Here is the current plan <plan> ${plan} </plan>` },
-        schema: {
-        "type": "object",
-        "description": "Output schema to track completion status and provide optional feedback.",
-        "properties": {
-            "status": {
-            "type": "string",
-            "enum": [
-                "COMPLETE",
-                "INCOMPLETE"
-            ],
-            "description": "The current completion state of the task."
-            },
-            "feedback": {
-            "type": "string",
-            "description": "Optional comments, suggestions, or reasons regarding the task status."
-            },
-            "replan": {
-            "type": "boolean",
-            "description": "Set to true if the plan needs to be updated following the tool call.",
-            "default": false
-            },    
-        },
-        "required": [
-            "status",
-            "replan"
-        ]
-        }
+        Here is the current plan <plan> ${plan} </plan>`;
     },
-    finalOutput: {
-        sys: `Answer in UK English. Your task is to provide a clean, well formatted and comprehensive final output result. 
+    schema: {
+      type: 'object',
+      description:
+        'Output schema to track completion status and provide optional feedback.',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['COMPLETE', 'INCOMPLETE'],
+          description: 'The current completion state of the task.',
+        },
+        feedback: {
+          type: 'string',
+          description:
+            'Optional comments, suggestions, or reasons regarding the task status.',
+        },
+        replan: {
+          type: 'boolean',
+          description:
+            'Set to true if the plan needs to be updated following the tool call.',
+          default: false,
+        },
+      },
+      required: ['status', 'replan'],
+    },
+  },
+  finalOutput: {
+    sys: `Answer in UK English. Your task is to provide a clean, well formatted and comprehensive final output result. 
 You will be provided the user task, plan of action and tool data outputs. 
 If the task asks for data or information then provided this in the fullest extent possible. 
 If the task doesn't ask for data or information then summarise the tasks that were completed. 
@@ -340,29 +349,30 @@ Context Data = { context: { potato: "Example Quote Data", cheese: ["More info.."
 Your answer = '<< context.potato >>'  will output ‘Example Quote Data’. 
 
 You can only quote the text DO NOT add string functions like .split() etc. You can combine multiple tags if you want to output multiple chunks of data.`,
-    
+
     usr: (task, actions, contextData) => {
-        return `<task> ${task} </task>
+      return `<task> ${task} </task>
         Here are the actions that have been completed <actions> ${actions} </actions>
         Here is the context data and tool outputs (may be empty) <contextData> ${contextData} </contextData>`;
     },
     schema: {
-        "type": "object",
-        "description": "An object for returning clean, well formatted text to the user.",
-        "properties": {
-            "output": {
-            "type": "string",
-            "enum": ["Text_Output", "Quote_Text", "Save_Text"]
-            },
-            "data": {
-            "type": "string"
-            }
+      type: 'object',
+      description:
+        'An object for returning clean, well formatted text to the user.',
+      properties: {
+        output: {
+          type: 'string',
+          enum: ['Text_Output', 'Quote_Text', 'Save_Text'],
         },
-        "required": ["output", "data"]
-    }
+        data: {
+          type: 'string',
+        },
+      },
+      required: ['output', 'data'],
     },
-    healError: {
-        sys: `Role: You are the Autonomous Error Recovery & Routing Engine. Your sole purpose is to diagnose execution failures within an agentic loop and route the system to the optimal recovery state.
+  },
+  healError: {
+    sys: `Role: You are the Autonomous Error Recovery & Routing Engine. Your sole purpose is to diagnose execution failures within an agentic loop and route the system to the optimal recovery state.
 
 Core Objective: Analyze the provided error, determine its root cause (Transient, Logic, or Terminal), and return the precise state transition required to "heal" the workflow.
 
@@ -403,9 +413,9 @@ Output MUST strictly follow the JSON schema.
 
 # THIS IS VERY IMPORTANT - The output for the 'nextPhase' field should only be one of the provided JSON enums. For example 'Loading_main' . DO NOT output anything other than the enums here!!
 `,
-    
+
     usr: (error, plan, task) => {
-        return `
+      return `
 ### DIAGNOSTIC CONTEXT
 - **Original Task:** ${task}
 - **Current Plan:** ${plan}
@@ -417,29 +427,29 @@ Analyze the failure point against the diagnostic heuristics. Identify if the fai
 # THIS IS VERY IMPORTANT - The output for the 'nextPhase' field should only be one of the provided JSON enums. For example 'Loading_main' . DO NOT output anything other than the enums here!!`;
     },
     schema: {
-        "type": "object",
-        "description": "An object for selecting the next phase to run.",
-        "properties": {
-            "nextPhase": {
-            "type": "string",
-            "enum": [
-                "Loading_main", 
-                "Plan_createPlan", 
-                "Plan_rePlanning", 
-                "Action_callAgentTool", 
-                "Action_messageUser", 
-                "Review_newMessageFromUser", 
-                "Review_toolOutput", 
-                "Review_contextProcessing", 
-                "Stopped_draftingFinalOutput", 
-                "Stopped_failed"
-            ]
-            },
-            "additionalPrompt": {
-            "type": "string"
-            }
+      type: 'object',
+      description: 'An object for selecting the next phase to run.',
+      properties: {
+        nextPhase: {
+          type: 'string',
+          enum: [
+            'Loading_main',
+            'Plan_createPlan',
+            'Plan_rePlanning',
+            'Action_callAgentTool',
+            'Action_messageUser',
+            'Review_newMessageFromUser',
+            'Review_toolOutput',
+            'Review_contextProcessing',
+            'Stopped_draftingFinalOutput',
+            'Stopped_failed',
+          ],
         },
-        "required": ["nextPhase", "additionalPrompt"]
-        }
+        additionalPrompt: {
+          type: 'string',
+        },
+      },
+      required: ['nextPhase', 'additionalPrompt'],
     },
-}
+  },
+};

@@ -10,13 +10,18 @@ import { Services } from '../../index.js';
 /**
  * Save Content to a file using Streams for memory efficiency.
  * @param {string} folderPath - The full filepath on the host machine (not docker/ container path)
- * @param {string | Buffer | Uint8Array | object | Readable} fileContent 
- * @param {string} fileNameIncExt 
+ * @param {string | Buffer | Uint8Array | object | Readable} fileContent
+ * @param {string} fileNameIncExt
  * @param {object} [options]
  * @param {BufferEncoding} [options.encoding] - optional, specify encoding.
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
-export async function saveFile(folderPath, fileContent, fileNameIncExt, options = {}) {
+export async function saveFile(
+  folderPath,
+  fileContent,
+  fileNameIncExt,
+  options = {}
+) {
   const savePath = path.join(folderPath, fileNameIncExt);
   let sourceStream;
   // Default encoding for strings/objects
@@ -27,7 +32,10 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
     if (fileContent instanceof Readable) {
       // It's already a stream (e.g., an incoming HTTP request or another file)
       sourceStream = fileContent;
-    } else if (Buffer.isBuffer(fileContent) || fileContent instanceof Uint8Array) {
+    } else if (
+      Buffer.isBuffer(fileContent) ||
+      fileContent instanceof Uint8Array
+    ) {
       // Raw binary data
       sourceStream = Readable.from(fileContent);
       encoding = undefined;
@@ -39,7 +47,9 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
       const jsonString = JSON.stringify(fileContent, null, 2);
       sourceStream = Readable.from(jsonString);
     } else {
-      return Services.v2Core.Helpers.Err('Error - (saveFile) : Unsupported content type.');
+      return Services.v2Core.Helpers.Err(
+        'Error - (saveFile) : Unsupported content type.'
+      );
     }
 
     // Ensure directory exists
@@ -51,7 +61,9 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
     // pipeline automatically handles errors and closes streams properly
     await pipeline(sourceStream, writeStream);
 
-    return Services.v2Core.Helpers.Ok(`File created in ${folderPath} called ${fileNameIncExt}`);
+    return Services.v2Core.Helpers.Ok(
+      `File created in ${folderPath} called ${fileNameIncExt}`
+    );
   } catch (error) {
     return Services.v2Core.Helpers.Err(`Error - (saveFile) : ${error.message}`);
   }
@@ -60,17 +72,22 @@ export async function saveFile(folderPath, fileContent, fileNameIncExt, options 
 // [][] ---- READ ---- [][]
 /**
  * Read file content from file on host machine.
- * @param {string} filePath - full filepath of file location on host machine (not docker/ container url) 
+ * @param {string} filePath - full filepath of file location on host machine (not docker/ container url)
  * @param {boolean} asBuffer - true = file will be read as buffer.
  * @param {object} options
- * @param {string} [options.encoding] - optional, specify the encoding if not binary. 
+ * @param {string} [options.encoding] - optional, specify the encoding if not binary.
  * @returns {Result} - {outcome: 'Ok' | 'Error', value: any }
  */
 export async function readFileContent(filePath, asBuffer = false, options) {
-  if(!filePath) return Services.v2Core.Helpers.Err(`Error (readFileContent) : No file path provided.`)
+  if (!filePath)
+    return Services.v2Core.Helpers.Err(
+      `Error (readFileContent) : No file path provided.`
+    );
   const stats = await fsp.lstat(filePath);
   if (!stats.isFile()) {
-    return Services.v2Core.Helpers.Err(`Error: Path is not a file: ${filePath}`);
+    return Services.v2Core.Helpers.Err(
+      `Error: Path is not a file: ${filePath}`
+    );
   }
   const encoding = options?.encoding || 'utf8';
   try {
@@ -88,10 +105,10 @@ export async function readFileContent(filePath, asBuffer = false, options) {
   }
 }
 
-// NOTE - 
+// NOTE -
 /**
  * Fetches the update, created, accessed times for a directory
- * @param {string} url - url must be a directory and be correctly escaped. 
+ * @param {string} url - url must be a directory and be correctly escaped.
  * @returns {Result} {outcome: 'Ok' | 'Error', value: any }
  *   Example Return Data
  */
@@ -101,10 +118,10 @@ export async function getUpdateStatsFromUrl(url) {
     const stats = await fsp.lstat(url);
     const data = {
       ...stats,
-      atimeMs: Math.round(stats.atimeMs),//The last time the file was accessed.
-      mtimeMs: Math.round(stats.mtimeMs),//The last time the file's data was modified.
-      ctimeMs: Math.round(stats.ctimeMs),//The last time the file's status was changed (e.g., permissions, ownership).
-      birthtimeMs: Math.round(stats.birthtimeMs),//The timestamp of when the file was created
+      atimeMs: Math.round(stats.atimeMs), //The last time the file was accessed.
+      mtimeMs: Math.round(stats.mtimeMs), //The last time the file's data was modified.
+      ctimeMs: Math.round(stats.ctimeMs), //The last time the file's status was changed (e.g., permissions, ownership).
+      birthtimeMs: Math.round(stats.birthtimeMs), //The timestamp of when the file was created
     };
     return Services.v2Core.Helpers.Ok(data);
   } catch (error) {
@@ -114,7 +131,7 @@ export async function getUpdateStatsFromUrl(url) {
 
 /**
  * Returns a list of files and sub-directories
- * @param {string} url - must be a directory! 
+ * @param {string} url - must be a directory!
  * @returns {Result} {outcome: 'Ok' | 'Error', value: any }
  */
 export async function getFilesAndDirectoriesFromDir(url) {
@@ -157,7 +174,9 @@ export async function getFilesAndDirectoriesFromDir(url) {
       }
     }
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (getFilesAndDirectoriesFromUrl) : ${error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (getFilesAndDirectoriesFromUrl) : ${error}`
+    );
   }
   // Convert the Set back to an array before returning
   const directoryList = Array.from(directorySet);
@@ -166,8 +185,8 @@ export async function getFilesAndDirectoriesFromDir(url) {
 
 /**
  * Extracts the file extension by looking for the last full stop.
- * @param {string} filename - Name of the file including extension. 
- * @returns {string | null } - null if failed. 
+ * @param {string} filename - Name of the file including extension.
+ * @returns {string | null } - null if failed.
  */
 export function getFileExtension(filename) {
   // Find the last occurrence of the dot character in the filename.
@@ -196,32 +215,38 @@ export function getFileExtensionAndSize(filePath) {
   try {
     // 1. Check if it exists at all before stating
     if (!fs.existsSync(filePath)) {
-        return Services.v2Core.Helpers.Err(`File does not exist at path: ${filePath}`);
+      return Services.v2Core.Helpers.Err(
+        `File does not exist at path: ${filePath}`
+      );
     }
 
     const stats = fs.statSync(filePath);
-    
+
     if (!stats.isFile()) {
-        return Services.v2Core.Helpers.Err(`Target is a directory, not a file: ${filePath}`);
+      return Services.v2Core.Helpers.Err(
+        `Target is a directory, not a file: ${filePath}`
+      );
     }
 
     const sizeBytes = stats.size;
     const ext = path.extname(filePath);
     const extension = ext ? ext.toLowerCase().substring(1) : ''; // Empty string for no extension
-    
+
     return Services.v2Core.Helpers.Ok({
       extension: extension,
       sizeBytes: sizeBytes,
       sizeFormatted: Services.v2Core.Utils.formatBytes(sizeBytes),
     });
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`OS Error accessing file: ${error.message}`);
+    return Services.v2Core.Helpers.Err(
+      `OS Error accessing file: ${error.message}`
+    );
   }
 }
 
 /**
- * Scans the provided folder returning an array of sub-directories and files.  
- * @param {string} relativeFolderPath - relative folder path (container path) not host system path. 
+ * Scans the provided folder returning an array of sub-directories and files.
+ * @param {string} relativeFolderPath - relative folder path (container path) not host system path.
  * @returns {Result} { outcome: 'Ok' | 'Error', value: { directoryList[string], fileList[string] } | string }
  */
 export async function scanFolderRecursively(relativeFolderPath) {

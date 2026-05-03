@@ -5,8 +5,8 @@ export class ServiceRegistry {
 
   /**
    * Register a service instance.
-   * @param {string} name 
-   * @param {object} instance 
+   * @param {string} name
+   * @param {object} instance
    */
   register(name, instance) {
     if (this.services.has(name)) {
@@ -21,7 +21,9 @@ export class ServiceRegistry {
   get(name) {
     const service = this.services.get(name);
     if (!service) {
-      throw new Error(`ServiceRegistry Error: "${name}" has not been registered yet.`);
+      throw new Error(
+        `ServiceRegistry Error: "${name}" has not been registered yet.`
+      );
     }
     return service;
   }

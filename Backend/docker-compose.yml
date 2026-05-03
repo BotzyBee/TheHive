@@ -22,7 +22,7 @@ services:
     depends_on:
       - indexdb
       - n8n
-      - ollama 
+      - ollama
     volumes:
       - shared-data:/data
     networks:
@@ -34,7 +34,7 @@ services:
     ports:
       - '5678:5678'
     environment:
-      - N8N_USER_FOLDER=/data/AppFiles/n8n_data 
+      - N8N_USER_FOLDER=/data/AppFiles/n8n_data
       - WEBHOOK_URL=http://localhost:5678/
     volumes:
       - shared-data:/data
@@ -66,7 +66,7 @@ volumes:
       type: none
       device: ${knowledgebaseHostURL}
       o: bind
-  ollama_models: 
+  ollama_models:
 
 networks:
   thehive_network:

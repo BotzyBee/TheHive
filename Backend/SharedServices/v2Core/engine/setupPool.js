@@ -15,23 +15,25 @@ export let pool; // Piscina worker pool (multi-thread)
 
 // Setup the worker pool
 export function setupPool() {
-    console.log("Setting up Worker Pool");
-    if(isMainThread){
-        pool = new Piscina({
-            filename: new URL('./workers.js', import.meta.url).href,
-            minThreads: 2, // Minimum number of worker threads to keep alive
-            maxThreads: 4, // Maximum number of worker threads
-        });
+  console.log('Setting up Worker Pool');
+  if (isMainThread) {
+    pool = new Piscina({
+      filename: new URL('./workers.js', import.meta.url).href,
+      minThreads: 2, // Minimum number of worker threads to keep alive
+      maxThreads: 4, // Maximum number of worker threads
+    });
 
-        // Listen for messages from workers and pass on
-        pool.on('message', (msg) => {
-            // io is your Socket.io instance on the main thread
-            const socket = io.value.sockets.sockets.get(msg.socketId); 
-            if (socket) {
-                socket.emit(msg.event, msg.data);
-            } else {
-                console.log(`Warning: Socket ${msg.socketId} not found for event "${msg.event}"`);
-            }
-        });
-    }
+    // Listen for messages from workers and pass on
+    pool.on('message', (msg) => {
+      // io is your Socket.io instance on the main thread
+      const socket = io.value.sockets.sockets.get(msg.socketId);
+      if (socket) {
+        socket.emit(msg.event, msg.data);
+      } else {
+        console.log(
+          `Warning: Socket ${msg.socketId} not found for event "${msg.event}"`
+        );
+      }
+    });
+  }
 }

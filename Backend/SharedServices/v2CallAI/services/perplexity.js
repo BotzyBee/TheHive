@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
 import { Services } from '../../index.js';
 
-
 /**
  * Unified Perplexity AI call handler (Internal Streaming).
  * Consumes the stream internally and returns the final concatenated result.
@@ -15,7 +14,7 @@ export async function callPerplexity(
   options = {}
 ) {
   console.log(`Calling Perplexity: ${model}`);
-  
+
   const ppxAPI = process.env.PXY_KEY;
   const { structuredOutput, domains = [] } = options;
 
@@ -65,7 +64,7 @@ export async function callPerplexity(
 
           try {
             const parsed = JSON.parse(message);
-            const delta = parsed.choices[0]?.delta?.content || "";
+            const delta = parsed.choices[0]?.delta?.content || '';
             fullContent += delta;
 
             // Citations usually come in the final chunks or update as they go
@@ -85,24 +84,33 @@ export async function callPerplexity(
           try {
             finalOutput = JSON.parse(fullContent);
           } catch (e) {
-            return resolve(Services.v2Core.Helpers.Err('Error: Could not parse final stream to JSON.'));
+            return resolve(
+              Services.v2Core.Helpers.Err(
+                'Error: Could not parse final stream to JSON.'
+              )
+            );
           }
         }
-        
-        resolve(Services.v2Core.Helpers.Ok(new Services.aiAgents.Classes.WebsearchResult(finalOutput, finalCitations)));
+
+        resolve(
+          Services.v2Core.Helpers.Ok(
+            new Services.aiAgents.Classes.WebsearchResult(
+              finalOutput,
+              finalCitations
+            )
+          )
+        );
       });
 
       response.data.on('error', (err) => {
         reject(Services.v2Core.Helpers.Err(`Stream Error: ${err.message}`));
       });
     });
-
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
     return Services.v2Core.Helpers.Err(`Error (callPerplexity): ${errorMsg}`);
   }
 }
-
 
 // /**
 //  * Unified Perplexity AI call handler (Synchronous only).
@@ -121,7 +129,7 @@ export async function callPerplexity(
 //   options = {}
 // ) {
 //   console.log(`Calling Perplexity : ${model}`);
-  
+
 //   const ppxAPI = process.env.PXY_KEY;
 
 //   const { structuredOutput, domains = [] } = options;

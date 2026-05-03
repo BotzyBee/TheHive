@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import { initServices, shutdownServices } from './ApiHelpers/manageServices.js';
-import { io } from './ApiHelpers/socketHelpers.js'; 
+import { io } from './ApiHelpers/socketHelpers.js';
 import { getConfigForFrontend, stopJob } from './ApiHelpers/miscHelpers.js';
 import { getFormattedModelRegistry } from './SharedServices/v2CallAI/core/utils.js';
 import { handleTAMessage } from './SharedServices/v2Agents/engine/taskAgent.js';
@@ -18,19 +18,19 @@ import { handleModelUpdates } from './ApiHelpers/miscHelpers.js';
 // [][] -------------------------------------- [][]
 //                init server
 // [][] -------------------------------------- [][]
-console.log("Starting The Hive API Server..."); 
+console.log('Starting The Hive API Server...');
 // Init Express server.
-const app = express(); 
+const app = express();
 const port = 3000;
-app.use(cors()); 
+app.use(cors());
 app.use(express.json());
 const httpServer = createServer(app); //Create the explicit HTTP server (wrapping the Express app)
 // Init Socket.io
 io.value = new Server(httpServer, {
   cors: {
-    origin: "*", // Matches your current Express CORS logic
-    methods: ["GET", "POST"]
-  }
+    origin: '*', // Matches your current Express CORS logic
+    methods: ['GET', 'POST'],
+  },
 });
 
 // [][] -------------------------------------- [][]
@@ -42,37 +42,37 @@ app.get('/', (req, res) => {
   res.status(200).send('The Hive is online 🐝');
 });
 
-app.get("/getConfig", async (req, res) => {
+app.get('/getConfig', async (req, res) => {
   let msg = getConfigForFrontend();
   res.status(200).json(msg);
 });
 
-app.get("/getModels", async (req, res) => {
+app.get('/getModels', async (req, res) => {
   let msg = await getFormattedModelRegistry();
   res.status(200).json(msg);
 });
 
-app.post("/updateModels", async (req, res) => {
+app.post('/updateModels', async (req, res) => {
   let data = req.body;
-  console.log("Received model update request:", data);
+  console.log('Received model update request:', data);
   let msg = await handleModelUpdates(data);
-  if(msg.isErr()){
+  if (msg.isErr()) {
     console.error(`Model update failed: ${msg.value}`);
-    return res.status(400).json({outcome: 'Failed', message: msg.value});
+    return res.status(400).json({ outcome: 'Failed', message: msg.value });
   }
-  console.log("Model update successful");
-  res.status(200).json({outcome: 'Success', message: msg.value});
+  console.log('Model update successful');
+  res.status(200).json({ outcome: 'Success', message: msg.value });
 });
 
-app.post("/handleN8N", async (req, res) => {
-  handleN8N_message(req)
-  res.status(200).json({result: "Ok"});
+app.post('/handleN8N', async (req, res) => {
+  handleN8N_message(req);
+  res.status(200).json({ result: 'Ok' });
 });
 
 // app.get("/test", async (req, res) => {
 //   let prompt = res.req.query?.prompt || null;
 //   let webUrl = res.req.query?.webUrl || null;
-//   if(prompt == null || webUrl == null){ 
+//   if(prompt == null || webUrl == null){
 //     return res.status(400).json({
 //         error: `Error : prompt or webUrl parameter is missing or null!`
 //     });
@@ -82,75 +82,81 @@ app.post("/handleN8N", async (req, res) => {
 //   res.status(200).json(msg.value);
 // });
 
-
 // [][] -------------------------------------- [][]
 //                 WEBSOCKET EVENTS
 // [][] -------------------------------------- [][]
- // shoud only be one for now but can be used for multi-user features in the future.
+// shoud only be one for now but can be used for multi-user features in the future.
 
 //Handle Socket.io.value connections
 
 io.value.on('connection', (socket) => {
-    log(`Main Route Active '/': ${socket.id}`);
+  log(`Main Route Active '/': ${socket.id}`);
 
-    // --- TASK AGENT JOB ---
-    socket.on('submit_task', async (data, callback) => {
-      console.log("Task Agent Job Received");
-        const frontendMessage = data?.fmf || null;
-        if (!frontendMessage) return callback({ error: "fmf is missing" });
-        let result = await handleTAMessage(frontendMessage, socket.id);
-        if (result.isErr()) { return callback({ error: result.value }); }
-        callback(result.value);
-    });
+  // --- TASK AGENT JOB ---
+  socket.on('submit_task', async (data, callback) => {
+    console.log('Task Agent Job Received');
+    const frontendMessage = data?.fmf || null;
+    if (!frontendMessage) return callback({ error: 'fmf is missing' });
+    let result = await handleTAMessage(frontendMessage, socket.id);
+    if (result.isErr()) {
+      return callback({ error: result.value });
+    }
+    callback(result.value);
+  });
 
-    // --- QUICK-ASK AGENT JOB ---
-    socket.on('submit_quick_ask', async (data, callback) => {
-      console.log("Quick Ask Job Received");
-        const frontendMessage = data?.fmf || null;
-        if (!frontendMessage) return callback({ error: "fmf is missing" });
-        let result = await handleQAMessage(frontendMessage, socket.id);
-        if (result.isErr()) return callback({ error: result.value });
+  // --- QUICK-ASK AGENT JOB ---
+  socket.on('submit_quick_ask', async (data, callback) => {
+    console.log('Quick Ask Job Received');
+    const frontendMessage = data?.fmf || null;
+    if (!frontendMessage) return callback({ error: 'fmf is missing' });
+    let result = await handleQAMessage(frontendMessage, socket.id);
+    if (result.isErr()) return callback({ error: result.value });
 
-        callback(result.value);
-    });
+    callback(result.value);
+  });
 
-    // --- STOP JOB ---
-    socket.on('stop_task', async (data, callback) => {
-        const jobID = data?.jobID;
-        if (!jobID) return callback({ error: "JobID missing" });
-        let res = stopJob(jobID);
-        callback(res);
-    });
+  // --- STOP JOB ---
+  socket.on('stop_task', async (data, callback) => {
+    const jobID = data?.jobID;
+    if (!jobID) return callback({ error: 'JobID missing' });
+    let res = stopJob(jobID);
+    callback(res);
+  });
 
-    // --- CALL MODEL DIRECTLY ---
-    socket.on('direct_to_model', async (data, callback) => {
-      console.log("Direct to model called...");
-      await directToModel(data.query, data.aiSettings, data.webGrounding, socket.id);
-    });
+  // --- CALL MODEL DIRECTLY ---
+  socket.on('direct_to_model', async (data, callback) => {
+    console.log('Direct to model called...');
+    await directToModel(
+      data.query,
+      data.aiSettings,
+      data.webGrounding,
+      socket.id
+    );
+  });
 
-    // Existing rust logic
-    // socket.on('take-action-result', (data) => {
-    //     rustActionState.result = data;
-    //     console.log('Received result from Rust WebDriver:', JSON.stringify(data));
-    // });
+  // Existing rust logic
+  // socket.on('take-action-result', (data) => {
+  //     rustActionState.result = data;
+  //     console.log('Received result from Rust WebDriver:', JSON.stringify(data));
+  // });
 
-    socket.on('disconnect', () => {
-        log(`User left: ${socket.id}`);
-    });
+  socket.on('disconnect', () => {
+    log(`User left: ${socket.id}`);
+  });
 });
 
 // [][] --- CHAT BOTZY WS ROUTE --- [][]
 io.value.of('/chat_botzy').on('connection', (socket) => {
   console.log(`Chat Botzy Active :: ${socket.id}`);
-    handleFrontendConnection(socket).catch(err => {
-        console.error('Chat Botzy Socket Failed:', err);
-        socket.disconnect(true);
-    });
+  handleFrontendConnection(socket).catch((err) => {
+    console.error('Chat Botzy Socket Failed:', err);
+    socket.disconnect(true);
+  });
 });
 
 io.value.of('/chat_botzy').on('disconnect', (socket) => {
-  console.log(`User Left (chat_botzy) : ${socket.id}`)
-})
+  console.log(`User Left (chat_botzy) : ${socket.id}`);
+});
 
 // [][] -------------------------------------- [][]
 //             LISTENERS & SERVER START

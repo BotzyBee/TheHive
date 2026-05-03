@@ -117,8 +117,8 @@ export async function generateEmbeddings(model, options = {}) {
     }
 
     const response = await client.embeddings.create(payload);
-    const vectors = response.data.map(item => item.embedding);
-    
+    const vectors = response.data.map((item) => item.embedding);
+
     return Services.v2Core.Helpers.Ok(vectors);
   } catch (error) {
     return Services.v2Core.Helpers.Err(
@@ -143,9 +143,7 @@ export async function generateText(
 ) {
   Services.v2Core.Helpers.log('Calling OpenAI -> generateText');
 
-  const {
-    structuredOutput,
-  } = options;
+  const { structuredOutput } = options;
 
   if (!model) {
     return Services.v2Core.Helpers.Err(
@@ -167,7 +165,10 @@ export async function generateText(
     } else if (typeof contentMessage === 'object' && contentMessage !== null) {
       const userContentArray = [];
       if (contentMessage.text) {
-        userContentArray.push({ type: 'text', text: contentMessage.text.trim() });
+        userContentArray.push({
+          type: 'text',
+          text: contentMessage.text.trim(),
+        });
       }
       if (contentMessage.imageUrl) {
         userContentArray.push({
@@ -175,7 +176,7 @@ export async function generateText(
           image_url: { url: contentMessage.imageUrl },
         });
       }
-      
+
       if (userContentArray.length > 0) {
         messages.push({ role: 'user', content: userContentArray });
       }
@@ -185,7 +186,6 @@ export async function generateText(
       model,
       messages,
     };
-
 
     // Implement Native Structured Outputs
     if (structuredOutput) {

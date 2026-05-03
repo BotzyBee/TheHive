@@ -5,10 +5,10 @@
 
 // /**
 //  * Sends a message to Rust to start the web agent with the specified URL and job ID.
-//  * @param {String} webUrl - The URL that the web agent should navigate to 
+//  * @param {String} webUrl - The URL that the web agent should navigate to
 //  * @param {Object} socket - The socket.io instance to communicate with Rust
 //  * @param {String} jobID - A unique identifier for the job, used for tracking and logging
-//  * Returns void, but emits a 'start-web-agent' event to Rust with the necessary information to start the web agent. 
+//  * Returns void, but emits a 'start-web-agent' event to Rust with the necessary information to start the web agent.
 //  */
 // export async function initWebDriver(socket, webUrl, jobID) {
 //     return new Promise((resolve) => {
@@ -76,7 +76,7 @@
 //                 socket.off('page-content-response', handleResponse);
 
 //                 if(data.outcome === RustMessageOutcome.Success){
-//                     resolve(Ok(data)); 
+//                     resolve(Ok(data));
 //                 } else {
 //                     resolve(Err(`Error (getCurrentPageContent) : ${data.data}`));
 //                 }
@@ -94,7 +94,7 @@
 //                 RustMessageType.Request,
 //                 {}
 //             );
-            
+
 //             socket.emit('capture-dom', message);
 //         } catch (e) {
 //             clearTimeout(timeout);

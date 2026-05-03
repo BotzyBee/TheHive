@@ -7,11 +7,11 @@ REMEMBER - Threads cannot access the global vars on the main thread... they have
 
 import { initRegistry } from '../../../ApiHelpers/buildRegistry.js';
 import { Services } from '../../index.js';
-import { TaskAgent } from '../../v2Agents/services/TaskAgent_v3/index.js'; 
+import { TaskAgent } from '../../v2Agents/services/TaskAgent_v3/index.js';
 import { QuickAskAgent } from '../../v2Agents/services/QuickAsk/index.js';
 import { parentPort } from 'worker_threads';
 
-let indexTimerActive = false
+let indexTimerActive = false;
 
 // Bootstrap the Services in the worker thread.
 let isInitialized = false;
@@ -21,33 +21,44 @@ function bootstrapServices() {
   isInitialized = true;
 }
 
-export async function poolIndexKnowledgebase(){
-    bootstrapServices();
-    indexTimerActive = true;
-    let dbAgent = await Services.database.ManageDb.getDbAgent();
-    if(dbAgent.isErr()){
-        indexTimerActive = false;
-        console.log(`Error getting DB Agent in poolIndexKnowledgebase: ${dbAgent.value}`);
-        return; 
-    }
-    let call = await Services.database.indexKnowledgebase(dbAgent.value);
+export async function poolIndexKnowledgebase() {
+  bootstrapServices();
+  indexTimerActive = true;
+  let dbAgent = await Services.database.ManageDb.getDbAgent();
+  if (dbAgent.isErr()) {
     indexTimerActive = false;
-    return call;
+    console.log(
+      `Error getting DB Agent in poolIndexKnowledgebase: ${dbAgent.value}`
+    );
+    return;
+  }
+  let call = await Services.database.indexKnowledgebase(dbAgent.value);
+  indexTimerActive = false;
+  return call;
 }
 
 // Process AI JOB
-export async function poolRunAiJob({jobClassObject, agentType}){
-    let job = await processObjectToClass(jobClassObject, agentType); 
-    if(job == null){ return Services.v2Core.Helpers.Err('Error (poolRunAiJob) - could not re-instantiate the job class object') }
-    // Run the Job
-    let call = await job.run();
-    if(call.isErr()){ return Services.v2Core.Helpers.Err({errorText: call.value, jobObject: job }) }; // has Result, return error.
-    // wait 3 secs to allow emit functions to complete
-    await new Promise(res => setTimeout(res, 3000));
-    // remove functions prior to sending back.
-    job.aiCall = null;
-    job.emitToSocket = null;
-    return Services.v2Core.Helpers.Ok(job); // return class
+export async function poolRunAiJob({ jobClassObject, agentType }) {
+  let job = await processObjectToClass(jobClassObject, agentType);
+  if (job == null) {
+    return Services.v2Core.Helpers.Err(
+      'Error (poolRunAiJob) - could not re-instantiate the job class object'
+    );
+  }
+  // Run the Job
+  let call = await job.run();
+  if (call.isErr()) {
+    return Services.v2Core.Helpers.Err({
+      errorText: call.value,
+      jobObject: job,
+    });
+  } // has Result, return error.
+  // wait 3 secs to allow emit functions to complete
+  await new Promise((res) => setTimeout(res, 3000));
+  // remove functions prior to sending back.
+  job.aiCall = null;
+  job.emitToSocket = null;
+  return Services.v2Core.Helpers.Ok(job); // return class
 }
 
 /**
@@ -55,36 +66,43 @@ export async function poolRunAiJob({jobClassObject, agentType}){
  * @param {object} jobClassObject - Instance of AiJob or sub-class.
  * @returns - the associated class object.
  */
-export async function processObjectToClass(jobClassObject, agentType){
-    const poolEmitToSocket = ({socketId, event, data}) => {
-        parentPort.postMessage({
-        socketId: socketId,
-        event: event,
-        data: data
-        });
-    };
+export async function processObjectToClass(jobClassObject, agentType) {
+  const poolEmitToSocket = ({ socketId, event, data }) => {
+    parentPort.postMessage({
+      socketId: socketId,
+      event: event,
+      data: data,
+    });
+  };
 
-    let instance;
-    let callFactory = await Services.callAI.aiFactory(); // add aiCall function
+  let instance;
+  let callFactory = await Services.callAI.aiFactory(); // add aiCall function
 
-    switch (agentType) {
-        case "AiJob": // Base Class
-            let job = new Services.aiAgents.Classes.AiJob({emitFunction: poolEmitToSocket, callFactory: callFactory});
-            instance = job.import(jobClassObject);
-            break;
-        case "QuickAsk":
-            instance = new QuickAskAgent({emitFunction: poolEmitToSocket, callFactory: callFactory}).import(jobClassObject);
-            break;
-        case "TaskAgent":
-            instance = new TaskAgent({emitFunction: poolEmitToSocket, callFactory: callFactory}).import(jobClassObject);
-            break;
-    }
-    instance.emitToSocket = poolEmitToSocket; // add pool emit function;
-    instance.aiCall = Services.callAI.aiFactory(); // add aiCall function
-    return instance;
+  switch (agentType) {
+    case 'AiJob': // Base Class
+      let job = new Services.aiAgents.Classes.AiJob({
+        emitFunction: poolEmitToSocket,
+        callFactory: callFactory,
+      });
+      instance = job.import(jobClassObject);
+      break;
+    case 'QuickAsk':
+      instance = new QuickAskAgent({
+        emitFunction: poolEmitToSocket,
+        callFactory: callFactory,
+      }).import(jobClassObject);
+      break;
+    case 'TaskAgent':
+      instance = new TaskAgent({
+        emitFunction: poolEmitToSocket,
+        callFactory: callFactory,
+      }).import(jobClassObject);
+      break;
+  }
+  instance.emitToSocket = poolEmitToSocket; // add pool emit function;
+  instance.aiCall = Services.callAI.aiFactory(); // add aiCall function
+  return instance;
 }
-
-
 
 // [][] -------------------------------------------------------------------------- [][]
 // Example functions in worker.js
