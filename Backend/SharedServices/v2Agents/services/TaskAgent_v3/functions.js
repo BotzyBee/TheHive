@@ -73,18 +73,38 @@ export async function loadingMain(agentObject) {
       loadedContent.push(message);
     }
     // Push to context
-    let processedToolOp = await agentObject.processToolOutput(loadedContent);
-    if (processedToolOp.isErr()) {
-      // Flow to healing
-      agentObject.setFlowState(TaskFlow.Healing.main);
-      agentObject.TaskState.handoverMessage =
-        'Process Tool Output has thrown an error - consider re-running process tool output action.';
-      agentObject.TaskState.handoverData = [];
-      agentObject.errors.push(
-        `Error (processToolOutputToContext -> processToolOutput ) : ${processedToolOp.value}`
-      );
-      return;
-    } // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
+    loadedContent.forEach((msg) => (msg.metadata['actionID'] = Services.v2Core.Utils.generateShortID("PRE")));
+    for(let i=0; i<loadedContent.length ?? 0; i++){
+      agentObject.emitUpdateStatus(`Loading file ${i+1} of ${loadedContent.length}`)
+      let processedToolOp = await agentObject.processToolOutput([loadedContent[i]]);
+      if (processedToolOp.isErr()) {
+          // Flow to healing
+          agentObject.setFlowState(TaskFlow.Healing.main);
+          agentObject.TaskState.handoverMessage =
+            'Process Tool Output has thrown an error - consider re-running process tool output action.';
+          agentObject.TaskState.handoverData = [];
+          agentObject.errors.push(
+            `Error (processToolOutputToContext -> processToolOutput ) : ${processedToolOp.value}`
+          );
+          return;
+        } // Result({ summaryObj: summary data object, rawDataMessage: DataMessage (full tool output) })
+
+        // Push to context
+        agentObject.contextData.toolData = {
+          ...agentObject.contextData.toolData,
+          ...processedToolOp.value.summaryObj,
+        };
+    }
+    // Push to message log
+    loadedContent.forEach((msg) =>
+      agentObject.messageHistory.addMessage(msg)
+    );
+
+    // Tidy up the prompt to remove the pre-load text
+    let task = agentObject.task;
+    task.replace(/\[\s*!!pre-load-files[\s\S]*?\]/g, '').trim();
+    console.log("UPDATED TASK :: ", task);
+    agentObject.task = task;
   }
 
   // Flow directly to Planning Stage

@@ -168,6 +168,15 @@ export const MODEL_REGISTRY = [
     id: 'no-db-id',
   },
   {
+    model: 'gpt-image-1.5',
+    provider: AiProviders.openAI,
+    capabilities: [ ModelTypes.image ],
+    maxContext: 65536,
+    quality: AiQuality.Advanced,
+    active: true,
+    id: 'no-db-id',
+  },
+  {
     model: 'gemini-2.5-flash-preview-tts',
     provider: AiProviders.gemini,
     capabilities: [ModelTypes.textToSpeech],

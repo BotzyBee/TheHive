@@ -14,9 +14,9 @@ const client = new OpenAI({
  * Unified OpenAI call handler.
  * @param {string} systemMessage - System/developer instruction
  * @param {string | { text?: string, imageUrl?: string }} contentMessage - Prompt content
- * @param {string} model - Model to use (e.g., 'gpt-4o', 'o1', 'text-embedding-3-large')
+ * @param {string} model - Model to use (e.g., 'gpt-5', 'gpt-4.1', 'text-embedding-3-large')
  * @param {object} options
- * @param {object} [options.structuredOutput] - A valid JSON Schema object for Native Structured Outputs
+ * @param {object} [options.structuredOutput] - A valid JSON Schema object for structured outputs
  * @param {string[]} [options.inputDataVec] - Required when capability is embedding
  * @param {number} [options.dimensionSize] - Embeddings dimension override
  * @param {ModelTypes} [options.capability] - Capability required for routing
@@ -43,9 +43,7 @@ export async function callOpenAI(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.image:
-      return Services.v2Core.Helpers.Err(
-        'Error (callOpenAI): OpenAI image generation not implemented yet.'
-      );
+      return await generateImage(contentMessage, model, options);
 
     case ModelTypes.deepResearch:
       return Services.v2Core.Helpers.Err(
@@ -128,8 +126,8 @@ export async function generateEmbeddings(model, options = {}) {
 }
 
 /**
- * Uses OpenAI Chat Completions endpoint to generate text, code, or structured JSON
- * @param {string} systemMessage - Instruction text mapped to system/developer role
+ * Uses OpenAI Responses endpoint to generate text, code, or structured JSON
+ * @param {string} systemMessage - Instruction text mapped to instructions
  * @param {string | { text?: string, imageUrl?: string }} contentMessage - Prompt content
  * @param {string} model - Model to use
  * @param {object} options
@@ -152,68 +150,80 @@ export async function generateText(
   }
 
   try {
-    const messages = [];
+    let input;
 
-    // 1. Construct System Message
-    if (systemMessage) {
-      messages.push({ role: 'system', content: systemMessage.trim() });
-    }
-
-    // 2. Construct User Message (Handling Multimodal Vision Input)
+    // Construct input for Responses API
     if (typeof contentMessage === 'string') {
-      messages.push({ role: 'user', content: contentMessage.trim() });
+      input = contentMessage.trim();
     } else if (typeof contentMessage === 'object' && contentMessage !== null) {
       const userContentArray = [];
+
       if (contentMessage.text) {
         userContentArray.push({
-          type: 'text',
+          type: 'input_text',
           text: contentMessage.text.trim(),
         });
       }
+
       if (contentMessage.imageUrl) {
         userContentArray.push({
-          type: 'image_url',
-          image_url: { url: contentMessage.imageUrl },
+          type: 'input_image',
+          image_url: contentMessage.imageUrl,
         });
       }
 
-      if (userContentArray.length > 0) {
-        messages.push({ role: 'user', content: userContentArray });
-      }
+      input =
+        userContentArray.length > 0
+          ? [
+              {
+                role: 'user',
+                content: userContentArray,
+              },
+            ]
+          : '';
+    } else {
+      input = '';
     }
 
     const payload = {
       model,
-      messages,
+      input,
     };
 
-    // Implement Native Structured Outputs
+    if (systemMessage?.trim()) {
+      payload.instructions = systemMessage.trim();
+    }
+
+    // Structured outputs via Responses API
     if (structuredOutput) {
-      let strictSchema = makeSchemaStrict(structuredOutput);
-      payload.response_format = {
-        type: 'json_schema',
-        json_schema: {
+      const strictSchema = makeSchemaStrict(structuredOutput);
+
+      payload.text = {
+        format: {
+          type: 'json_schema',
           name: 'structured_response',
-          strict: false,
           schema: strictSchema,
+          strict: false,
         },
       };
     }
 
-    // 5. Execute API Call
-    const response = await client.chat.completions.create(payload);
-    const responseMessage = response.choices?.[0]?.message;
+    const response = await client.responses.create(payload);
 
-    // Handle OpenAI safety filter refusals (common with structured outputs)
-    if (responseMessage?.refusal) {
+    // Handle refusals if present
+    const refusal =
+      response?.output
+        ?.flatMap((item) => item.content || [])
+        ?.find((item) => item.type === 'refusal')?.refusal || null;
+
+    if (refusal) {
       return Services.v2Core.Helpers.Err(
-        `Error (callOpenAI -> generateText): Model refused the request. Reason: ${responseMessage.refusal}`
+        `Error (callOpenAI -> generateText): Model refused the request. Reason: ${refusal}`
       );
     }
 
-    const text = responseMessage?.content?.trim() ?? '';
+    const text = response.output_text?.trim() ?? '';
 
-    // 6. Process output
     if (structuredOutput) {
       try {
         return Services.v2Core.Helpers.Ok(JSON.parse(text));
@@ -228,6 +238,52 @@ export async function generateText(
   } catch (error) {
     return Services.v2Core.Helpers.Err(
       `Error (callOpenAI -> generateText): ${error?.message || error}`
+    );
+  }
+}
+
+
+/**
+ * Generates an image using OpenAI
+ * @param {string} contentMessage - Prompt for the AI to follow
+ * @param {string} model - Model to use
+ * @param {object} options - Further options
+ * @param {object} [options.imageOptions]
+ * @param {string} [options.imageOptions.size] - eg '1024x1024', '1536x1024', '1024x1536'
+ * @returns {Result} - Result([ ImageMessage ])
+ */
+async function generateImage(contentMessage, model, options = {}) {
+  if (!model) {
+    return Services.v2Core.Helpers.Err(
+      'Error (callOpenAI -> generateImage): No model provided.'
+    );
+  }
+
+  const { imageOptions = {} } = options;
+  const { size = '1024x1024' } = imageOptions;
+
+  try {
+    const response = await client.images.generate({
+      model,
+      prompt: contentMessage,
+      size,
+    });
+
+    const responseMessages = (response.data || [])
+      .filter(item => item.b64_json)
+      .map(
+        item =>
+          new Services.aiAgents.Classes.ImageMessage({
+            role: Services.aiAgents.Constants.Roles.Tool,
+            mimeType: 'image/png',
+            base64: item.b64_json,
+          })
+      );
+
+    return Services.v2Core.Helpers.Ok(responseMessages);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(
+      `Error (callOpenAI -> generateImage): ${error?.message || error}`
     );
   }
 }
