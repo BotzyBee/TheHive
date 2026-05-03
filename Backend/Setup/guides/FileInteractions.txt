@@ -3,12 +3,14 @@
 
 Covers: This guide covers how to best handle tasks that require File Actions to be performed. This could be finding a file, reading a file, writing data to file etc. It could also be getting the contents of a directory or finding a directory. 
 
-# Key Consideration
-When planning to undertake a file system action the main consideration is knowing the file path (url) of the file or directory you need to interact with. If the user has not provided a clear filepath then it's likely that you will need to determine this yourself. You MUST include pre-curser actions to resolve urls / file paths if they are not explicitly known in advance. 
+# IMPORTANT - Specific URL Given by the user.
+If the user provides a filepath (URL) to a specific file or folder you MUST use this exactly as the user has provided. URL paths MUST start with /UserFiles/ - this is important when entering a file url path into parameters.  
+
+# No specific URL
+If the user has not provided a clear filepath then it's likely that you will need to determine this yourself. You MUST include pre-curser actions to resolve urls / file paths if they are not explicitly known in advance. 
 
 A good starting point if no other information is given is the 'workingDirectory' url provided in the global context object or the projectIndexUrl. If provided - the projectIndexUrl takes precedence over the workingDirectory and MUST be used. 
 
-The root directory is /UserFiles/ if you are really stuck.
 
 # Tools
 Later in the planning process you will be given the opportunity to use one or more tools to help you locate files or folders. You MUST use these tools if you are not 100% sure of a file or folder filepath / url. 

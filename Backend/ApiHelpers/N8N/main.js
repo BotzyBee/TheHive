@@ -1,5 +1,3 @@
-
-export async function handleN8N_message(message){
-    // {route: , data: }
-
+export async function handleN8N_message(message) {
+  // {route: , data: }
 }

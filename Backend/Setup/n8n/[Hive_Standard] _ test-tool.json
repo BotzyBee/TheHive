@@ -9,10 +9,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        -272,
-        -208
-      ],
+      "position": [-272, -208],
       "id": "48f6d0be-d638-428d-86ba-2a06815fbe53",
       "name": "Details",
       "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165"
@@ -23,10 +20,7 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -64,
-        -208
-      ],
+      "position": [-64, -208],
       "id": "b2efa92e-0b8d-485d-b3b2-454cb96465c4",
       "name": "Code in JavaScript"
     },
@@ -37,10 +31,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [
-        144,
-        -208
-      ],
+      "position": [144, -208],
       "id": "ff01c697-48ee-4df9-b4bb-44c531c6c3a9",
       "name": "Respond to Webhook"
     },
@@ -51,10 +42,7 @@
         "width": 512
       },
       "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -256,
-        -320
-      ],
+      "position": [-256, -320],
       "typeVersion": 1,
       "id": "9922d8e3-ba19-44d0-84c2-23b4cb4915a1",
       "name": "Sticky Note"
@@ -68,10 +56,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        -272,
-        192
-      ],
+      "position": [-272, 192],
       "id": "46ec9d66-4db5-4574-ab26-b5ad58c5ec5f",
       "name": "Details1",
       "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165",
@@ -83,10 +68,7 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -64,
-        192
-      ],
+      "position": [-64, 192],
       "id": "2b0905ed-2f58-4c08-8bb0-9692604cd614",
       "name": "Code in JavaScript1"
     },
@@ -97,10 +79,7 @@
         "width": 512
       },
       "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -256,
-        48
-      ],
+      "position": [-256, 48],
       "typeVersion": 1,
       "id": "42379d5d-404d-499f-9f72-484937dd54d2",
       "name": "Sticky Note1"
@@ -112,10 +91,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [
-        144,
-        192
-      ],
+      "position": [144, 192],
       "id": "44c77d20-e11c-4969-94a9-5cc80c8b3504",
       "name": "Respond to Webhook1"
     },
@@ -127,10 +103,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        -272,
-        544
-      ],
+      "position": [-272, 544],
       "id": "8201757f-c764-4543-a657-b69020b67c2f",
       "name": "Details2",
       "webhookId": "1b24e07d-2051-47e2-adca-1920ab067165",
@@ -143,10 +116,7 @@
         "width": 512
       },
       "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -272,
-        416
-      ],
+      "position": [-272, 416],
       "typeVersion": 1,
       "id": "b9c4f157-60d2-4b42-b12d-cd46bc71e4d0",
       "name": "Sticky Note2"

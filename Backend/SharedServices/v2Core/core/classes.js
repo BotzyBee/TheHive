@@ -1,8 +1,8 @@
-// The main class returned by all functions. 
+// The main class returned by all functions.
 export class Result {
   #ResultText = {
     Error: 'Error',
-    Ok: 'Ok'
+    Ok: 'Ok',
   };
   constructor(ok, value) {
     if (ok === true) {

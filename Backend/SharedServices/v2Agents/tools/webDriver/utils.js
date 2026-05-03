@@ -18,7 +18,7 @@
 
 //         // 2. Interactive Attribute Whitelist
 //         const keeperAttrs = [
-//             'id', 'name', 'type', 'placeholder', 'aria-label', 
+//             'id', 'name', 'type', 'placeholder', 'aria-label',
 //             'role', 'href', 'value', 'data-testid', 'data-nav-id'
 //         ];
 
@@ -27,7 +27,7 @@
 //         allElements.forEach((el, index) => {
 //             const tagName = el.tagName.toLowerCase();
 //             const isInteractive = ['button', 'a', 'input', 'textarea', 'select', 'option'].includes(tagName);
-            
+
 //             // Assign a unique "Action ID" to every interactive element
 //             // This is the ONLY selector the AI should ideally use.
 //             if (isInteractive) {
@@ -65,7 +65,7 @@
 //  * Smart extractor that uses an AI decision engine to determine the best extraction method.
 //  * @param {string} htmlString - The raw HTML of the webpage.
 //  * @param {string} userRequest - The user's prompt (e.g., "Fetch XYZ data from XY website").
-//  * @param {Object} agent - The AI agent instance. 
+//  * @param {Object} agent - The AI agent instance.
 //  * Returns { extractedData: any } || string - Result object with either extracted data or an error message.
 //  */
 // export async function smartExtractData(htmlString, userRequest, agent) {
@@ -78,20 +78,20 @@
 //     );
 //     if(aiDecision.isErr()) {
 //         return Err(`Error (smartExtractData) : AI decision failed ${JSON.stringify(aiDecision.value)}`);
-//     }   
+//     }
 
 //     // 2. Route based on the AI's decision
 //     if (aiDecision.value.action === 'return_data') {
 //         // The AI was able to extract the data directly from the HTML
 //         console.log("AI decided to return data directly:");
 //         return Ok({ extractedData: aiDecision.value.extractedData });
-//     } 
+//     }
 //     else if (aiDecision.value.action === 'use_dom') {
 //         // The AI decided the data is too large/structured and provided a selector
 //         console.log("AI decided to use DOM extraction with params:", aiDecision.value.domParams);
 //         const domResult = await extractWithDOM(htmlString, aiDecision.value.domParams);
 //         return domResult.isErr() ? Err(`Error (smartExtractData) : ${JSON.stringify(domResult.value)}`) : Ok({ extractedData: domResult.value });
-//     } 
+//     }
 //     else {
 //         return Err(`Error (smartExtractData) : Unrecognized AI action: ${JSON.stringify(aiDecision.value.action)}`);
 //     }
@@ -151,7 +151,7 @@
 
 // ### DOM PARAMETER GUIDELINES:
 // - **selector**: Provide a precise CSS selector (id, class, or tag hierarchy).
-// - **extractType**: 
+// - **extractType**:
 //     - Use "text" for plain content.
 //     - Use "html" for inner content with tags.
 //     - Use "outerHtml" if the container tag itself is needed.`,

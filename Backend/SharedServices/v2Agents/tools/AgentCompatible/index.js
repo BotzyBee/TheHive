@@ -1,4 +1,4 @@
-// the 'as' name MUST match the toolName given in the tool details object !! 
+// the 'as' name MUST match the toolName given in the tool details object !!
 export * as aiTextAction from './textAction.js';
 export * as readFile from './readFile.js';
 export * as writeFile from './writeFile.js';
@@ -12,14 +12,14 @@ export * as createCodeTool from './createCode.js';
 export * as calculatorTool from './calculator.js';
 export * as findAndReplaceTextTool from './findReplaceText.js';
 export * as timeAndDateTool from './timeAndDate.js';
-export * as textCombiner from './textCombiner.js';
+//export * as textCombiner from './textCombiner.js';
 export * as superEditor from './superEditor.js';
 export * as createMermaidDiagram from './createMermaidDiagram.js';
 export * as deepResearchTool from './deepResearchTool.js';
 export * as scheduleJobTool from './scheduleJobTool.js';
-export * as manageCalendar from './GoogleCalendarTool.js'; 
+export * as manageCalendar from './GoogleCalendarTool.js';
+export * as superWriterTool from './superWriterTool.js';
 // READ THE NOTE AT THE TOP !!
-
 
 // TO DO
 // Update file tool

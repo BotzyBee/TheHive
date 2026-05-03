@@ -1,4 +1,3 @@
-
 // export class RustAgentMessage {
 //     constructor(job_id, base_url, message_type, data) {
 //         this.job_id = job_id || "";
@@ -11,16 +10,16 @@
 
 // export const RustMessageType = {
 //   Update: "Update",
-//   Data: "Data", 
+//   Data: "Data",
 //   DomResponse: "DomResponse",
 //   Error: "Error",
-//   Request: "Request"  
+//   Request: "Request"
 // }
 
 // export const RustMessageOutcome = {
 //     Success: "Success",
 //     Error: "Error",
-//     NotSet: "NotSet"   
+//     NotSet: "NotSet"
 // }
 
 // export class RustWebAction {

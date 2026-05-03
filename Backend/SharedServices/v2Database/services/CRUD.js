@@ -1,7 +1,48 @@
-import { dirTableName, fileTableName, mgmtTableName } from "../core/constants.js";
-import { Services } from "../../index.js";
+import {
+  dirTableName,
+  fileTableName,
+  mgmtTableName,
+  modelTableName,
+} from '../core/constants.js';
+import { Services } from '../../index.js';
 
 // [][] -- CREATE -- [][]
+
+// Add Model to DB
+export async function addModelToDB(
+  dbAgent,
+  active,
+  model,
+  provider,
+  capabilities,
+  maxContext,
+  quality
+) {
+  try {
+    let result = await dbAgent.query(
+      `INSERT INTO ${modelTableName} {
+        active: $active,
+        model: $model,
+        provider: $provider,
+        capabilities: $capabilities,
+        maxContext: $maxContext,
+        quality: $quality
+      }`,
+      {
+        active,
+        model,
+        provider,
+        capabilities,
+        maxContext,
+        quality,
+      }
+    );
+    return Services.v2Core.Helpers.Ok(result);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error (addModelToDB) : ${error}`);
+  }
+}
+
 // Directory Index - add directory to index
 export async function addDirectoryToDB(
   dbAgent,
@@ -210,16 +251,20 @@ export async function getRecords(dbAgent, tableName, searchField, searchTerm) {
 
 export async function getAllRecordsFromTable(dbAgent, tableName) {
   try {
-    if (!tableName) { return Services.v2Core.Helpers.Err('Error (getAllRecordsFromTable): tableName is missing or null!'); }
-     const query = `SELECT * FROM ${tableName}`;
+    if (!tableName) {
+      return Services.v2Core.Helpers.Err(
+        'Error (getAllRecordsFromTable): tableName is missing or null!'
+      );
+    }
+    const query = `SELECT * FROM ${tableName}`;
     const result = await dbAgent.query(query);
     const rows = result?.[0] || [];
-    
-    const decodedRows = rows.map(row => {
-      if (row.Url) {
+
+    const decodedRows = rows.map((row) => {
+      if (row?.Url) {
         return {
           ...row,
-          Url: decodeURIComponent(row.Url)
+          Url: decodeURIComponent(row.Url),
         };
       }
       return row;
@@ -227,7 +272,9 @@ export async function getAllRecordsFromTable(dbAgent, tableName) {
 
     return Services.v2Core.Helpers.Ok(decodedRows);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (getAllRecordsFromTable): ${error.message || error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (getAllRecordsFromTable): ${error.message || error}`
+    );
   }
 }
 
@@ -274,7 +321,9 @@ export async function getMgmtData(dbAgent) {
     let result = await dbAgent.query(`SELECT * FROM ${mgmtTableName}`);
     let resLen = result[0].length ?? 0;
     if (resLen == 0) {
-      return Services.v2Core.Helpers.Err('Error (getMgmtData) : DB returned no records');
+      return Services.v2Core.Helpers.Err(
+        'Error (getMgmtData) : DB returned no records'
+      );
     }
     return Services.v2Core.Helpers.Ok(result);
   } catch (error) {
@@ -425,6 +474,25 @@ export async function getDirsAndFilesRecursive(dbAgent, Url) {
 }
 
 // [][] -- UPDATE -- [][]
+// Note idRef is just the 2nd half of the full ref - eg f4639pd6zvvftrgqb9u2 from Vectors:f4639pd6zvvftrgqb9u2
+export async function updateRecordById(dbAgent, tableName, idRef, updateData) {
+  // updateData = object of keys/values to be updated
+  // eg { LastUpdate: 123, Meta: { tags: ["cheese", "potato"] } }
+  try {
+    const query = `
+      UPDATE ${tableName}:${idRef}
+      SET ${Object.keys(updateData)
+        .map((key) => `${key} = $${key}`)
+        .join(', ')}
+      RETURN AFTER
+    `;
+    const result = await dbAgent.query(query, updateData);
+    return Services.v2Core.Helpers.Ok(result);
+  } catch (error) {
+    return Services.v2Core.Helpers.Err(`Error (updateRecordById) : ${error}`);
+  }
+}
+
 export async function updateRecords(
   dbAgent,
   tableName,
@@ -492,9 +560,11 @@ export async function deleteRecordsByField(
     );
     return Services.v2Core.Helpers.Ok(result);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (deleteRecordByField) : ${error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (deleteRecordByField) : ${error}`
+    );
   }
-} 
+}
 
 // Note idRef is just the 2nd half of the full ref - eg f4639pd6zvvftrgqb9u2 from Vectors:f4639pd6zvvftrgqb9u2
 export async function deleteRecordsById(dbAgent, tableName, idRef) {

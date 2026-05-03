@@ -14,9 +14,12 @@ function createChatStore() {
         stats: { toolCount: 0, aiCount: 0, loopNumber: 0 }, 
         errorMessage: '',
         latestJobRef: null,
-        lastStatus: null,
+        lastStatus: ['Processing...'],
         aiSettings: {
-            agent: "Task_Agent"
+            agent: "Task_Agent",
+            provider:"Gemini",
+            quality:2,
+            randomModel:false
         },
         config: {},
         webGrounding: false
@@ -51,7 +54,7 @@ function createChatStore() {
                     isLoading: false,
                     jobDone: true,
                     errorMessage: data.value,
-                    lastStatus: null,
+                    lastStatus: ['Processing...'],
                 })); 
             } else {
                 let sanitised = parseAndSanitizeMarkdown(data.value);
@@ -61,7 +64,7 @@ function createChatStore() {
                     isLoading: false,
                     jobDone: true,
                     errorMessage: '',
-                    lastStatus: null,
+                    lastStatus: ['Processing...'],
                     messageHistory: [...s.messageHistory, responseMsg]
                 }));                
             }
@@ -71,7 +74,11 @@ function createChatStore() {
         socket.on('job_update', (data) => {
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return; // Ignore old job updates
-            let parsedStatus = parseStatus(data.status);
+            let parsedStatus = currentStore.lastStatus;
+            parsedStatus.push(parseStatus(data.status));
+            if(parsedStatus.length >= 4) {
+                parsedStatus = parsedStatus.slice(-4) // take the last 4 status'
+            }
             let il = true;
             let jd = false;
             if(data.status.taskStatus == "Failed") {
@@ -130,7 +137,6 @@ function createChatStore() {
         socket.on('job_error', (data) => {
             const currentStore = get({ subscribe });
             if (data.aiJobId !== currentStore.latestJobRef) return;
-
             update(s => ({
                 ...s,
                 isLoading: false,
@@ -156,7 +162,7 @@ function createChatStore() {
             isLoading: true,
             jobDone: false,
             errorMessage: '',
-            lastStatus: null,
+            lastStatus: ['Processing...'],
             messageHistory: [...s.messageHistory, userMsg]
         }));
         const currentState = get({ subscribe });
@@ -181,7 +187,7 @@ function createChatStore() {
             isLoading: true,
             jobDone: false,
             errorMessage: '',
-            lastStatus: null,
+            lastStatus: ['Processing...'],
             messageHistory: [...s.messageHistory, userMsg]
         }));
 
@@ -214,7 +220,10 @@ function createChatStore() {
         set({
             ...state, // Reset to initial blank state defined at top
             aiSettings: {
-                agent: currentState.aiSettings.agent || "Task_Agent"
+                agent: currentState.aiSettings.agent || "Task_Agent",
+                provider: currentState.aiSettings.provider || "Gemini",
+                quality: currentState.aiSettings.quality || 2,
+                randomModel: currentState.aiSettings.randomModel || false
             }
         });
     }

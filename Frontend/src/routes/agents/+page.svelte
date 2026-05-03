@@ -1,7 +1,7 @@
 <script>
     import { chatStore } from '$lib/code/Stores/chatStore.js';
     import Sidebar from '$lib/componants/Sidebar.svelte';
-    import { slide } from 'svelte/transition';
+    import { slide, fade } from 'svelte/transition';
     import SettingsModal from '$lib/componants/SettingsModal.svelte';
     import { onMount, tick } from 'svelte';
     import { invoke } from '@tauri-apps/api/core';
@@ -14,7 +14,7 @@
     let chatContainer; 
     let lastMessageCount = 0;
     let agentName = "Botzy Bee";
-    let providerName = "Default"
+    let providerName = 'Default';
 
     // For slash command menu
     let menuOpen = false;
@@ -78,14 +78,15 @@
         if (lastWord.startsWith("/")) {
         const query = lastWord.slice(1).toLowerCase();
         
-        // 1. Initial Categories
+        // Initial Categories
         let options = [
             { label: 'folder', icon: '📁', type: 'cmd' },
-            { label: 'file', icon: '📄', type: 'cmd' }
+            { label: 'file', icon: '📄', type: 'cmd' },
+            { label: 'Plan Needs Approved', icon: '👌', type: 'flag', flagText: '!!plans-need-approved' },
+            { label: 'Pre Load Files', icon: '🗄️', type: 'flag', flagText: '!!pre-load-files' }
         ];
 
-        // 2. If user typed "/folder " or similar, we could trigger Rust here
-        // For this example, we filter the initial command list
+        // filter the initial command list
         filteredOptions = options.filter(opt => 
             opt.label.toLowerCase().includes(query)
         );
@@ -127,25 +128,40 @@
         const baseText = textBeforeCursor.slice(0, lastSlashIndex);
         let replacement = "";
 
-        if (option.label === 'folder' || option.label === 'file') {
+        if (option.label === 'folder' || option.label === 'file' || option.label === 'Pre Load Files') {
             try {
-                const selected = await open({
+                let selected = await open({
                     directory: option.label === 'folder',
-                    multiple: false,
+                    multiple: option.label === 'Pre Load Files' ? true : false,
                     defaultPath: import.meta.env.VITE_KNOWLEDGEBASE_PATH
                 });
 
                 if (selected) {
-                    let selectedPath = selected.replace(/\\/g, '/');
-                    const basePath = import.meta.env.VITE_KNOWLEDGEBASE_PATH.replace(/\\/g, '/');
-                    const base = new URL(`file:///${basePath}/`);
-                    const target = new URL(`file:///${selectedPath}`);
-                    let relative = target.pathname.replace(base.pathname, '');
-                    
-                    if (!relative.startsWith('/')) {
-                        relative = '/' + relative;
+                    // multiple select
+                    let allPaths = '';
+                    if(!Array.isArray(selected)){
+                        selected = [selected];
                     }
-                    replacement = relative;
+                    for(let i=0; i<selected.length ?? 0; i++){
+                        let selectedPath = selected[i].replace(/\\/g, '/');
+                        const basePath = import.meta.env.VITE_KNOWLEDGEBASE_PATH.replace(/\\/g, '/');
+                        const base = new URL(`file:///${basePath}/`);
+                        const target = new URL(`file:///${selectedPath}`);
+                        let relative = target.pathname.replace(base.pathname, '');
+                        if (!relative.startsWith('/')) {
+                            relative = '/' + relative;
+                        }
+                        if(option.label === 'Pre Load Files'){
+                            allPaths += ` target:${relative} `;
+                        } else {
+                            allPaths += `${relative}`
+                        }
+                    }
+                    if(option.label === 'Pre Load Files'){
+                        replacement = `[ ${option.flagText} ${allPaths} ]`;
+                    } else {
+                        replacement = allPaths;
+                    }
                 } else {
                     // If user cancels, we might want to put the slash back or leave it
                     replacement = "/"; 
@@ -156,7 +172,11 @@
             }
         } else {
             // It's a tool or a specific command
-            replacement = `[${option.label}]`;
+            if(option.type == 'flag'){
+                replacement = `[ ${option.flagText} ]`; 
+            } else {
+                replacement = `[ ${option.label} ]`;
+            }
         }
 
         // Combine: everything before slash + the new text + everything after cursor
@@ -237,9 +257,21 @@
                 </div>
             {/each}
 
-            {#if $chatStore.latestJobRef && $chatStore.jobDone === false}
-                <div class="ai-response status-update" transition:slide>
-                    <p><i>{$chatStore.lastStatus || 'Processing...'}</i></p>
+            {#if $chatStore.latestJobRef && !$chatStore.jobDone}
+                <div class="ai-response status-update-container" transition:slide>
+                    <div class="status-list">
+                        {#each $chatStore.lastStatus as status, i (status)}
+                            <p 
+                                class="status-line" 
+                                in:fade={{ duration: 200 }} 
+                                out:fade={{ duration: 200 }}
+                                style="opacity: {(i + 1) / $chatStore.lastStatus.length}"
+                            >
+                                <i>{status}</i>
+                            </p>
+                        {/each}
+                    </div>
+
                     <button on:click={chatStore.cancelTask} class="cancel-link">
                         Cancel Task
                     </button>
@@ -438,9 +470,25 @@
         padding: 0;
     }
 
-    .status-update {
-        opacity: 0.8;
+    .status-update-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+    .status-list {
+        min-height: 9em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        /* Ensures the text stays within bounds during transitions */
+        overflow: hidden; 
+    }
+
+    .status-line {
+        margin: 0;
         font-size: 0.9rem;
+        transition: opacity 0.3s ease;
     }
 
     .app-container {

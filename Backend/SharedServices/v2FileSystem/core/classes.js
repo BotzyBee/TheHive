@@ -7,12 +7,12 @@ export class FileRegistry {
 
   register(config) {
     this.definitions.push(config);
-    
+
     // Index all associated MIME types
-    config.mimes.forEach(mime => this.mimeIndex.set(mime, config));
-    
+    config.mimes.forEach((mime) => this.mimeIndex.set(mime, config));
+
     // Index all associated Extensions
-    config.exts.forEach(ext => this.extIndex.set(ext, config));
+    config.exts.forEach((ext) => this.extIndex.set(ext, config));
   }
 
   getByMime(mime) {
@@ -25,9 +25,9 @@ export class FileRegistry {
     return this.extIndex.get(cleanExt) || this.getDefaultFallback();
   }
 
-  getDefaultFallback(mime = "") {
-    if (mime.startsWith("text/")) return this.getByExt("txt");
-    if (mime.startsWith("image/")) return this.getByExt("png");
-    return this.getByExt("bin"); // Ultimate fallback
+  getDefaultFallback(mime = '') {
+    if (mime.startsWith('text/')) return this.getByExt('txt');
+    if (mime.startsWith('image/')) return this.getByExt('png');
+    return this.getByExt('bin'); // Ultimate fallback
   }
 }

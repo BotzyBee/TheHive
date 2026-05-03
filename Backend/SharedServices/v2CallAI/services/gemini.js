@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { makeSchemaStrict } from '../core/utils.js';
 import { ModelTypes } from '../core/constants.js';
 import { Services } from '../../index.js';
+import { parseDirtyJson } from '../core/helpers.js';
 
 // Uses Google API not Langchain interface
 // https://ai.google.dev/gemini-api/docs#javascript
@@ -27,9 +28,12 @@ export async function callGemini(
   model,
   options = {}
 ) {
+  Services.v2Core.Helpers.log(`Calling Gemini : ${model}`);
   const { capability } = options;
-  if(!capability){
-    return Services.v2Core.Helpers.Err('Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes')
+  if (!capability) {
+    return Services.v2Core.Helpers.Err(
+      'Error (callGemini : Capability param is missing or null. Ensure options.capability has valid ModelTypes'
+    );
   }
 
   // Match Capabilities
@@ -47,28 +51,40 @@ export async function callGemini(
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.deepResearch:
-      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have deep research capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callGemini) : Gemini does not have deep research capability.'
+      );
 
     case ModelTypes.websearch:
       return await generateText(systemMessage, contentMessage, model, options);
 
     case ModelTypes.embedding:
-      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have embedding capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callGemini) : Gemini does not have embedding capability.'
+      );
 
     case ModelTypes.textToSpeech:
       return await generateAudio(contentMessage, model, options);
 
     case ModelTypes.speechToText:
-      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have speech to text capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callGemini) : Gemini does not have speech to text capability.'
+      );
 
     case ModelTypes.maps:
-      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have maps capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callGemini) : Gemini does not have maps capability.'
+      );
 
     case ModelTypes.local:
-      return Services.v2Core.Helpers.Err('Error (callGemini) : Gemini does not have local capability.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callGemini) : Gemini does not have local capability.'
+      );
 
     default:
-      Services.v2Core.Helpers.Err(`Error (callGemini) "${capability}" not specifically handled.`);
+      Services.v2Core.Helpers.Err(
+        `Error (callGemini) "${capability}" not specifically handled.`
+      );
   }
 }
 
@@ -83,16 +99,18 @@ function processGrounding(apiResponse) {
 
   // Determine the order of appearance and create new indices
   // We sort ascending to see what appears first in the text
-  const appearanceOrder = [...supports].sort((a, b) => a.segment.startIndex - b.segment.startIndex);
+  const appearanceOrder = [...supports].sort(
+    (a, b) => a.segment.startIndex - b.segment.startIndex
+  );
 
   appearanceOrder.forEach((support) => {
     const originalIndex = support.groundingChunkIndices[0];
-    
+
     if (!indexMap.has(originalIndex)) {
       // If we haven't seen this source yet, assign it the next available number
       const newIndex = usedReferences.length;
       indexMap.set(originalIndex, newIndex);
-      
+
       // Output the reference info for this chunk
       const chunk = chunks[originalIndex].web;
       usedReferences.push(chunk.uri);
@@ -101,23 +119,27 @@ function processGrounding(apiResponse) {
 
   // 2. Insert the new numbers into the text
   // We sort descending to insert from back-to-front (prevents index shifting)
-  const insertionOrder = [...supports].sort((a, b) => b.segment.startIndex - a.segment.startIndex);
+  const insertionOrder = [...supports].sort(
+    (a, b) => b.segment.startIndex - a.segment.startIndex
+  );
 
   insertionOrder.forEach((support) => {
     const { endIndex } = support.segment;
     const originalIndex = support.groundingChunkIndices[0];
     const newIndex = indexMap.get(originalIndex);
-    
+
     const refLabel = `[${newIndex}]`;
-    fullText = fullText.slice(0, endIndex) + refLabel + fullText.slice(endIndex);
+    fullText =
+      fullText.slice(0, endIndex) + refLabel + fullText.slice(endIndex);
   });
 
-  return new Services.aiAgents.Classes.WebsearchResult(fullText, usedReferences);;
+  return new Services.aiAgents.Classes.WebsearchResult(
+    fullText,
+    usedReferences
+  );
 }
 
-
-
-// Generate Text 
+// Generate Text
 /**
  * Uses Gemini to generate text
  * @param {string} systemMessage - System message for the AI to follow.
@@ -140,16 +162,13 @@ export async function generateText(
 
   // Validation: Ensure a model is provided
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callGemini -> generateText 1): No model provided in options.');
+    return Services.v2Core.Helpers.Err(
+      'Error (callGemini -> generateText 1): No model provided in options.'
+    );
   }
 
   const ai = new GoogleGenAI({ apiKey: gemiKey });
-
-  // FOR DEBUG
-  // let rootDir = Services.fileSystem.Constants.containerVolumeRoot;
-  // let joined = Services.aiAgents.ToolHelpers.pathHelper.join(rootDir, "UserFiles/GemiTesting/");
-  // let rndm = systemMessage.length + contentMessage.length; 
-  // Services.fileSystem.CRUD.saveFile(joined, `System Prompt: \n\n ${systemMessage} \n\n ${contentMessage}`, `File_${rndm}.txt`);
+  let fullText = ''; // up here for err logging
 
   try {
     // ------------------------------------------------------------------
@@ -166,7 +185,7 @@ export async function generateText(
         },
       });
 
-      let firstPassText = "";
+      let firstPassText = '';
       for await (const chunk of firstResponseStream) {
         firstPassText += chunk.text; // Accumulate quietly
       }
@@ -189,7 +208,15 @@ export async function generateText(
       try {
         parsed = JSON.parse(secondResponse.text);
       } catch (error) {
-        return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 2): JSON Parse failed ${parsed}`);
+        // attempt dirty fix
+        let fixed = parseDirtyJson(secondResponse.text);
+        if (fixed.ok) {
+          parsed = fixed.data;
+        } else {
+          return Services.v2Core.Helpers.Err(
+            `Error (callGemini -> generateText 2): JSON Parse failed ${error}`
+          );
+        }
       }
       return Services.v2Core.Helpers.Ok(parsed);
     }
@@ -216,14 +243,13 @@ export async function generateText(
       config: config,
     });
 
-    let fullText = "";
     let finalCandidate = null;
 
     // Consume the stream internally
     for await (const chunk of responseStream) {
       // FOR DEBUG
       fullText += chunk.text;
-      
+
       // The grounding metadata is usually attached to the final chunk's candidates array
       if (chunk.candidates && chunk.candidates.length > 0) {
         finalCandidate = chunk.candidates[0];
@@ -236,26 +262,44 @@ export async function generateText(
     if (useWeb && finalCandidate && finalCandidate.groundingMetadata) {
       // Reconstruct an object that matches what your existing processGrounding expects
       const mockApiResponse = {
-        candidates: [{
-          content: { parts: [{ text: fullText }] },
-          groundingMetadata: finalCandidate.groundingMetadata
-        }]
+        candidates: [
+          {
+            content: { parts: [{ text: fullText }] },
+            groundingMetadata: finalCandidate.groundingMetadata,
+          },
+        ],
       };
-      
+
       const groundedResponse = processGrounding(mockApiResponse);
       return Services.v2Core.Helpers.Ok(groundedResponse);
     }
 
     // Parse JSON if Structured Output
     if (structuredOutput) {
-      return Services.v2Core.Helpers.Ok(JSON.parse(fullText));
+      let parsed;
+      try {
+        parsed = JSON.parse(fullText);
+      } catch (error) {
+        // attempt dirty fix
+        let fixed = parseDirtyJson(fullText);
+        if (fixed.ok) {
+          parsed = fixed.data;
+        } else {
+          return Services.v2Core.Helpers.Err(
+            `Error (callGemini -> generateText 3): JSON Parse failed ${error}`
+          );
+        }
+      }
+      return Services.v2Core.Helpers.Ok(parsed);
     }
 
     // Standard text completion
     return Services.v2Core.Helpers.Ok(fullText);
-
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateText 3): ${error}`);
+    console.log(`ERROR FULL TEXT :: ${fullText}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callGemini -> generateText 4): ${error}`
+    );
   }
 }
 
@@ -272,28 +316,26 @@ export async function generateText(
  * @param {ImageMessage} [options.imageOptions.contextImage] - Image to be edited or used as part of the process.
  * @returns {Result} - Result( [ ImageMessage ] )
  */
-async function generateImage(
-  contentMessage,
-  model,
-  options = {}
-){
+async function generateImage(contentMessage, model, options = {}) {
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callGemini -> generateImage): No model provided in options.');
+    return Services.v2Core.Helpers.Err(
+      'Error (callGemini -> generateImage): No model provided in options.'
+    );
   }
   const gemiKey = process.env.GEM_KEY;
   const ai = new GoogleGenAI({ apiKey: gemiKey });
 
   const { imageOptions = {}, useWeb = false } = options;
-  const { aspectRatio = '4:3', resolution = '1K', contextImage } = imageOptions; 
+  const { aspectRatio = '4:3', resolution = '1K', contextImage } = imageOptions;
 
   // Handle Context image
-  let img = contextImage 
-  ? { inlineData: { mimeType: contextImage.mime, data: contextImage.base64 } }
-  : null;
+  let img = contextImage
+    ? { inlineData: { mimeType: contextImage.mime, data: contextImage.base64 } }
+    : null;
 
-  const contents = contextImage 
-  ? [ { text: contentMessage } , ...img ] 
-  : [ { text: contentMessage } ];
+  const contents = contextImage
+    ? [{ text: contentMessage }, ...img]
+    : [{ text: contentMessage }];
   const webTool = useWeb ? [{ googleSearch: {} }] : [];
   try {
     const response = await ai.models.generateContent({
@@ -305,7 +347,7 @@ async function generateImage(
           aspectRatio: aspectRatio,
           imageSize: resolution,
         },
-      tools: webTool,
+        tools: webTool,
       },
     });
     // Handle Response
@@ -313,22 +355,24 @@ async function generateImage(
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
         const imageData = part.inlineData.data;
-        let msg = new Services.aiAgents.Classes.ImageMessage({ 
+        let msg = new Services.aiAgents.Classes.ImageMessage({
           role: Services.aiAgents.Constants.Roles.Tool,
-          mimeType: "image/png", 
-          base64: imageData
+          mimeType: 'image/png',
+          base64: imageData,
         });
         responseMessages.push(msg);
       }
     }
     return Services.v2Core.Helpers.Ok(responseMessages);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateImage) : ${error}`)
+    return Services.v2Core.Helpers.Err(
+      `Error (callGemini -> generateImage) : ${error}`
+    );
   }
 }
 
 // https://ai.google.dev/gemini-api/docs/speech-generation
-/** 
+/**
  * Generates audio (Text-to-Speech) using Gemini
  * @param {string} contentMessage - The text to be converted to speech
  * @param {string} model - Optional, TTS Model to use (e.g., "gemini-2.5-flash-preview-tts")
@@ -338,13 +382,11 @@ async function generateImage(
  * @param {string}  [options.ttsOptions.gender ] - Optional, [ "Male" | "Female" ] specify if male or female voice should be used.
  * @returns {Result} - Ok( [ AudioMessage ] )
  */
-async function generateAudio( // TODO - * @param {object}  [options.speechOptions.multiSpeaker] - Configuration for multiple speakers
-  contentMessage,
-  model,
-  options = {}
-) {
+async function generateAudio(contentMessage, model, options = {}) { // TODO - * @param {object}  [options.speechOptions.multiSpeaker] - Configuration for multiple speakers
   if (contentMessage == null) {
-    return Services.v2Core.Helpers.Err('Error (callGemini -> generateAudio): No contentMessage provided.');
+    return Services.v2Core.Helpers.Err(
+      'Error (callGemini -> generateAudio): No contentMessage provided.'
+    );
   }
 
   const gemiKey = process.env.GEM_KEY;
@@ -352,10 +394,10 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
 
   const { ttsOptions = {}, useWeb = false } = options;
   const { gender, multiSpeaker = null } = ttsOptions;
-  
+
   let voiceName = 'sadaltager'; // Male
-  if(gender == "Female"){
-    voiceName = 'despina';  // Female
+  if (gender == 'Female') {
+    voiceName = 'despina'; // Female
   }
 
   // Example of MultiSpeaker (TO DO !)
@@ -374,7 +416,7 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
   //                }
 
   // Set up the speech configuration
-  const speechConfig = multiSpeaker 
+  const speechConfig = multiSpeaker
     ? { multiSpeakerVoiceConfig: multiSpeaker }
     : {
         voiceConfig: {
@@ -404,12 +446,12 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
       if (part.inlineData) {
         let msg = new Services.aiAgents.Classes.AudioMessage({
           role: Services.aiAgents.Constants.Roles.Tool,
-          mimeType: part.inlineData.mimeType || "audio/wav", // Default to wav for TTS stability
-          base64: part.inlineData.data
+          mimeType: part.inlineData.mimeType || 'audio/wav', // Default to wav for TTS stability
+          base64: part.inlineData.data,
         });
         responseMessages.push(msg);
       }
-      
+
       // If the model also provides a transcript in the text part
       if (part.text && responseMessages.length > 0) {
         responseMessages[responseMessages.length - 1].transcript = part.text;
@@ -418,6 +460,8 @@ async function generateAudio( // TODO - * @param {object}  [options.speechOption
 
     return Services.v2Core.Helpers.Ok(responseMessages);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callGemini -> generateAudio) : ${error.message || error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callGemini -> generateAudio) : ${error.message || error}`
+    );
   }
 }

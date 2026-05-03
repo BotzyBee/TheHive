@@ -1,54 +1,80 @@
-import { Services } from "../../index.js";
-import { processApiMessagesToClasses } from "./processMessages.js";
+import { Services } from '../../index.js';
+import { processApiMessagesToClasses } from './processMessages.js';
 import path from 'path';
 
 /**
- * 
+ *
  * @param {string} toolName - The name of the tool to call.
  * @param {string} filePath - this will either be the path to the plugin or 'built-in'
- * @param {object} params - the input parameters object for the tool. 
- * @param {object} agentDependencies - this is an optional parameter that can be used to pass in any additional dependencies the tool may need. 
+ * @param {object} params - the input parameters object for the tool.
+ * @param {object} agentDependencies - this is an optional parameter that can be used to pass in any additional dependencies the tool may need.
  * @returns {Result(any)} - returns the output from the agent tool.
  */
-export async function callAgentTool(toolName, filePath, params, agentDependencies = {}){
-  if(toolName == null || filePath == null){
-      return Services.v2Core.Helpers.Err(`Error ( callTool ) : toolName or filePath missing or null.`)
+export async function callAgentTool(
+  toolName,
+  filePath,
+  params,
+  agentDependencies = {}
+) {
+  if (toolName == null || filePath == null) {
+    return Services.v2Core.Helpers.Err(
+      `Error ( callTool ) : toolName or filePath missing or null.`
+    );
   }
 
-  if(filePath == Services.fileSystem.Constants.builtInFilePath){
+  if (filePath == Services.fileSystem.Constants.builtInFilePath) {
     // built-in tool
     let injectedDependencies = {
       ...Services,
     };
     // Not sure if this is needed anymore ??
     injectedDependencies.Helpers = {
-        saveMessageContent,
-        processBase64Audio_ToWavBuffer,
-        callAgentTool
+      saveMessageContent,
+      processBase64Audio_ToWavBuffer,
+      callAgentTool,
     };
-    return await Services.aiAgents.AgentTools[toolName].run(injectedDependencies, params, agentDependencies ); // tools must return Ok/ Err.
-  } else if(filePath.includes(Services.database.Constants.N8N_Url)){
+    return await Services.aiAgents.AgentTools[toolName].run(
+      injectedDependencies,
+      params,
+      agentDependencies
+    ); // tools must return Ok/ Err.
+  } else if (filePath.includes(Services.database.Constants.N8N_Url)) {
     let axios = Services.aiAgents.ToolHelpers.axiosHelper;
     try {
       let toolDetails = await axios.get(`${filePath}/details`);
-      if(toolDetails.data[0].pollForResult == true || toolDetails.data[0].pollForResult == "true"){
+      if (
+        toolDetails.data[0].pollForResult == true ||
+        toolDetails.data[0].pollForResult == 'true'
+      ) {
         // Need to poll to get the tool result
         // TODO!
       } else {
         let call = await axios.post(`${filePath}/run`, params);
         let processedMsgs = processApiMessagesToClasses(call.data);
-        if(processedMsgs.isErr()){ Services.v2Core.Helpers.Err(`Error ( callTool -> (N8N) ) : - ${filePath} - ${processedMsgs.value}`);  }
+        if (processedMsgs.isErr()) {
+          Services.v2Core.Helpers.Err(
+            `Error ( callTool -> (N8N) ) : - ${filePath} - ${processedMsgs.value}`
+          );
+        }
         return Services.v2Core.Helpers.Ok(processedMsgs.value);
       }
     } catch (error) {
-      return Services.v2Core.Helpers.Err(`Error ( callTool -> N8N ) : Could not use N8N tool - ${filePath} - ${error}`); 
+      return Services.v2Core.Helpers.Err(
+        `Error ( callTool -> N8N ) : Could not use N8N tool - ${filePath} - ${error}`
+      );
     }
   } else {
     let readFile = await import(/* @vite-ignore */ filePath);
-    if(readFile){
-        return await readFile.run(injectedDependencies, params, agentDependencies);
+    if (readFile) {
+      return await readFile.run(
+        injectedDependencies,
+        params,
+        agentDependencies
+      );
     } else {
-        return Services.v2Core.Helpers.Err(`Error ( callTool -> import ) : Could not read tool file - ${filePath}`); 
+      return Services.v2Core.Helpers.Err(
+        `Error ( callTool -> import ) : Could not read tool file - ${filePath}`
+      );
     }
   }
 }
@@ -62,7 +88,9 @@ export async function callAgentTool(toolName, filePath, params, agentDependencie
  */
 export async function saveMessageContent(message, folderPath, fileName = null) {
   if (!message || !folderPath) {
-    return Services.v2Core.Helpers.Err(`Error (saveMessageContent): message or folderPath missing.`);
+    return Services.v2Core.Helpers.Err(
+      `Error (saveMessageContent): message or folderPath missing.`
+    );
   }
   try {
     const fileRegistry = Services.fileSystem.IO.fileRegistry;
@@ -84,34 +112,52 @@ export async function saveMessageContent(message, folderPath, fileName = null) {
       strategyToUse = mimeConfig.strategy;
     }
 
-    const finalFileName = fileName 
-      ? `${fileName}.${finalExtension}` 
+    const finalFileName = fileName
+      ? `${fileName}.${finalExtension}`
       : `${message.id}.${finalExtension}`;
 
-    const targetDirectory = path.join(Services.fileSystem.Constants.containerVolumeRoot, folderPath);
+    const targetDirectory = path.join(
+      Services.fileSystem.Constants.containerVolumeRoot,
+      folderPath
+    );
 
     // 2. Extract content dynamically based on priority
     let contentToSave = message.base64 || message.textData || message.data;
 
     // Handle URL-only Edge Case
     if (message.url && !contentToSave) {
-       return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Cannot save remote URL ${message.type} directly. Download required.`);
+      return Services.v2Core.Helpers.Err(
+        `Error (saveMessageContent): Cannot save remote URL ${message.type} directly. Download required.`
+      );
     }
 
     // Handle Empty/Null Content Edge Case
     if (!contentToSave) {
       // Fallback: Save the whole message object as JSON
-      return await fileRegistry.getByExt("json").strategy.write(targetDirectory, message.toJSON(), `${message.id}.json`);
+      return await fileRegistry
+        .getByExt('json')
+        .strategy.write(
+          targetDirectory,
+          message.toJSON(),
+          `${message.id}.json`
+        );
     }
     // Not supported
     if (!strategyToUse || !strategyToUse.write) {
-      return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Writing is not supported for extension '.${finalExtension}'`);
+      return Services.v2Core.Helpers.Err(
+        `Error (saveMessageContent): Writing is not supported for extension '.${finalExtension}'`
+      );
     }
     // Delegate to the Strategy's Write Method
-    return await strategyToUse.write(targetDirectory, contentToSave, finalFileName);
-
+    return await strategyToUse.write(
+      targetDirectory,
+      contentToSave,
+      finalFileName
+    );
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (saveMessageContent): Exception: ${error.message}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (saveMessageContent): Exception: ${error.message}`
+    );
   }
 }
 
@@ -121,11 +167,11 @@ function createWavHeader(dataLength, sampleRate, numChannels, bitDepth) {
   const blockAlign = (numChannels * bitDepth) / 8;
   const byteRate = sampleRate * blockAlign;
   header.write('RIFF', 0);
-  header.writeUInt32LE(36 + dataLength, 4); 
+  header.writeUInt32LE(36 + dataLength, 4);
   header.write('WAVE', 8);
   header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);           // Subchunk1Size (16 for PCM)
-  header.writeUInt16LE(1, 20);            // AudioFormat (1 for PCM)
+  header.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
+  header.writeUInt16LE(1, 20); // AudioFormat (1 for PCM)
   header.writeUInt16LE(numChannels, 22);
   header.writeUInt32LE(sampleRate, 24);
   header.writeUInt32LE(byteRate, 28);
@@ -137,12 +183,12 @@ function createWavHeader(dataLength, sampleRate, numChannels, bitDepth) {
 }
 
 /**
- * Used to convert audio/L16;codec=pcm;rate=24000 to a Wav buffer for saving. 
- * @param {string} base64_Audio - Base64 audio (audio/L16;codec=pcm;rate=24000) 
- * @returns {Buffer | Null} - Returns Buffer or null.  
+ * Used to convert audio/L16;codec=pcm;rate=24000 to a Wav buffer for saving.
+ * @param {string} base64_Audio - Base64 audio (audio/L16;codec=pcm;rate=24000)
+ * @returns {Buffer | Null} - Returns Buffer or null.
  */
-export function processBase64Audio_ToWavBuffer(base64_Audio, mime){
-  if(mime == "audio/L16;codec=pcm;rate=24000"){
+export function processBase64Audio_ToWavBuffer(base64_Audio, mime) {
+  if (mime == 'audio/L16;codec=pcm;rate=24000') {
     const pcmData = Buffer.from(base64_Audio, 'base64');
     const header = createWavHeader(pcmData.length, 24000, 1, 16);
     const finalBuffer = Buffer.concat([header, pcmData]);
@@ -157,7 +203,7 @@ export function processBase64Audio_ToWavBuffer(base64_Audio, mime){
  * * @param {string|Buffer} input - The image data to process.
  * @returns {Buffer} - The processed binary buffer.
  */
-export function prepareImageForSaving(input){
+export function prepareImageForSaving(input) {
   // If it's already a Buffer, just hand it back.
   if (Buffer.isBuffer(input)) {
     return Services.v2Core.Helpers.Ok(input);
@@ -175,10 +221,12 @@ export function prepareImageForSaving(input){
     return Services.v2Core.Helpers.Ok(Buffer.from(input, 'base64'));
   }
 
-  return Services.v2Core.Helpers.Err('Error (prepareImageForSaving) : Unsupported image format. Input must be a Base64 string or a Buffer.');
-};
+  return Services.v2Core.Helpers.Err(
+    'Error (prepareImageForSaving) : Unsupported image format. Input must be a Base64 string or a Buffer.'
+  );
+}
 
-// WIP! 
+// WIP!
 // import { spawn } from 'child_process';
 
 // /**
@@ -196,7 +244,7 @@ export function prepareImageForSaving(input){
 //     // -f opus: Wrap in Ogg container (Telegram voice format)
 //     const ffmpeg = spawn('ffmpeg', [
 //       '-f', 's16le', '-ar', '24000', '-ac', '1', '-i', 'pipe:0',
-//       '-c:a', 'libopus', '-b:a', '32k', '-vbr', 'on', 
+//       '-c:a', 'libopus', '-b:a', '32k', '-vbr', 'on',
 //       '-f', 'opus', 'pipe:1'
 //     ]);
 

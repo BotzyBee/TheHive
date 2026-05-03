@@ -1,19 +1,18 @@
 import dotenv from 'dotenv';
 let allTimers = []; // Array of Timer Class
 import { Ok, Err } from '../core/helperFunctions.js';
-dotenv.config({ path: ".env" });
-
+dotenv.config({ path: '.env' });
 
 class timerClass {
   constructor(timerName, callbackFn, options = {}) {
     this.timerName = timerName;
     this.callbackFn = callbackFn;
-    
+
     // Destructure options with defaults
     this.intervalMs = options.intervalMs || 0;
     this.delayMs = options.delayMs || 0;
     this.isOneOff = options.isOneOff || false;
-    
+
     this.timerID = null; // Reference to the active timeout
     this.isRunning = false;
   }
@@ -64,15 +63,14 @@ class timerClass {
       intervalMs: this.intervalMs,
       delayMs: this.delayMs,
       isOneOff: this.isOneOff,
-      isRunning: this.isRunning
+      isRunning: this.isRunning,
     };
   }
 }
 
-
 /**
- * @param {string} timerName 
- * @param {function} callbackFn 
+ * @param {string} timerName
+ * @param {function} callbackFn
  * @param {object} options - { delay: number|Date, intervalMs: number, isOneOff: boolean }
  * @param {number|Date} options.delay - Initial delay before the first execution. Can be a number (ms) or a Date object.
  * @param {number} options.intervalMs - If provided and isOneOff is false, the timer will repeat at this interval.
@@ -81,7 +79,7 @@ class timerClass {
  */
 export function addNewTimer(timerName, callbackFn, config = {}) {
   // Check for duplicates
-  if (allTimers.some(t => t.timerName === timerName)) {
+  if (allTimers.some((t) => t.timerName === timerName)) {
     return Err(`Error(addNewTimer) - ${timerName} already exists!`);
   }
 
@@ -94,7 +92,7 @@ export function addNewTimer(timerName, callbackFn, config = {}) {
   const options = {
     delayMs: delay,
     intervalMs: config.intervalMs || 0,
-    isOneOff: config.isOneOff || false
+    isOneOff: config.isOneOff || false,
   };
 
   const tmr = new timerClass(timerName, callbackFn, options);
@@ -138,62 +136,62 @@ export function stopAndClearAllTimers() {
 /**
  * Returns an object with the current day, date, epoch etc.
  * @param {object} params
- * @param {string} [params.dateFormat] - eg 'en-GB' the format for datetime object. Defaults to 'en-GB'. 
+ * @param {string} [params.dateFormat] - eg 'en-GB' the format for datetime object. Defaults to 'en-GB'.
  * @returns {Result[object]} - { currentEpoch, fullDateTime, dayOfMonth, dayOfWeek,
  * monthName, monthNumber, year, timezone }
  */
 export function getDateTime(params = {}) {
-    const locale = params.dateFormat || 'en-GB';
-    
-    const tz = process.env.TIMEZONE;
-    const timeZone = tz;
-    try {
-        const now = new Date();
-        // 1. Current Epoch
-        const currentEpoch = now.getTime();
-        // 2. Formatting Options for the Full String
-        const fullDateTime = now.toLocaleString(locale, {
-            timeZone,
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-        // 3. Extract components using Intl.DateTimeFormat for reliability
-        const parts = new Intl.DateTimeFormat(locale, {
-            timeZone,
-            day: 'numeric',
-            weekday: 'long',
-            month: 'long',
-            year: 'numeric',
-            timeZoneName: 'short'
-        }).formatToParts(now);
-        // Helper to find specific parts from the formatter
-        const getPart = (type) => parts.find(p => p.type === type)?.value;
-        const dayOfMonth = parseInt(getPart('day'));
-        const dayOfWeek = getPart('weekday');
-        const monthName = getPart('month');
-        const monthNumber = now.getMonth() + 1; // Month is 0-indexed in JS
-        const year = now.getFullYear();
-        
-        // This will correctly return "GMT" or "BST" based on the date
-        const timezoneName = getPart('timeZoneName');
+  const locale = params.dateFormat || 'en-GB';
 
-        let op = {
-            currentEpoch,
-            fullDateTime,
-            dayOfMonth,
-            dayOfWeek,
-            monthName,
-            monthNumber,
-            year,
-            timezone: timezoneName
-        };
-        return Ok(op);
-    } catch (error) {
-        return Err(`Error (getDateTimeContext) : ${error.message}`);
-    }
+  const tz = process.env.TIMEZONE;
+  const timeZone = tz;
+  try {
+    const now = new Date();
+    // 1. Current Epoch
+    const currentEpoch = now.getTime();
+    // 2. Formatting Options for the Full String
+    const fullDateTime = now.toLocaleString(locale, {
+      timeZone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    // 3. Extract components using Intl.DateTimeFormat for reliability
+    const parts = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      day: 'numeric',
+      weekday: 'long',
+      month: 'long',
+      year: 'numeric',
+      timeZoneName: 'short',
+    }).formatToParts(now);
+    // Helper to find specific parts from the formatter
+    const getPart = (type) => parts.find((p) => p.type === type)?.value;
+    const dayOfMonth = parseInt(getPart('day'));
+    const dayOfWeek = getPart('weekday');
+    const monthName = getPart('month');
+    const monthNumber = now.getMonth() + 1; // Month is 0-indexed in JS
+    const year = now.getFullYear();
+
+    // This will correctly return "GMT" or "BST" based on the date
+    const timezoneName = getPart('timeZoneName');
+
+    let op = {
+      currentEpoch,
+      fullDateTime,
+      dayOfMonth,
+      dayOfWeek,
+      monthName,
+      monthNumber,
+      year,
+      timezone: timezoneName,
+    };
+    return Ok(op);
+  } catch (error) {
+    return Err(`Error (getDateTimeContext) : ${error.message}`);
+  }
 }

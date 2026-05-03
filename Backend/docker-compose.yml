@@ -5,7 +5,7 @@ services:
     ports:
       - '8000:8000'
     volumes:
-      - shared-data:/data # don't change this!
+      - shared-data:/data
     command: start --bind 0.0.0.0:8000 --user ${dbRootUser} --pass ${dbRootPass} surrealkv:///data/AppFiles/surreal.db
     networks:
       - thehive_network
@@ -21,9 +21,10 @@ services:
       - '3000:3000'
     depends_on:
       - indexdb
-      - n8n 
+      - n8n
+      - ollama
     volumes:
-      - shared-data:/data # don't change this!
+      - shared-data:/data
     networks:
       - thehive_network
 
@@ -33,13 +34,30 @@ services:
     ports:
       - '5678:5678'
     environment:
-      - N8N_USER_FOLDER=/data/AppFiles/n8n_data 
+      - N8N_USER_FOLDER=/data/AppFiles/n8n_data
       - WEBHOOK_URL=http://localhost:5678/
     volumes:
-      - shared-data:/data # don't change this!
+      - shared-data:/data
     networks:
       - thehive_network
-    # restart: always
+
+  ollama:
+    container_name: thehive_ollama
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - thehive_network
+    # Note - below is just for Nvidia GPUs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   shared-data:
@@ -48,6 +66,7 @@ volumes:
       type: none
       device: ${knowledgebaseHostURL}
       o: bind
+  ollama_models:
 
 networks:
   thehive_network:

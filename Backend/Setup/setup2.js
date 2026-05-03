@@ -1,54 +1,60 @@
-import { Surreal } from "surrealdb";
+import { Surreal } from 'surrealdb';
 import dotenv from 'dotenv';
-dotenv.config({ path: ".env" });
+dotenv.config({ path: '.env' });
 import {
-    namespaceName,
-    databaseName,
-    dirTableName,
-    fileTableName,
-    vectorTableName,
-    vectorEmbedSize,
-    mgmtTableName,
-    toolTableName,
-    guideTableName,
-} from '../SharedServices/v2Database/core/constants.js'
+  namespaceName,
+  databaseName,
+  dirTableName,
+  fileTableName,
+  vectorTableName,
+  vectorEmbedSize,
+  mgmtTableName,
+  toolTableName,
+  guideTableName,
+  modelTableName,
+} from '../SharedServices/v2Database/core/constants.js';
 
-import { generateLongID } from "../SharedServices/v2Core/core/utils.js";
+import { generateLongID } from '../SharedServices/v2Core/core/utils.js';
 
 // Setup Namespace, Database and tables
 export async function setupFolderBotDB() {
+  let db;
+  try {
+    db = new Surreal();
+    console.log('Setting Up DB...');
+  } catch (e) {
+    console.log('DB Setup Error : ', e);
+    return;
+  }
 
-    const db = new Surreal();
-    console.log("DB :: ", db);
+  const dbUser = process.env.dbRootUser;
+  const dbPass = process.env.dbRootPass;
+  const dbUserRegular = process.env.dbRegularUser;
+  const dbPassRegular = process.env.dbRegularPass;
+  const rootDirUrl = process.env.knowledgebaseURL;
 
-    const dbUser = process.env.dbRootUser;
-    const dbPass = process.env.dbRootPass;
-    const dbUserRegular = process.env.dbRegularUser;
-    const dbPassRegular = process.env.dbRegularPass;
-    const rootDirUrl = process.env.knowledgebaseURL;
+  try {
+    // Connect to the SurrealDB instance
+    await db.connect('ws://127.0.0.1:8000');
+    //await db.connect("http://127.0.0.1:8000/rpc");
+    // Authenticate as a root user (required to define namespaces and databases)
+    await db.signin({
+      username: dbUser,
+      password: dbPass,
+    });
 
-    try {
-        // Connect to the SurrealDB instance
-        await db.connect("ws://127.0.0.1:8000");
-        //await db.connect("http://127.0.0.1:8000/rpc"); 
-        // Authenticate as a root user (required to define namespaces and databases)
-        await db.signin({
-            username: dbUser,
-            password: dbPass,
-        });
+    // --- Create Namespace if it doesn't exist ---
+    await db.query(`DEFINE NAMESPACE IF NOT EXISTS ${namespaceName};`);
+    await db.use({ namespace: namespaceName });
 
-        // --- Create Namespace if it doesn't exist ---
-        await db.query(`DEFINE NAMESPACE IF NOT EXISTS ${namespaceName};`);
-        await db.use({ namespace: namespaceName });
+    // --- Create Database if it doesn't exist ---
+    await db.query(`DEFINE DATABASE IF NOT EXISTS ${databaseName};`);
 
-        // --- Create Database if it doesn't exist ---
-        await db.query(`DEFINE DATABASE IF NOT EXISTS ${databaseName};`);
+    // --- Now use both the namespace and database ---
+    await db.use({ namespace: namespaceName, database: databaseName });
 
-        // --- Now use both the namespace and database ---
-        await db.use({ namespace: namespaceName, database: databaseName });
-
-        // Define the schema for the 'Directories' table
-        await db.query(`
+    // Define the schema for the 'Directories' table
+    await db.query(`
             DEFINE TABLE ${dirTableName} SCHEMAFULL;
             DEFINE FIELD DirRef ON TABLE ${dirTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD ParentDirRef ON TABLE ${dirTableName} TYPE string ASSERT $value != NONE;
@@ -57,16 +63,16 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Meta ON TABLE ${dirTableName} TYPE object;
         `);
 
-        // Create an index on Directories table
-        await db.query(`
+    // Create an index on Directories table
+    await db.query(`
             DEFINE INDEX uniqueDirRef ON TABLE ${dirTableName} COLUMNS DirRef UNIQUE;
             DEFINE INDEX uniqueDirUrl ON TABLE ${dirTableName} COLUMNS Url UNIQUE;
             DEFINE INDEX parentDirIndex ON TABLE ${dirTableName} COLUMNS ParentDirRef;
         `);
-        console.log(`${dirTableName} Table and Index setup on ${databaseName}`);
+    console.log(`${dirTableName} Table and Index setup on ${databaseName}`);
 
-        // Define the schema for the 'Files' table
-        await db.query(`
+    // Define the schema for the 'Files' table
+    await db.query(`
             DEFINE TABLE ${fileTableName} SCHEMAFULL;
             DEFINE FIELD DirRef ON TABLE ${fileTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD FileRef ON TABLE ${fileTableName} TYPE string ASSERT $value != NONE;
@@ -76,49 +82,61 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Meta ON TABLE ${fileTableName} TYPE object;
         `);
 
-        // Create an index on FILES table
-        await db.query(`
+    // Define the schema for the 'modelTableName' table
+    await db.query(`
+            DEFINE TABLE ${modelTableName} SCHEMAFULL;
+            DEFINE FIELD active ON TABLE ${modelTableName} TYPE bool ASSERT $value != NONE;
+            DEFINE FIELD model ON TABLE ${modelTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD provider ON TABLE ${modelTableName} TYPE string ASSERT $value != NONE;
+            DEFINE FIELD capabilities ON TABLE ${modelTableName} TYPE array ASSERT $value != NONE;
+            DEFINE FIELD capabilities.* ON TABLE ${modelTableName} TYPE string;
+            DEFINE FIELD maxContext ON TABLE ${modelTableName} TYPE number ASSERT $value != NONE;
+            DEFINE FIELD quality ON TABLE ${modelTableName} TYPE number ASSERT $value != NONE;
+        `);
+
+    // Create an index on FILES table
+    await db.query(`
             DEFINE INDEX uniqueFileRef ON TABLE ${fileTableName} COLUMNS FileRef UNIQUE;
             DEFINE INDEX dirIndex ON TABLE ${fileTableName} COLUMNS DirRef;
             DEFINE INDEX uniqueUrl ON TABLE ${fileTableName} COLUMNS Url UNIQUE;
         `);
-        console.log(`${fileTableName} Table and Index setup on ${databaseName}`);
-        
-        // Create management Data table
-        await db.query(`
+    console.log(`${fileTableName} Table and Index setup on ${databaseName}`);
+
+    // Create management Data table
+    await db.query(`
             DEFINE TABLE ${mgmtTableName} SCHEMALESS;
             DEFINE FIELD lastIndexCheckMs ON TABLE ${mgmtTableName} TYPE int;
             DEFINE FIELD toolSettings ON TABLE ${mgmtTableName}  TYPE object;
         `);
-        // Populate init mgmt data
-        await db.query(`
+    // Populate init mgmt data
+    await db.query(`
             INSERT INTO ${mgmtTableName} {
                 lastIndexCheckMs: 0,
                 toolSettings: {}
             };
         `);
 
-        // Add Root Dir Record
-        let encodedURL = encodeURIComponent(rootDirUrl);
-        const dirRef = generateLongID('DIR');
-            let result = await db.query(
-            `INSERT INTO ${dirTableName} {
+    // Add Root Dir Record
+    let encodedURL = encodeURIComponent(rootDirUrl);
+    const dirRef = generateLongID('DIR');
+    let result = await db.query(
+      `INSERT INTO ${dirTableName} {
                         DirRef: '${dirRef}',
                         ParentDirRef: $pdr,
                         Url: $u,
                         LastUpdate: $lu,
                         Meta: $mo
                         }`,
-            {
-                pdr: 'N/A',
-                u: encodedURL,
-                lu: 999,
-                mo: {},
-            }
-        );
+      {
+        pdr: 'N/A',
+        u: encodedURL,
+        lu: 999,
+        mo: {},
+      }
+    );
 
-        // Define the schema for the File Vector Table
-        await db.query(`
+    // Define the schema for the File Vector Table
+    await db.query(`
             DEFINE TABLE ${vectorTableName} SCHEMAFULL;
             DEFINE FIELD DirRef ON TABLE ${vectorTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD FileRef ON TABLE ${vectorTableName} TYPE string ASSERT $value != NONE;
@@ -128,18 +146,18 @@ export async function setupFolderBotDB() {
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
 
-        // Define Index for File Vector DB
-        await db.query(`
+    // Define Index for File Vector DB
+    await db.query(`
             DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${vectorTableName}
             FIELDS Vector HNSW
             DIMENSION ${vectorEmbedSize}
             DIST COSINE
             TYPE F32;
         `);
-        console.log(`${vectorTableName} table and index created.`)
+    console.log(`${vectorTableName} table and index created.`);
 
-        // Define the schema for the Tool Vector Table
-        await db.query(`
+    // Define the schema for the Tool Vector Table
+    await db.query(`
             DEFINE TABLE ${toolTableName} SCHEMAFULL;
             DEFINE FIELD ToolName ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD ToolDescription ON TABLE ${toolTableName} TYPE string ASSERT $value != NONE;
@@ -148,9 +166,9 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Vector ON TABLE ${toolTableName} TYPE array<float>  ASSERT $value != NONE;
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
-        
-        // Define Index for File Vector DB
-        await db.query(`
+
+    // Define Index for File Vector DB
+    await db.query(`
             DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${toolTableName}
             FIELDS Vector HNSW
             DIMENSION ${vectorEmbedSize}
@@ -159,8 +177,8 @@ export async function setupFolderBotDB() {
         `);
     console.log(`${toolTableName} table and index created.`);
 
-        // Define the schema for the Guide Vector Table
-        await db.query(`
+    // Define the schema for the Guide Vector Table
+    await db.query(`
             DEFINE TABLE ${guideTableName} SCHEMAFULL;
             DEFINE FIELD GuideName ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
             DEFINE FIELD GuideDescription ON TABLE ${guideTableName} TYPE string ASSERT $value != NONE;
@@ -169,9 +187,9 @@ export async function setupFolderBotDB() {
             DEFINE FIELD Vector ON TABLE ${guideTableName} TYPE array<float>  ASSERT $value != NONE;
            
         `); //  DEFINE FIELD Vector.* ON TABLE ${vectorTableName} TYPE float;
-        
-        // Define Index for File Vector DB
-        await db.query(`
+
+    // Define Index for File Vector DB
+    await db.query(`
             DEFINE INDEX HNSW_VECTOR_INDEX ON TABLE ${guideTableName}
             FIELDS Vector HNSW
             DIMENSION ${vectorEmbedSize}
@@ -184,12 +202,13 @@ export async function setupFolderBotDB() {
     await db.query(`
             DEFINE USER ${dbUserRegular} ON DATABASE PASSWORD '${dbPassRegular}' ROLES OWNER DURATION FOR SESSION 1d, FOR TOKEN 1d;
         `);
-        console.log(`User ${dbUserRegular} created with OWNER permissions on database level.`);
-
-    } catch (error) {
-        //console.error('Error setting up SurrealDB:', error);
-        throw new Error(error);
-    } finally {
-        db.close(); 
-    }
+    console.log(
+      `User ${dbUserRegular} created with OWNER permissions on database level.`
+    );
+  } catch (error) {
+    //console.error('Error setting up SurrealDB:', error);
+    throw new Error(error);
+  } finally {
+    db.close();
+  }
 }

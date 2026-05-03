@@ -1,22 +1,25 @@
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { makeSchemaStrict } from '../core/utils.js';
+import OpenAI from 'openai';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
+
 import { Services } from '../../index.js';
 import { ModelTypes } from '../core/constants.js';
+import { makeSchemaStrict } from '../core/utils.js';
+
+const client = new OpenAI({
+  apiKey: process.env.OAI_KEY,
+});
 
 /**
  * Unified OpenAI call handler.
- * @param {string} systemMessage - Not needed for embeddings mode
- * @param {string | { text?: string, imageUrl?: string }} contentMessage  - not needed for embeddings mode
+ * @param {string} systemMessage - System/developer instruction
+ * @param {string | { text?: string, imageUrl?: string }} contentMessage - Prompt content
+ * @param {string} model - Model to use (e.g., 'gpt-4o', 'o1', 'text-embedding-3-large')
  * @param {object} options
- * @param {object} [options.structuredOutput]   - If provided, uses structured output
- * @param {string} [options.model]            - Override default model
- * @param {boolean} [options.embeddingsMode]  - If true, runs embeddings instead
- * @param {string[]} [options.inputDataVec]   - Required when embeddingsMode is true
- * @param {number} [options.dimensionSize]    - Embeddings dimension override
- * @param {ModelTypes} [options.capability]    - What capability is required for the call (for routing)
+ * @param {object} [options.structuredOutput] - A valid JSON Schema object for Native Structured Outputs
+ * @param {string[]} [options.inputDataVec] - Required when capability is embedding
+ * @param {number} [options.dimensionSize] - Embeddings dimension override
+ * @param {ModelTypes} [options.capability] - Capability required for routing
  */
 export async function callOpenAI(
   systemMessage,
@@ -24,85 +27,112 @@ export async function callOpenAI(
   model,
   options = {}
 ) {
-  Services.v2Core.Helpers.log(`Calling Open AI : ${model}`);
+  Services.v2Core.Helpers.log(`Calling OpenAI: ${model}`);
   const { capability } = options;
+
   if (!capability) {
-    return Services.v2Core.Helpers.Err('Error (callOpenAI) : Capability param is missing or null. Ensure options.capability has valid ModelTypes');
+    return Services.v2Core.Helpers.Err(
+      'Error (callOpenAI): Capability param is missing or null. Ensure options.capability has valid ModelTypes'
+    );
   }
 
-  // Match Capabilities
   switch (capability) {
     case ModelTypes.text:
-      return await generateText(systemMessage, contentMessage, model, options);
-
     case ModelTypes.code:
-      return await generateText(systemMessage, contentMessage, model, options);
-
-    case ModelTypes.image:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI image generation not implemented yet.');
-
     case ModelTypes.reasoning:
       return await generateText(systemMessage, contentMessage, model, options);
 
+    case ModelTypes.image:
+      return Services.v2Core.Helpers.Err(
+        'Error (callOpenAI): OpenAI image generation not implemented yet.'
+      );
+
     case ModelTypes.deepResearch:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI deep research not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOpenAI): OpenAI deep research not implemented yet.'
+      );
 
     case ModelTypes.websearch:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI websearch not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOpenAI): OpenAI websearch not implemented yet.'
+      );
 
     case ModelTypes.embedding:
       return await generateEmbeddings(model, options);
 
     case ModelTypes.textToSpeech:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI text to speech not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOpenAI): OpenAI text to speech not implemented yet.'
+      );
 
     case ModelTypes.speechToText:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : OpenAI speech to text not implemented yet.');
+      return Services.v2Core.Helpers.Err(
+        'Error (callOpenAI): OpenAI speech to text not implemented yet.'
+      );
 
     case ModelTypes.maps:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : Maps capability not available.');
-
     case ModelTypes.local:
-      return Services.v2Core.Helpers.Err('Error (callOpenAI) : Local capability not available.');
+      return Services.v2Core.Helpers.Err(
+        `Error (callOpenAI): ${capability} capability not available.`
+      );
 
     default:
-      return Services.v2Core.Helpers.Err(`Error (callOpenAI) "${capability}" not specifically handled.`);
+      return Services.v2Core.Helpers.Err(
+        `Error (callOpenAI): "${capability}" not specifically handled.`
+      );
   }
 }
 
 /**
  * Uses OpenAI to generate embeddings
  * @param {string} model - Model to use
- * @param {object} options - further options
+ * @param {object} options
  * @returns {Result}
  */
 export async function generateEmbeddings(model, options = {}) {
   Services.v2Core.Helpers.log('Calling OpenAI -> generateEmbeddings');
-  const apiKey = process.env.OAI_KEY;
+
   const { inputDataVec, dimensionSize } = options;
-  if (!Array.isArray(inputDataVec)) {
-    return Services.v2Core.Helpers.Err('Error: inputDataVec must be an array of strings.');
+
+  if (!model) {
+    return Services.v2Core.Helpers.Err(
+      'Error (callOpenAI -> generateEmbeddings): No model provided.'
+    );
   }
+
+  if (!Array.isArray(inputDataVec) || inputDataVec.length === 0) {
+    return Services.v2Core.Helpers.Err(
+      'Error (callOpenAI -> generateEmbeddings): inputDataVec must be a non-empty array of strings.'
+    );
+  }
+
   try {
-    const embeddings = new OpenAIEmbeddings({
-      model: model,
-      dimensions: dimensionSize,
-      openAIApiKey: apiKey,
-    });
-    const vectors = await embeddings.embedDocuments(inputDataVec);
+    const payload = {
+      model,
+      input: inputDataVec,
+    };
+
+    if (dimensionSize) {
+      payload.dimensions = dimensionSize;
+    }
+
+    const response = await client.embeddings.create(payload);
+    const vectors = response.data.map((item) => item.embedding);
+
     return Services.v2Core.Helpers.Ok(vectors);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callOpenAI -> generateEmbeddings): ${error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callOpenAI -> generateEmbeddings): ${error?.message || error}`
+    );
   }
 }
 
 /**
- * Uses OpenAI to generate text
- * @param {*} systemMessage - System message for the AI to follow.
- * @param {string | object} contentMessage - Prompt for the AI to follow
+ * Uses OpenAI Chat Completions endpoint to generate text, code, or structured JSON
+ * @param {string} systemMessage - Instruction text mapped to system/developer role
+ * @param {string | { text?: string, imageUrl?: string }} contentMessage - Prompt content
  * @param {string} model - Model to use
- * @param {object} options - further options, optional
- * @param {object}  [options.structuredOutput] - a JSON schema for structured outputs, optional.
+ * @param {object} options
  * @returns {Result}
  */
 export async function generateText(
@@ -112,48 +142,92 @@ export async function generateText(
   options = {}
 ) {
   Services.v2Core.Helpers.log('Calling OpenAI -> generateText');
-  const apiKey = process.env.OAI_KEY;
+
   const { structuredOutput } = options;
-  // Validation: Ensure a model is provided
+
   if (!model) {
-    return Services.v2Core.Helpers.Err('Error (callOpenAI -> generateText): No model provided in options.');
+    return Services.v2Core.Helpers.Err(
+      'Error (callOpenAI -> generateText): No model provided.'
+    );
   }
-  const hasImage = contentMessage?.imageUrl != null;
-  const modelChoice = model;
-  const chatModel = new ChatOpenAI({
-    model: modelChoice,
-    openAIApiKey: apiKey,
-  });
-
-  // Build message content - string for plain, array for multimodal
-  let humanContent;
-  if (hasImage) {
-    humanContent = [
-      ...(contentMessage.text
-        ? [{ type: 'text', text: contentMessage.text }]
-        : []),
-      { type: 'image_url', image_url: { url: contentMessage.imageUrl } },
-    ];
-  } else {
-    humanContent = contentMessage;
-  }
-
-  const messages = [
-    new SystemMessage(systemMessage),
-    new HumanMessage(hasImage ? { content: humanContent } : humanContent),
-  ];
 
   try {
-    if (structuredOutput) {
-      const schemaWithStrictness = makeSchemaStrict(structuredOutput);
-      const structured = chatModel.withStructuredOutput(schemaWithStrictness);
-      const res = await structured.invoke(messages);
-      return Services.v2Core.Helpers.Ok(res);
-    } else {
-      const res = await chatModel.invoke(messages);
-      return Services.v2Core.Helpers.Ok(res.content);
+    const messages = [];
+
+    // 1. Construct System Message
+    if (systemMessage) {
+      messages.push({ role: 'system', content: systemMessage.trim() });
     }
+
+    // 2. Construct User Message (Handling Multimodal Vision Input)
+    if (typeof contentMessage === 'string') {
+      messages.push({ role: 'user', content: contentMessage.trim() });
+    } else if (typeof contentMessage === 'object' && contentMessage !== null) {
+      const userContentArray = [];
+      if (contentMessage.text) {
+        userContentArray.push({
+          type: 'text',
+          text: contentMessage.text.trim(),
+        });
+      }
+      if (contentMessage.imageUrl) {
+        userContentArray.push({
+          type: 'image_url',
+          image_url: { url: contentMessage.imageUrl },
+        });
+      }
+
+      if (userContentArray.length > 0) {
+        messages.push({ role: 'user', content: userContentArray });
+      }
+    }
+
+    const payload = {
+      model,
+      messages,
+    };
+
+    // Implement Native Structured Outputs
+    if (structuredOutput) {
+      let strictSchema = makeSchemaStrict(structuredOutput);
+      payload.response_format = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'structured_response',
+          strict: false,
+          schema: strictSchema,
+        },
+      };
+    }
+
+    // 5. Execute API Call
+    const response = await client.chat.completions.create(payload);
+    const responseMessage = response.choices?.[0]?.message;
+
+    // Handle OpenAI safety filter refusals (common with structured outputs)
+    if (responseMessage?.refusal) {
+      return Services.v2Core.Helpers.Err(
+        `Error (callOpenAI -> generateText): Model refused the request. Reason: ${responseMessage.refusal}`
+      );
+    }
+
+    const text = responseMessage?.content?.trim() ?? '';
+
+    // 6. Process output
+    if (structuredOutput) {
+      try {
+        return Services.v2Core.Helpers.Ok(JSON.parse(text));
+      } catch {
+        return Services.v2Core.Helpers.Err(
+          `Error (callOpenAI -> generateText): Failed to parse JSON. Raw output: ${text}`
+        );
+      }
+    }
+
+    return Services.v2Core.Helpers.Ok(text);
   } catch (error) {
-    return Services.v2Core.Helpers.Err(`Error (callOpenAI -> generateText): ${error}`);
+    return Services.v2Core.Helpers.Err(
+      `Error (callOpenAI -> generateText): ${error?.message || error}`
+    );
   }
 }

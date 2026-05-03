@@ -1,4 +1,9 @@
-import { dbURL, dbURL_Fallback, namespaceName, databaseName } from '../core/constants.js';
+import {
+  dbURL,
+  dbURL_Fallback,
+  namespaceName,
+  databaseName,
+} from '../core/constants.js';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
 import { Services } from '../../index.js';
@@ -17,7 +22,7 @@ export let DATABASE_AGENT = null;
 async function createDbAgent(offline = false, options = {}) {
   const { Surreal } = await import('surrealdb');
   let db = new Surreal();
-  // use regular user not root! 
+  // use regular user not root!
   const dbUser = process.env.dbRegularUser;
   const dbPass = process.env.dbRegularPass;
   try {
@@ -25,15 +30,15 @@ async function createDbAgent(offline = false, options = {}) {
     let url = offline ? dbURL_Fallback : dbURL;
     await db.connect(url, {
       namespace: namespaceName,
-      database: databaseName
+      database: databaseName,
     });
     // Authenticate as 'Database' level user (non-root!)
     await db.signin({
-        namespace: namespaceName,
-        database: databaseName,
-        username: dbUser,
-        password: dbPass
-      });
+      namespace: namespaceName,
+      database: databaseName,
+      username: dbUser,
+      password: dbPass,
+    });
     await db.use({ namespace: namespaceName, database: databaseName });
     DATABASE_AGENT = db; // update global dbAgent var;
     return Services.v2Core.Helpers.Ok(db);
@@ -41,7 +46,7 @@ async function createDbAgent(offline = false, options = {}) {
     // Try fallback DB URL - once!
     const { optAttemptNumber } = options;
     if (optAttemptNumber == null || optAttemptNumber == undefined) {
-      let dbAgent2 = await createDbAgent(true, {optAttemptNumber: 1}); // attempt number stops never ending loop!
+      let dbAgent2 = await createDbAgent(true, { optAttemptNumber: 1 }); // attempt number stops never ending loop!
       if (dbAgent2.isOk()) {
         return dbAgent2;
       }
@@ -59,7 +64,7 @@ export async function closeDatabaseConnection() {
 
 export async function initDatabaseConnection(offline = false) {
   let db = await createDbAgent(offline);
-  return db; // returning Ok/ Err for app.js init 
+  return db; // returning Ok/ Err for app.js init
 }
 
 export async function getDbAgent() {
@@ -71,7 +76,9 @@ export async function getDbAgent() {
     if (outcome.isOk()) {
       return outcome;
     } else {
-      return Services.v2Core.Helpers.Err(`Error (getDbAgent -> createDbAgent) : ${outcome.value}`);
+      return Services.v2Core.Helpers.Err(
+        `Error (getDbAgent -> createDbAgent) : ${outcome.value}`
+      );
     }
   }
 }

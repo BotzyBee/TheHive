@@ -27,7 +27,7 @@
 //         return Err(`WebDriver initialisation failed: ${initResult.value}`);
 //     }
 //     let completedActions = [];
-    
+
 //     for(let i=0; i<maxLoops; i++){
 //         let contentResult = await getCurrentPageContent(socket, jobID);
 //         if(contentResult.isErr()){
@@ -44,11 +44,11 @@
 //         const strippedContent = cleanedResult.value;
 
 //         // SAVE FILE - TEMPORARY - REMOVE LATER
- 
+
 //         const targetDirectoryInContainer = path.join(containerVolumeRoot, 'UserFiles/WebAgent/');
 //         saveFile(targetDirectoryInContainer, JSON.stringify(strippedContent, null, 2), `WebAgent_${Date.now()}.txt`);
-        
-//         // TASK REVIEW AND ROUTING 
+
+//         // TASK REVIEW AND ROUTING
 //         // Decide whether to extract data from the current page and whether the task is complete based on the current page content and task progress.
 //         let call1 = await agent.generateText(
 //             PromptsAndSchemas.reviewTask.sys,
@@ -64,7 +64,7 @@
 //             break;
 //         }
 //         if(call1.value.action.includes("extract")){
-//             console.log("Task requires data extraction. Extract Prompt:", call1.value.extractPrompt);   
+//             console.log("Task requires data extraction. Extract Prompt:", call1.value.extractPrompt);
 //             let extractedDataResult = await smartExtractData(strippedContent, call1.value.extractPrompt, agent);
 //             if(extractedDataResult.isErr()){
 //                 console.error(extractedDataResult.value);
@@ -94,7 +94,7 @@
 //         rustActionState.result = null; // Reset before sending new actions
 //         socket.emit('take-action', { actions: actions, job_id: jobID });
 
-//         // Wait for the result of the actions from Rust WebDriver with a timeout 
+//         // Wait for the result of the actions from Rust WebDriver with a timeout
 //         let result = await new Promise((resolve) => {
 //             const checkResult = setInterval(() => {
 //                 if (rustActionState.result !== null) {
@@ -129,12 +129,12 @@
 // 1. **ID**: (e.g., '#email-input')
 // 2. **Unique Attributes**: (e.g., 'input[name="username"]', '[data-testid="login-button"]')
 // 3. **ARIA Labels/Placeholders**: (e.g., 'input[aria-label="Search"]')
-// 4. **Hierarchical paths**: Only use as a last resort (e.g., 'div > form > button'). 
+// 4. **Hierarchical paths**: Only use as a last resort (e.g., 'div > form > button').
 
 // Avoid dynamic classes (e.g., '.css-1abc23') that look auto-generated, as these change frequently.
 
 // ### Contextual Awareness
-// Before performing an action, verify the element's purpose. 
+// Before performing an action, verify the element's purpose.
 // - If multiple inputs exist, look for the associated <label> or placeholder text in the provided page state.
 // - If you are typing, ensure the selector targets an <input> or <textarea>, not their parent <div>.
 
@@ -147,9 +147,9 @@
 // - scroll_into_view(selector): Scrolls the webpage until the element specified by the CSS selector is in view.
 // - clear_field(selector): Clears the text from the input field specified by the CSS selector.
 
-// Important - only create actions that can be completed on the page you have been provided. Further actions will be conducted in the next round of the loop. If there is a cookie or GDPR banner - accept this first before any other actions. 
+// Important - only create actions that can be completed on the page you have been provided. Further actions will be conducted in the next round of the loop. If there is a cookie or GDPR banner - accept this first before any other actions.
 
-// If a field performs a live search as you type then you should input the full string and no other action. This will allow you to get the updated HTML for the available options. 
+// If a field performs a live search as you type then you should input the full string and no other action. This will allow you to get the updated HTML for the available options.
 
 // If are unsure about the actions to take output an empty array. It's best to carry out 2-3 small actions and then check the resulting page than to output a large list of actions that may be rendered impossible by the dynamic nature of the web.
 
@@ -236,9 +236,9 @@
 //                 "action": {
 //                     "type": "string",
 //                     "enum": [
-//                         "extract_text_continue", 
-//                         "extract_text_break", 
-//                         "no-action", 
+//                         "extract_text_continue",
+//                         "extract_text_break",
+//                         "no-action",
 //                         "task_complete"
 //                     ],
 //                     "description": "The routing decision based on the current page state and task progress."
